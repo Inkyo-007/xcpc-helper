@@ -22,7 +22,6 @@ class TemplateSummary(BaseModel):
     cat: str
     lang: str
     file: str
-    cplx: str | None
     tags: list[str]
     src: str | None
     page: str | None

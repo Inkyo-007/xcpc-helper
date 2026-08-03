@@ -30,7 +30,6 @@ CREATE TABLE templates (
     page TEXT,
     priority INTEGER NOT NULL,
     updated TEXT,
-    cplx TEXT,
     lang TEXT NOT NULL,
     file TEXT NOT NULL,
     body TEXT NOT NULL,
@@ -95,7 +94,6 @@ def _template_row(template: TemplateNode) -> tuple:
         primary.meta.page,
         priority,
         updated,
-        primary.meta.cplx,
         primary.lang,
         primary.file,
         primary.body,
@@ -116,7 +114,7 @@ def rebuild_index(db_path: Path, scan: ScanResult) -> None:
 
         for template in scan.templates:
             conn.execute(
-                "INSERT INTO templates VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO templates VALUES (" + ",".join("?" * 14) + ")",
                 _template_row(template),
             )
             for order, version in enumerate(template.versions):

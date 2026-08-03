@@ -19,7 +19,6 @@ export interface TemplateSummary {
   cat: string
   lang: LangId
   file: string
-  cplx: string | null
   tags: string[]
   src: string | null
   page: string | null
@@ -56,7 +55,6 @@ export interface NewTemplateInput {
   name: string
   cat: string
   lang: LangId
-  cplx: string
   priority?: number
   src: string
   desc: string

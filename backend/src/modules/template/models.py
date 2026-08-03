@@ -14,8 +14,7 @@ DEFAULT_PRIORITY = 2
 
 class ReadmeMeta(BaseModel):
     """README.md front matter 元数据。
-
-    除规范字段外允许额外字段（如 cplx），保证向前兼容。
+    允许规范之外的额外字段，保证向前兼容。
     """
 
     model_config = ConfigDict(extra="allow")
@@ -26,7 +25,6 @@ class ReadmeMeta(BaseModel):
     source: str | None = None
     page: str | None = None
     priority: int = DEFAULT_PRIORITY
-    cplx: str | None = None
 
 
 class VersionNode(BaseModel):

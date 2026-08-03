@@ -25,7 +25,6 @@ def test_rebuild_and_list(db_path: Path) -> None:
     assert sieve["title"] == "线性筛（欧拉筛）"
     assert sieve["priority"] == 5
     assert sieve["updated"] == "2026-07-29"
-    assert sieve["cplx"] == "O(n)"
 
 
 def test_versions_ordered(db_path: Path) -> None:

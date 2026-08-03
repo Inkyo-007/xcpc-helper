@@ -110,7 +110,6 @@ def _row_to_summary(row: sqlite3.Row) -> TemplateSummary:
         cat=row["category"],
         lang=row["lang"],
         file=row["file"],
-        cplx=row["cplx"],
         tags=json.loads(row["tags"]),
         src=row["source"],
         page=row["page"],

@@ -41,7 +41,6 @@ const descHtml = computed(() => (props.detail.desc ? marked.parse(props.detail.d
           <template v-else>{{ detail.src }}</template>
         </span>
         <span v-if="detail.updated" class="meta-item"><b>更新于</b>{{ detail.updated }}</span>
-        <span v-if="detail.cplx" class="meta-item"><b>复杂度</b>{{ detail.cplx }}</span>
         <span class="meta-item priority"><b>优先级</b>{{ detail.priority }}</span>
       </div>
     </div>

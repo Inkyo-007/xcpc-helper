@@ -29,7 +29,6 @@ const form = reactive({
   name: '',
   cat: 'ds' as string,
   lang: 'cpp' as LangId,
-  cplx: '',
   src: '',
   desc: '',
   code: '',
@@ -66,7 +65,6 @@ async function submit(): Promise<void> {
   emit('update:show', false)
   message.success('模板已加入本地模板库')
   form.name = ''
-  form.cplx = ''
   form.src = ''
   form.desc = ''
   form.code = ''
@@ -92,9 +90,6 @@ async function submit(): Promise<void> {
         </n-form-item>
         <n-form-item label="语言" path="lang">
           <n-select v-model:value="form.lang" :options="langOptions" />
-        </n-form-item>
-        <n-form-item label="复杂度" path="cplx">
-          <n-input v-model:value="form.cplx" placeholder="例如：O(log n)" />
         </n-form-item>
         <n-form-item label="来源" path="src">
           <n-input v-model:value="form.src" placeholder="题目或仓库来源" />
