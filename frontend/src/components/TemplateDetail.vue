@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { marked } from 'marked'
+import { Marked } from 'marked'
+import markedKatex from 'marked-katex-extension'
+import 'katex/dist/katex.min.css'
 import CodeView from '@/components/CodeView.vue'
 import type { LangId, TemplateDetail, TemplateVariant } from '@/types'
 
@@ -16,6 +18,9 @@ const lang = computed<LangId>(() => props.variant?.lang ?? props.detail.lang)
 
 // 说明框随版本切换显示对应版本的 README 正文；本地内容可信，直接渲染
 const desc = computed(() => props.variant?.body ?? props.detail.desc)
+// 支持 $...$ 行内公式与 $$...$$ 块级公式（KaTeX）
+const marked = new Marked()
+marked.use(markedKatex({ throwOnError: false }))
 const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
 </script>
 
