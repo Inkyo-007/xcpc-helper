@@ -1,22 +1,42 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { Check, ChevronRight, Inbox, Search } from 'lucide-vue-next'
-import { NButton, NEmpty, NInput, NSelect } from 'naive-ui'
-import { CATEGORIES, categoryHue } from '@/data/categories'
+import { computed, onMounted, ref, watch } from 'vue'
+import { Check, ChevronRight, Inbox, RefreshCw, Search } from 'lucide-vue-next'
+import { NAlert, NButton, NEmpty, NInput, NSelect, NSpin } from 'naive-ui'
 import TemplateDetail from '@/components/TemplateDetail.vue'
-import type { CategoryId, SortMode, Template, TemplateVariant } from '@/types'
+import { useTemplates } from '@/composables/useTemplates'
+import type {
+  SortMode,
+  TemplateDetail as TemplateDetailData,
+  TemplateSummary,
+  TemplateVariant,
+} from '@/types'
 
-const props = defineProps<{
-  templates: Template[]
-}>()
+const {
+  templates,
+  categories,
+  diagnostics,
+  listLoading,
+  listError,
+  initialized,
+  init,
+  loadList,
+  loadDetail,
+  reload,
+  categoryHue,
+  categoryName,
+} = useTemplates()
 
 const query = ref('')
-const category = ref<CategoryId>('all')
+const category = ref('all')
 const sortMode = ref<SortMode>('updated')
-const activeId = ref<number | null>(null)
+const activeId = ref<string | null>(null)
 const catMenuOpen = ref(false)
-const openVariants = ref<Record<number, boolean>>({})
-const activeVariant = ref<TemplateVariant | null>(null)
+const openVariants = ref<Record<string, boolean>>({})
+const activeVariantId = ref<string | null>(null)
+const reloading = ref(false)
+
+/** 已加载的详情缓存（驱动右侧详情与列表中的副标签展开） */
+const details = ref<Record<string, TemplateDetailData>>({})
 
 const sortOptions = [
   { label: '按更新时间', value: 'updated' },
@@ -24,84 +44,89 @@ const sortOptions = [
   { label: '按优先级', value: 'priority' },
 ]
 
-const filtered = computed(() => {
-  const keyword = query.value.trim().toLowerCase()
-  const matched = props.templates.filter((template) => {
-    const catMatched = category.value === 'all' || template.cat === category.value
-    const haystack = [template.name, template.desc, template.code, template.src, template.tags.join(' ')]
-      .join(' ')
-      .toLowerCase()
-    return catMatched && (!keyword || haystack.includes(keyword))
-  })
+let debounceTimer: number | undefined
+watch([query, category, sortMode], () => {
+  window.clearTimeout(debounceTimer)
+  debounceTimer = window.setTimeout(() => {
+    void loadList({ category: category.value, keyword: query.value, sort: sortMode.value })
+  }, 200)
+})
 
-  return [...matched].sort((a, b) => {
-    if (sortMode.value === 'name') return a.name.localeCompare(b.name, 'zh-Hans-CN')
-    if (sortMode.value === 'priority') {
-      const diff = (b.priority ?? 0) - (a.priority ?? 0)
-      if (diff !== 0) return diff
-      return a.updated < b.updated ? 1 : -1
-    }
-    return a.updated < b.updated ? 1 : -1
-  })
+onMounted(() => {
+  if (!initialized.value) {
+    void init()
+  } else {
+    void loadList({ category: category.value, keyword: query.value, sort: sortMode.value })
+  }
 })
 
 const activeTemplate = computed(
-  () => filtered.value.find((template) => template.id === activeId.value) ?? filtered.value[0] ?? null,
+  () =>
+    templates.value.find((template) => template.id === activeId.value) ??
+    templates.value[0] ??
+    null,
 )
 
-const activeDetailVariant = computed(() => {
-  const template = activeTemplate.value
-  if (!template?.variants?.length) return null
-  return (
-    template.variants.find((variant) => variant.id === activeVariant.value?.id) ??
-    template.variants[0]
-  )
+const activeDetail = computed(() => {
+  const id = activeTemplate.value?.id
+  return id ? (details.value[id] ?? null) : null
 })
 
-const activeVariantId = computed(() => activeDetailVariant.value?.id ?? null)
+const activeDetailVariant = computed(() => {
+  const detail = activeDetail.value
+  if (!detail?.variants.length) return null
+  return detail.variants.find((v) => v.id === activeVariantId.value) ?? detail.variants[0]
+})
 
 watch(
   activeTemplate,
   (template) => {
-    if (template?.variants?.length && openVariants.value[template.id] === undefined) {
+    if (!template) return
+    if (template.variant_count > 1 && openVariants.value[template.id] === undefined) {
       openVariants.value[template.id] = true
     }
+    void ensureDetail(template.id)
   },
   { immediate: true },
 )
 
-function selectTemplate(template: Template): void {
+async function ensureDetail(id: string): Promise<TemplateDetailData | null> {
+  if (details.value[id]) return details.value[id]
+  const detail = await loadDetail(id)
+  if (detail) details.value[id] = detail
+  return detail
+}
+
+async function selectTemplate(template: TemplateSummary): Promise<void> {
   activeId.value = template.id
   for (const id of Object.keys(openVariants.value)) {
-    if (Number(id) !== template.id) {
-      openVariants.value[Number(id)] = false
-    }
+    if (id !== template.id) openVariants.value[id] = false
   }
-  if (!template.variants?.length) {
-    activeVariant.value = null
+  void ensureDetail(template.id)
+  if (template.variant_count <= 1) {
+    activeVariantId.value = null
     return
   }
   const opening = !openVariants.value[template.id]
   openVariants.value[template.id] = opening
   if (opening) {
-    activeVariant.value = template.variants[0]
+    const detail = await ensureDetail(template.id)
+    activeVariantId.value = detail?.variants[0]?.id ?? null
   } else {
-    activeVariant.value = null
+    activeVariantId.value = null
   }
 }
 
-function selectVariant(template: Template, variant: TemplateVariant): void {
+function selectVariant(template: TemplateSummary, variant: TemplateVariant): void {
   activeId.value = template.id
   for (const id of Object.keys(openVariants.value)) {
-    if (Number(id) !== template.id) {
-      openVariants.value[Number(id)] = false
-    }
+    if (id !== template.id) openVariants.value[id] = false
   }
   openVariants.value[template.id] = true
-  activeVariant.value = variant
+  activeVariantId.value = variant.id
 }
 
-function selectCategory(id: CategoryId): void {
+function selectCategory(id: string): void {
   category.value = id
   catMenuOpen.value = false
 }
@@ -109,6 +134,19 @@ function selectCategory(id: CategoryId): void {
 function resetFilters(): void {
   query.value = ''
   category.value = 'all'
+}
+
+async function onReload(): Promise<void> {
+  reloading.value = true
+  try {
+    await reload()
+    for (const id of Object.keys(details.value)) {
+      delete details.value[id]
+    }
+    if (activeTemplate.value) await ensureDetail(activeTemplate.value.id)
+  } finally {
+    reloading.value = false
+  }
 }
 </script>
 
@@ -140,7 +178,7 @@ function resetFilters(): void {
                 aria-label="按分类筛选"
               >
                 <button
-                  v-for="cat in CATEGORIES"
+                  v-for="cat in categories"
                   :key="cat.id"
                   type="button"
                   class="cat-option"
@@ -158,89 +196,121 @@ function resetFilters(): void {
                     "
                   ></span>
                   <span>{{ cat.name }}</span>
+                  <span v-if="cat.count !== undefined" class="cat-count">{{ cat.count }}</span>
                   <Check v-if="category === cat.id" :size="14" class="cat-check" />
                 </button>
               </div>
             </Transition>
           </div>
           <div class="tpl-tools">
+            <n-button
+              size="small"
+              quaternary
+              :loading="reloading"
+              title="重建索引（content/ 变更后同步）"
+              @click="onReload"
+            >
+              <template #icon><RefreshCw :size="14" /></template>
+            </n-button>
             <n-select
               v-model:value="sortMode"
               class="sort-select"
               size="small"
               :options="sortOptions"
             />
-            <span class="toolbar-meta">{{ filtered.length }} / {{ templates.length }} 个模板</span>
+            <span class="toolbar-meta">{{ templates.length }} 个模板</span>
           </div>
         </div>
 
-        <div class="tpl-list">
-          <TransitionGroup name="tpl-list" tag="div" class="tpl-list-inner">
-            <div
-              v-for="(template, index) in filtered"
-              :key="template.id"
-              class="tpl-item"
-              :class="{ open: openVariants[template.id] }"
-            >
-              <button
-                type="button"
-                class="tpl-row"
-                :class="{ active: template.id === activeTemplate?.id }"
-                @click="selectTemplate(template)"
+        <n-alert
+          v-if="diagnostics.length"
+          type="warning"
+          class="diag-alert"
+          :bordered="false"
+        >
+          content/ 中存在 {{ diagnostics.length }} 处格式问题：{{ diagnostics[0].message }}（{{
+            diagnostics[0].path
+          }}）{{ diagnostics.length > 1 ? ' 等' : '' }}
+        </n-alert>
+
+        <n-alert v-if="listError" type="error" class="diag-alert" :bordered="false">
+          {{ listError }}
+          <n-button size="tiny" quaternary @click="onReload">重试</n-button>
+        </n-alert>
+
+        <n-spin :show="listLoading" class="tpl-list-spin">
+          <div class="tpl-list">
+            <TransitionGroup name="tpl-list" tag="div" class="tpl-list-inner">
+              <div
+                v-for="(template, index) in templates"
+                :key="template.id"
+                class="tpl-item"
+                :class="{ open: openVariants[template.id] }"
               >
-                <span class="tpl-idx">{{ String(index + 1).padStart(2, '0') }}</span>
-                <span class="tpl-cell">
-                  <span class="tpl-name">
-                    <span
-                      class="cat-dot"
-                      :style="{ background: `hsl(${categoryHue(template.cat)} 55% 50%)` }"
-                    ></span>
-                    <span class="tpl-name-text">{{ template.name }}</span>
-                  </span>
-                  <span class="tpl-meta">{{ template.updated }}</span>
-                </span>
-                <ChevronRight v-if="template.variants?.length" class="tpl-chev" :size="14" />
-              </button>
-              <div v-if="template.variants?.length" class="tpl-variants">
                 <button
-                  v-for="variant in template.variants"
-                  :key="variant.id"
                   type="button"
-                  class="tpl-variant"
-                  :class="{
-                    active:
-                      activeVariantId === variant.id && template.id === activeTemplate?.id,
-                  }"
-                  @click="selectVariant(template, variant)"
+                  class="tpl-row"
+                  :class="{ active: template.id === activeTemplate?.id }"
+                  @click="selectTemplate(template)"
                 >
-                  <span class="variant-name">{{ variant.name }}</span>
-                  <span class="variant-lang">{{ variant.lang }}</span>
+                  <span class="tpl-idx">{{ String(index + 1).padStart(2, '0') }}</span>
+                  <span class="tpl-cell">
+                    <span class="tpl-name">
+                      <span
+                        class="cat-dot"
+                        :style="{ background: `hsl(${categoryHue(template.cat)} 55% 50%)` }"
+                      ></span>
+                      <span class="tpl-name-text">{{ template.name }}</span>
+                    </span>
+                    <span class="tpl-meta">{{ template.updated ?? '' }}</span>
+                  </span>
+                  <ChevronRight v-if="template.variant_count > 1" class="tpl-chev" :size="14" />
                 </button>
+                <div
+                  v-if="template.variant_count > 1 && (details[template.id]?.variants.length ?? 0) > 0"
+                  class="tpl-variants"
+                >
+                  <button
+                    v-for="variant in details[template.id]?.variants ?? []"
+                    :key="variant.id"
+                    type="button"
+                    class="tpl-variant"
+                    :class="{
+                      active:
+                        activeVariantId === variant.id && template.id === activeTemplate?.id,
+                    }"
+                    @click="selectVariant(template, variant)"
+                  >
+                    <span class="variant-name">{{ variant.name }}</span>
+                    <span class="variant-lang">{{ variant.lang }}</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          </TransitionGroup>
-          <n-empty
-            v-if="!filtered.length"
-            class="empty-panel"
-            description="没有匹配的模板"
-          >
-            <template #extra>
-              <n-button size="small" quaternary @click="resetFilters">清除筛选</n-button>
-            </template>
-          </n-empty>
-        </div>
+            </TransitionGroup>
+            <n-empty
+              v-if="!templates.length && !listLoading"
+              class="empty-panel"
+              description="没有匹配的模板"
+            >
+              <template #extra>
+                <n-button size="small" quaternary @click="resetFilters">清除筛选</n-button>
+              </template>
+            </n-empty>
+          </div>
+        </n-spin>
       </div>
 
       <Transition name="detail-swap" mode="out-in">
         <TemplateDetail
-          v-if="activeTemplate"
-          :key="activeTemplate.id"
-          :template="activeTemplate"
+          v-if="activeDetail"
+          :key="activeDetail.id"
+          :detail="activeDetail"
           :variant="activeDetailVariant"
+          :category-name="categoryName(activeDetail.cat)"
         />
         <div v-else class="detail empty-detail">
           <Inbox :size="32" />
-          <span>未选择模板</span>
+          <span>{{ listLoading ? '加载中…' : '未选择模板' }}</span>
         </div>
       </Transition>
     </div>

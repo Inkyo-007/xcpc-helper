@@ -12,7 +12,7 @@ import {
   type FormInst,
   type SelectOption,
 } from 'naive-ui'
-import type { LangId, NewTemplateInput, TemplateCategory } from '@/types'
+import type { LangId, NewTemplateInput } from '@/types'
 
 defineProps<{
   show: boolean
@@ -27,7 +27,7 @@ const message = useMessage()
 const formRef = ref<FormInst | null>(null)
 const form = reactive({
   name: '',
-  cat: 'ds' as TemplateCategory,
+  cat: 'ds' as string,
   lang: 'cpp' as LangId,
   cplx: '',
   src: '',

@@ -14,12 +14,10 @@ import TopBar from '@/components/TopBar.vue'
 import PlaceholderPage from '@/components/pages/PlaceholderPage.vue'
 import TemplateLibrary from '@/components/pages/TemplateLibrary.vue'
 import { useTheme } from '@/composables/useTheme'
-import { useTemplates } from '@/composables/useTemplates'
 import { NAV_GROUPS, PLACEHOLDER_PAGES } from '@/data/nav'
 import type { PageId, PlaceholderMeta } from '@/types'
 
 const { mode, hue, isDark, modeIcon, modeLabel, cycleMode, setMode, setHue } = useTheme()
-const { templates } = useTemplates()
 
 const activePage = ref<PageId>('lib')
 const openGroups = ref<Record<string, boolean>>({ templates: true })
@@ -188,7 +186,6 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
             <Transition name="page-swap" mode="out-in">
               <TemplateLibrary
                 v-if="activePage === 'lib'"
-                :templates="templates"
               />
               <PlaceholderPage v-else :page="activePage" :meta="placeholderMeta" />
             </Transition>
