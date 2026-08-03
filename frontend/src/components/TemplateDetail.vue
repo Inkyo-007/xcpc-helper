@@ -29,7 +29,9 @@ const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
     <div class="detail-head">
       <div class="detail-title-row">
         <h2 class="detail-title">{{ detail.name }}</h2>
-        <span v-if="variant && detail.variant_count > 1" class="tag">{{ variant.name }}</span>
+        <span v-if="variant && detail.variant_count > 1" class="variant-badge">{{
+          variant.name
+        }}</span>
         <span v-for="tag in detail.tags" :key="tag" class="tag">{{ tag }}</span>
       </div>
       <div class="detail-meta">
@@ -57,6 +59,15 @@ const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
 </template>
 
 <style scoped>
+.variant-badge {
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .src-link {
   color: var(--accent);
   text-decoration: none;
