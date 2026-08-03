@@ -70,7 +70,7 @@
 
 ### 模板库管理
 
-所有模板内容均保存在 backend/src/template/content/ 目录下，具体路径样式如下：
+所有模板内容均保存在 backend/content/ 目录下（纳入 git 管理，附带少量示例模板），具体路径样式如下：
 
 ```plaintxt
 content/
@@ -132,3 +132,56 @@ priority: 5
 
 暂未开发，待补充
 
+## 5. 后端架构设计（2026-08-03 确认版）
+
+### 5.1 整体拓扑
+
+- `content/` 目录是模板库的**唯一事实来源**，选手按指定格式手动维护文件；
+- SQLite 不作为业务数据库，仅作为 FTS5 全文检索索引 + 元数据缓存，可随时删除重建；
+- 后端通过 watchdog 监听 `content/` 变更，**自动重建索引**，改动即时生效；
+- 前端通过 HTTP API 获取数据，开发环境经 Vite proxy 转发 `/api`，生产环境由 FastAPI 托管 `frontend/dist/`。
+
+### 5.2 目录结构
+
+```plaintxt
+backend/
+├── pyproject.toml              # uv 项目定义与依赖
+├── .python-version
+├── src/
+│   ├── main.py                 # FastAPI 入口：创建 app、挂路由、全局异常处理、CORS、托管前端 dist/
+│   ├── core/                   # 基础设施：config / database / exceptions / logging
+│   ├── common/                 # 跨功能通用件（通用响应模型、工具函数）
+│   ├── routers/
+│   │   └── template/           # 模板功能的路由（薄层：参数校验 + 调 service）
+│   ├── services/
+│   │   └── template/           # 模板功能的业务编排（查询组装、过滤排序）
+│   └── modules/
+│       └── template/           # 模板功能的领域核心：scanner / parser / repository / models / schemas / watcher
+├── content/                    # 模板库数据（纳入 git 管理）
+└── tests/
+    └── template/               # 测试按功能目录镜像组织
+```
+
+### 5.3 分层职责与约定
+
+- `routers/`：仅做参数校验与调用 service，不写业务逻辑；不宽泛 try/except，不记录堆栈，异常统一交由全局异常处理器；
+- `services/`：业务编排，组合 modules 能力对外提供用例级接口；
+- `modules/<功能>/`：领域核心。SQLModel 表模型放 `models.py`，API 请求/响应的 Pydantic 模型放 `schemas.py`（对外契约与内部存储分离）；若某 schema 未来被多功能共用，再提升至 `common/`；
+- 不单独设立 `api/` 目录：路由聚合由 `main.py` / `routers/__init__.py` 承担，API 公共件归属 `common/`；
+- **扩展方式**：新功能（打印册、做题统计、比赛信息等）在 `routers/`、`services/`、`modules/` 下各开一个平级功能目录（如 `print_book/`），在 `main.py` 一行挂载路由，模块间零耦合。
+
+### 5.4 本期 API 范围
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/templates` | 模板列表（摘要），支持 `category` / `tags` / `keyword`（FTS5 搜标题/标签/说明/代码）/ `sort`（updated/name/priority） |
+| GET | `/api/templates/{id}` | 模板详情，含全部副标签版本（代码 + README 正文） |
+| GET | `/api/categories` | 分类列表（从 content/ 一级目录自动派生） |
+| GET | `/api/diagnostics` | 扫描诊断（格式错误、缺失 title、page 无 source 等），供前端显示报错提示 |
+| POST | `/api/templates/reload` | 手动重建索引（watcher 之外的兜底） |
+
+### 5.5 本期范围说明
+
+- **不包含**"新建模板"可视化入口的开发（基础版本靠手动维护 content/ 文件），前端新建入口暂不接入；
+- 前端改造：新增 `src/api/` 请求层，`useTemplates` 改为异步拉取 API，移除静态假数据；分类由后端动态返回，前端 `CategoryId` 固定枚举放开为动态字符串；
+- 扫描器对三种目录形态统一处理：模板目录直接含代码文件（单版本）、含多个副标签子目录（多版本）、只含一个子目录（折叠为单版本）；路径含中文名时须正确识别，不乱码不报错。
