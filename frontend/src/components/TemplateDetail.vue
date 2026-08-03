@@ -14,8 +14,9 @@ const code = computed(() => props.variant?.code ?? props.detail.variants[0]?.cod
 const file = computed(() => props.variant?.file ?? props.detail.file)
 const lang = computed<LangId>(() => props.variant?.lang ?? props.detail.lang)
 
-// 说明框适配 Markdown（README 正文）；本地内容可信，直接渲染
-const descHtml = computed(() => (props.detail.desc ? marked.parse(props.detail.desc) : ''))
+// 说明框随版本切换显示对应版本的 README 正文；本地内容可信，直接渲染
+const desc = computed(() => props.variant?.body ?? props.detail.desc)
+const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
 </script>
 
 <template>
