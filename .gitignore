@@ -1,0 +1,23 @@
+# ---------- 通用 ----------
+.DS_Store
+Thumbs.db
+*.log
+
+# ---------- 前端 ----------
+frontend/node_modules/
+frontend/dist/
+
+# ---------- 后端（Python / uv） ----------
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# SQLite 检索索引缓存（可随时重建，不入库）
+backend/data/*.db
+backend/data/*.db-journal
+backend/data/*.db-wal
+backend/data/*.db-shm
