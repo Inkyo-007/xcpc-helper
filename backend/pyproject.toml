@@ -8,7 +8,6 @@ dependencies = [
     "uvicorn[standard]>=0.32",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
-    "sqlmodel>=0.0.22",
     "pyyaml>=6.0",
     "watchdog>=6.0",
 ]
