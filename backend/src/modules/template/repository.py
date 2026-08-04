@@ -15,7 +15,7 @@ import sqlite3
 from pathlib import Path
 
 from core.database import get_connection
-from modules.template.models import ScanResult, TemplateNode
+from modules.template.models import DEFAULT_PRIORITY, ScanResult, TemplateNode
 
 logger = logging.getLogger("xcpc.repository")
 
@@ -29,8 +29,8 @@ CREATE TABLE templates (
     page TEXT,
     priority INTEGER NOT NULL,
     updated TEXT,
-    lang TEXT NOT NULL,
-    file TEXT NOT NULL,
+    lang TEXT,
+    file TEXT,
     body TEXT NOT NULL,
     variant_count INTEGER NOT NULL,
     search_text TEXT NOT NULL
@@ -71,8 +71,11 @@ def _try_create_fts(conn: sqlite3.Connection) -> bool:
 
 
 def _template_row(template: TemplateNode) -> tuple:
-    """将扫描结果折算为模板级字段：主版本取第一个，标签取并集，日期取最新。"""
-    primary = template.versions[0]
+    """将扫描结果折算为模板级字段：主版本取第一个，标签取并集，日期取最新。
+
+    空模板（没有任何版本）时主版本相关字段为 None，优先级取默认值。
+    """
+    primary = template.versions[0] if template.versions else None
     tags: list[str] = []
     for version in template.versions:
         for tag in version.meta.tags:
@@ -80,7 +83,9 @@ def _template_row(template: TemplateNode) -> tuple:
                 tags.append(tag)
     dates = [v.meta.updated for v in template.versions if v.meta.updated is not None]
     updated = max(dates).isoformat() if dates else None
-    priority = max(v.meta.priority for v in template.versions)
+    priority = max(
+        (v.meta.priority for v in template.versions), default=DEFAULT_PRIORITY
+    )
 
     search_text = " ".join(
         [template.slug, " ".join(tags)]
@@ -92,13 +97,13 @@ def _template_row(template: TemplateNode) -> tuple:
         template.category,
         template.slug,
         json.dumps(tags, ensure_ascii=False),
-        primary.meta.source,
-        primary.meta.page,
+        primary.meta.source if primary else None,
+        primary.meta.page if primary else None,
         priority,
         updated,
-        primary.lang,
-        primary.file,
-        primary.body,
+        primary.lang if primary else None,
+        primary.file if primary else None,
+        primary.body if primary else "",
         len(template.versions),
         search_text,
     )

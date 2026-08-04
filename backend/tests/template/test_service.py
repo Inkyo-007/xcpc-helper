@@ -69,6 +69,16 @@ def test_detail_not_found(service: TemplateService) -> None:
         service.get_detail("not/exist")
 
 
+def test_detail_empty_template(service: TemplateService) -> None:
+    """空主标签：详情返回空版本列表，主版本字段为 None。"""
+    detail = service.get_detail("misc/empty-tpl")
+    assert detail.variant_count == 0
+    assert detail.variants == []
+    assert detail.lang is None
+    assert detail.file is None
+    assert detail.priority == 2
+
+
 def test_categories(service: TemplateService) -> None:
     cats = {c.id: c.count for c in service.list_categories()}
     assert cats["字符串"] == 1

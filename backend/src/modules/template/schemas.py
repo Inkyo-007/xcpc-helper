@@ -20,8 +20,8 @@ class TemplateSummary(BaseModel):
     id: str
     name: str
     cat: str
-    lang: str
-    file: str
+    lang: str | None  # 空模板（无版本）时为 None
+    file: str | None  # 空模板（无版本）时为 None
     tags: list[str]
     src: str | None
     page: str | None

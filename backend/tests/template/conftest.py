@@ -63,4 +63,7 @@ def content_dir(tmp_path: Path) -> Path:
     _write(root / "misc" / "bare" / "README.md", "---\ntags: [a]\n---\n")
     _write(root / "misc" / "broken-no-code" / "README.md", "---\n---\n")
 
+    # 空主标签：完全空的模板目录（前端可视化新建的占位模板）
+    (root / "misc" / "empty-tpl").mkdir(parents=True)
+
     return root

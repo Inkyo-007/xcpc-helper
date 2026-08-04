@@ -8,8 +8,24 @@ from modules.template.scanner import scan_content
 def test_scan_all_forms(content_dir: Path) -> None:
     result = scan_content(content_dir)
     ids = {t.id for t in result.templates}
-    # broken-no-code 无代码文件被跳过；bare 为极简但合法的元数据样本
-    assert ids == {"math/sieve", "ds/dsu", "graph/tarjan", "字符串/哈希", "misc/bare"}
+    # broken-no-code 有内容但无版本被跳过；bare 为极简但合法的元数据样本；
+    # empty-tpl 是完全空的目录，作为空主标签正常载入
+    assert ids == {
+        "math/sieve",
+        "ds/dsu",
+        "graph/tarjan",
+        "字符串/哈希",
+        "misc/bare",
+        "misc/empty-tpl",
+    }
+
+
+def test_empty_template_dir(content_dir: Path) -> None:
+    """完全空的模板目录：载入为无版本的空主标签，不产生诊断。"""
+    result = scan_content(content_dir)
+    empty = next(t for t in result.templates if t.id == "misc/empty-tpl")
+    assert empty.versions == []
+    assert not any(d.path == "misc/empty-tpl" for d in result.diagnostics)
 
 
 def test_single_version_template(content_dir: Path) -> None:
