@@ -2,6 +2,8 @@
 
 import { ref } from 'vue'
 import {
+  createTemplate as apiCreateTemplate,
+  deleteTemplate as apiDeleteTemplate,
   fetchCategories,
   fetchDiagnostics,
   fetchTemplateDetail,
@@ -9,7 +11,13 @@ import {
   reloadTemplates,
   type TemplateQuery,
 } from '@/api/template'
-import type { Category, DiagnosticItem, TemplateDetail, TemplateSummary } from '@/types'
+import type {
+  Category,
+  DiagnosticItem,
+  TemplateCreateInput,
+  TemplateDetail,
+  TemplateSummary,
+} from '@/types'
 
 /** 分类色板：按后端返回顺序循环取色，保持视觉区分度 */
 const HUE_PALETTE = [160, 25, 280, 200, 340, 80, 120, 300, 0, 220]
@@ -86,6 +94,25 @@ async function reload(): Promise<void> {
   await init()
 }
 
+/** 写操作成功后的本地刷新：清详情缓存，重新拉取列表/分类/诊断 */
+async function refresh(): Promise<void> {
+  detailCache.clear()
+  await Promise.all([loadList(), loadCategories(), loadDiagnostics()])
+}
+
+/** 新建空主标签，返回新建模板的 id（用于选中） */
+async function createTemplate(input: TemplateCreateInput): Promise<string> {
+  const detail = await apiCreateTemplate(input)
+  await refresh()
+  return detail.id
+}
+
+/** 删除空主标签（后端拒绝非空模板） */
+async function deleteTemplate(id: string): Promise<void> {
+  await apiDeleteTemplate(id)
+  await refresh()
+}
+
 function categoryHue(id: string): number {
   return categories.value.find((c) => c.id === id)?.hue ?? 160
 }
@@ -106,6 +133,9 @@ export function useTemplates() {
     loadList,
     loadDetail,
     reload,
+    refresh,
+    createTemplate,
+    deleteTemplate,
     categoryHue,
     categoryName,
   }

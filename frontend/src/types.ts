@@ -17,8 +17,10 @@ export interface TemplateSummary {
   id: string
   name: string
   cat: string
-  lang: LangId
-  file: string
+  /** 主版本语言；空模板（无版本）时为 null */
+  lang: LangId | null
+  /** 主版本文件名；空模板（无版本）时为 null */
+  file: string | null
   tags: string[]
   src: string | null
   page: string | null
@@ -55,15 +57,10 @@ export interface DiagnosticItem {
   message: string
 }
 
-/** 新建模板输入（可视化 CRUD 预留，本期未接入） */
-export interface NewTemplateInput {
+/** 新建空主标签输入：与后端 TemplateCreate 对应 */
+export interface TemplateCreateInput {
+  category: string
   name: string
-  cat: string
-  lang: LangId
-  priority?: number
-  src: string
-  desc: string
-  code: string
 }
 
 export type PageId = 'lib' | 'books' | 'io' | 'stress' | 'gen' | 'settings'
