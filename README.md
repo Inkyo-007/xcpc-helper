@@ -122,7 +122,6 @@ npm run dev
 
 ```markdown
 ---
-title: '并查集'
 updated: 2026-07-05
 tags: ['连通性']
 source: '洛谷 P3367'        # 可选，与 page 配合展示
