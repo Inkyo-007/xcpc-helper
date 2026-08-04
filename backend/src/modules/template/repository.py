@@ -24,7 +24,6 @@ CREATE TABLE templates (
     id TEXT PRIMARY KEY,
     category TEXT NOT NULL,
     slug TEXT NOT NULL,
-    title TEXT NOT NULL,
     tags TEXT NOT NULL,
     source TEXT,
     page TEXT,
@@ -48,7 +47,12 @@ CREATE TABLE versions (
     file TEXT NOT NULL,
     code TEXT NOT NULL,
     body TEXT NOT NULL,
-    ord INTEGER NOT NULL
+    ord INTEGER NOT NULL,
+    tags TEXT NOT NULL,
+    source TEXT,
+    page TEXT,
+    priority INTEGER NOT NULL,
+    updated TEXT
 )
 """
 
@@ -58,7 +62,7 @@ def _try_create_fts(conn: sqlite3.Connection) -> bool:
     try:
         conn.execute(
             "CREATE VIRTUAL TABLE templates_fts USING fts5("
-            "id UNINDEXED, title, tags, body, code, tokenize='trigram')"
+            "id UNINDEXED, name, tags, body, code, tokenize='trigram')"
         )
         return True
     except sqlite3.OperationalError:
@@ -77,10 +81,9 @@ def _template_row(template: TemplateNode) -> tuple:
     dates = [v.meta.updated for v in template.versions if v.meta.updated is not None]
     updated = max(dates).isoformat() if dates else None
     priority = max(v.meta.priority for v in template.versions)
-    title = primary.meta.title or template.slug
 
     search_text = " ".join(
-        [title, " ".join(tags)]
+        [template.slug, " ".join(tags)]
         + [v.body for v in template.versions]
         + [v.code for v in template.versions]
     )
@@ -88,7 +91,6 @@ def _template_row(template: TemplateNode) -> tuple:
         template.id,
         template.category,
         template.slug,
-        title,
         json.dumps(tags, ensure_ascii=False),
         primary.meta.source,
         primary.meta.page,
@@ -114,7 +116,7 @@ def rebuild_index(db_path: Path, scan: ScanResult) -> None:
 
         for template in scan.templates:
             conn.execute(
-                "INSERT INTO templates VALUES (" + ",".join("?" * 14) + ")",
+                "INSERT INTO templates VALUES (" + ",".join("?" * 13) + ")",
                 _template_row(template),
             )
             for order, version in enumerate(template.versions):
@@ -122,7 +124,7 @@ def rebuild_index(db_path: Path, scan: ScanResult) -> None:
                     f"{template.id}/{version.slug}" if version.slug else template.id
                 )
                 conn.execute(
-                    "INSERT INTO versions VALUES (?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO versions VALUES (" + ",".join("?" * 14) + ")",
                     (
                         version_id,
                         template.id,
@@ -133,17 +135,21 @@ def rebuild_index(db_path: Path, scan: ScanResult) -> None:
                         version.code,
                         version.body,
                         order,
+                        json.dumps(version.meta.tags, ensure_ascii=False),
+                        version.meta.source,
+                        version.meta.page,
+                        version.meta.priority,
+                        version.meta.updated.isoformat() if version.meta.updated else None,
                     ),
                 )
-            title = template.versions[0].meta.title or template.slug
             all_tags = " ".join(
                 dict.fromkeys(tag for v in template.versions for tag in v.meta.tags)
             )
             conn.execute(
-                "INSERT INTO templates_fts (id, title, tags, body, code) VALUES (?,?,?,?,?)",
+                "INSERT INTO templates_fts (id, name, tags, body, code) VALUES (?,?,?,?,?)",
                 (
                     template.id,
-                    title,
+                    template.slug,
                     all_tags,
                     "\n".join(v.body for v in template.versions),
                     "\n".join(v.code for v in template.versions),

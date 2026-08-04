@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 README_FULL = """---
-title: '线性筛（欧拉筛）'
 updated: 2026-07-29
 tags: ['素数', '积性函数']
 source: '洛谷 P3383'
@@ -13,7 +12,7 @@ page: 'https://www.luogu.com.cn/problem/P3383'
 priority: 5
 ---
 
-每个合数只被最小质因子筛掉一次。
+线性筛：每个合数只被最小质因子筛掉一次。
 """
 
 CPP_CODE = "#include <bits/stdc++.h>\nusing namespace std;\n"
@@ -37,31 +36,31 @@ def content_dir(tmp_path: Path) -> Path:
     _write(root / "ds" / "dsu" / "path-compression" / "dsu.cpp", CPP_CODE)
     _write(
         root / "ds" / "dsu" / "path-compression" / "README.md",
-        "---\ntitle: '并查集'\npriority: 4\n---\n\n路径压缩版。\n",
+        "---\npriority: 4\nupdated: 2026-07-01\n---\n\n并查集路径压缩版。\n",
     )
     _write(root / "ds" / "dsu" / "with-weight" / "dsu_weight.cpp", CPP_CODE)
     _write(
         root / "ds" / "dsu" / "with-weight" / "README.md",
-        "---\ntitle: '并查集'\ntags: '连通性'\n---\n\n带权版。\n",
+        "---\npriority: 3\nupdated: 2026-07-10\ntags: '连通性'\n---\n\n并查集带权版。\n",
     )
 
     # 形态三：仅一个副标签子目录（折叠为单版本）
     _write(root / "graph" / "tarjan" / "v1" / "tarjan.cpp", CPP_CODE)
     _write(
         root / "graph" / "tarjan" / "v1" / "README.md",
-        "---\ntitle: 'Tarjan SCC'\nupdated: 'bad-date'\n---\n",
+        "---\nupdated: 'bad-date'\n---\n",
     )
 
     # 中文路径
     _write(root / "字符串" / "哈希" / "str_hash.cpp", CPP_CODE)
     _write(
         root / "字符串" / "哈希" / "README.md",
-        "---\ntitle: '字符串哈希（双模）'\npage: 'https://example.com'\n---\n\n双模不撞。\n",
+        "---\npage: 'https://example.com'\n---\n\n双模不撞。\n",
     )
 
-    # 异常样本：缺少 title / 缺代码文件
-    _write(root / "misc" / "broken-no-title" / "x.cpp", CPP_CODE)
-    _write(root / "misc" / "broken-no-title" / "README.md", "---\ntags: [a]\n---\n")
-    _write(root / "misc" / "broken-no-code" / "README.md", "---\ntitle: '孤儿'\n---\n")
+    # 异常样本：极简元数据（合法）/ 缺代码文件
+    _write(root / "misc" / "bare" / "x.cpp", CPP_CODE)
+    _write(root / "misc" / "bare" / "README.md", "---\ntags: [a]\n---\n")
+    _write(root / "misc" / "broken-no-code" / "README.md", "---\n---\n")
 
     return root

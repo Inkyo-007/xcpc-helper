@@ -14,12 +14,11 @@ DEFAULT_PRIORITY = 2
 
 class ReadmeMeta(BaseModel):
     """README.md front matter 元数据。
-    允许规范之外的额外字段，保证向前兼容。
+    显示名取自目录名，无需 title 字段；允许规范之外的额外字段，保证向前兼容。
     """
 
     model_config = ConfigDict(extra="allow")
 
-    title: str | None = None
     updated: datetime.date | None = None
     tags: list[str] = []
     source: str | None = None

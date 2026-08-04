@@ -1,5 +1,6 @@
 """模板服务的单元测试（含 FastAPI 路由冒烟测试）。"""
 
+import datetime
 from pathlib import Path
 
 import pytest
@@ -29,7 +30,7 @@ def test_list_sorted_by_priority(service: TemplateService) -> None:
     items = service.list_templates()
     priorities = [t.priority for t in items]
     assert priorities == sorted(priorities, reverse=True)
-    assert items[0].name == "线性筛（欧拉筛）"
+    assert items[0].name == "sieve"
 
 
 def test_list_filter_by_category_and_keyword(service: TemplateService) -> None:
@@ -48,6 +49,17 @@ def test_detail_with_variants(service: TemplateService) -> None:
     assert detail.variant_count == 2
     assert [v.id for v in detail.variants] == ["ds/dsu/path-compression", "ds/dsu/with-weight"]
     assert "带权版" in detail.variants[1].body
+
+
+def test_detail_variants_carry_meta(service: TemplateService) -> None:
+    """详情接口的版本携带各自元信息，前端切换版本时随动展示。"""
+    detail = service.get_detail("ds/dsu")
+    first, second = detail.variants
+    assert first.priority == 4
+    assert first.updated == datetime.date(2026, 7, 1)
+    assert second.priority == 3
+    assert second.updated == datetime.date(2026, 7, 10)
+    assert second.tags == ["连通性"]
 
 
 def test_detail_not_found(service: TemplateService) -> None:

@@ -83,6 +83,13 @@ class TemplateService:
                 file=v["file"],
                 code=v["code"],
                 body=v["body"],
+                tags=json.loads(v["tags"]),
+                src=v["source"],
+                page=v["page"],
+                updated=(
+                    datetime.date.fromisoformat(v["updated"]) if v["updated"] else None
+                ),
+                priority=v["priority"],
             )
             for v in repository.get_versions(db, template_id)
         ]
@@ -106,7 +113,7 @@ def _row_to_summary(row: sqlite3.Row) -> TemplateSummary:
     )
     return TemplateSummary(
         id=row["id"],
-        name=row["title"],
+        name=row["slug"],
         cat=row["category"],
         lang=row["lang"],
         file=row["file"],

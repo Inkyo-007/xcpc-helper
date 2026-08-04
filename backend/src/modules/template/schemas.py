@@ -39,6 +39,11 @@ class TemplateVersion(BaseModel):
     file: str
     code: str
     body: str
+    tags: list[str]
+    src: str | None
+    page: str | None
+    updated: datetime.date | None
+    priority: int
 
 
 class TemplateDetail(TemplateSummary):

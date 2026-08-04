@@ -54,10 +54,8 @@ def _coerce_meta(data: dict[str, Any], path: str, diags: list[Diagnostic]) -> Re
         diags.append(
             Diagnostic(level="warning", path=path, message=f"front matter 字段异常，已按默认值兜底: {exc.errors()[0]['msg']}")
         )
-        meta = ReadmeMeta(title=data.get("title") if isinstance(data.get("title"), str) else None)
+        meta = ReadmeMeta()
 
-    if not meta.title:
-        diags.append(Diagnostic(level="error", path=path, message="front matter 缺少必填项 title"))
     if meta.page and not meta.source:
         diags.append(
             Diagnostic(level="warning", path=path, message="填写了 page 但未填写 source，链接将不会显示")

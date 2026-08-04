@@ -8,8 +8,8 @@ from modules.template.scanner import scan_content
 def test_scan_all_forms(content_dir: Path) -> None:
     result = scan_content(content_dir)
     ids = {t.id for t in result.templates}
-    # broken-no-code 无代码文件被跳过；broken-no-title 保留但产生诊断
-    assert ids == {"math/sieve", "ds/dsu", "graph/tarjan", "字符串/哈希", "misc/broken-no-title"}
+    # broken-no-code 无代码文件被跳过；bare 为极简但合法的元数据样本
+    assert ids == {"math/sieve", "ds/dsu", "graph/tarjan", "字符串/哈希", "misc/bare"}
 
 
 def test_single_version_template(content_dir: Path) -> None:
@@ -18,8 +18,8 @@ def test_single_version_template(content_dir: Path) -> None:
     assert len(sieve.versions) == 1
     version = sieve.versions[0]
     assert version.slug == ""  # 单版本无副标签
+    assert version.name == "sieve"  # 显示名取自目录名
     assert version.lang == "cpp"
-    assert version.meta.title == "线性筛（欧拉筛）"
     assert version.meta.priority == 5
     assert "最小质因子" in version.body
 
@@ -41,7 +41,7 @@ def test_chinese_paths(content_dir: Path) -> None:
     result = scan_content(content_dir)
     hashed = next(t for t in result.templates if t.id == "字符串/哈希")
     assert hashed.category == "字符串"
-    assert hashed.versions[0].meta.title == "字符串哈希（双模）"
+    assert hashed.versions[0].name == "哈希"
     # page 填写但 source 缺失 → 产生告警
     assert any("source" in d.message for d in result.diagnostics)
 
@@ -49,7 +49,6 @@ def test_chinese_paths(content_dir: Path) -> None:
 def test_diagnostics_collected(content_dir: Path) -> None:
     result = scan_content(content_dir)
     messages = [d.message for d in result.diagnostics]
-    assert any("title" in m for m in messages)  # broken-no-title 缺 title
     assert any("未找到任何可用版本" in m for m in messages)  # broken-no-code
     assert any("updated" in m for m in messages)  # tarjan 的坏日期
 
