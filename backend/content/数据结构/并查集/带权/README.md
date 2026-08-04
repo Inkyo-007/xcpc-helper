@@ -1,5 +1,4 @@
 ---
-title: '并查集'
 updated: 2026-07-05
 tags: ['连通性']
 priority: 4

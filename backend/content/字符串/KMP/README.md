@@ -1,5 +1,4 @@
 ---
-title: 'KMP'
 updated: 2026-04-18
 tags: ['模式匹配']
 source: '洛谷 P3375'

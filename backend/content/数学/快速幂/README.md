@@ -1,5 +1,4 @@
 ---
-title: '快速幂'
 updated: 2026-03-08
 tags: ['取模']
 source: '洛谷 P1226'

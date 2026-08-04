@@ -1,5 +1,4 @@
 ---
-title: '并查集'
 updated: 2026-06-30
 tags: ['连通性']
 source: '洛谷 P3367'
