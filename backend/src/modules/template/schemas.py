@@ -64,3 +64,50 @@ class DiagnosticsResponse(BaseModel):
 class ReloadResponse(BaseModel):
     templates: int
     diagnostics: int
+
+
+# ===== 可视化增删改的输入模型 =====
+
+# 寻址"顶层单版本"（代码直接在模板目录下）时 URL 中使用的保留版本名
+ROOT_VERSION_TOKEN = "~"
+
+
+class TemplateCreate(BaseModel):
+    """新建空主标签：仅需分类与模板名。"""
+
+    category: str
+    name: str
+
+
+class TemplateRename(BaseModel):
+    """主标签重命名/换分类。两个字段至少填一个。"""
+
+    new_category: str | None = None
+    new_name: str | None = None
+
+
+class VersionMetaInput(BaseModel):
+    """版本元数据输入：与 README front matter 一一对应。"""
+
+    updated: datetime.date | None = None
+    tags: list[str] = []
+    source: str | None = None
+    page: str | None = None
+    priority: int = 2
+
+
+class VersionUpsert(BaseModel):
+    """新建/更新版本的请求体。
+
+    name：副标签名。新建时必填（一律建为副标签子目录）；
+    更新时可选，用于副标签改名（顶层单版本不支持改名）。
+    file：代码文件名，可选，默认为 code.<ext>。
+    ext：代码扩展名（不含点，大小写不敏感），如 cpp / c / py / java。
+    """
+
+    name: str | None = None
+    file: str | None = None
+    ext: str
+    code: str
+    meta: VersionMetaInput = VersionMetaInput()
+    body: str = ""

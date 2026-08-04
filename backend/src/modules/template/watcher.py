@@ -21,6 +21,10 @@ class _DebouncedHandler(FileSystemEventHandler):
     def on_any_event(self, event: FileSystemEvent) -> None:
         if event.is_directory:
             return
+        # 写操作（writer.py）的暂存文件以 .tmp- 开头，它们随后会被原子替换/移动，
+        # 属于中间态，不触发重建（最终落盘的那次 rename 会产生正常事件）
+        if any(part.startswith(".tmp-") for part in Path(event.src_path).parts):
+            return
         with self._lock:
             if self._timer is not None:
                 self._timer.cancel()

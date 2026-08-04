@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("xcpc")
@@ -35,6 +36,13 @@ class BadRequestError(AppError):
     code = "bad_request"
 
 
+class ConflictError(AppError):
+    """资源冲突（409）。例如新建的目录名已存在、删除非空模板。"""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "conflict"
+
+
 def _error_body(code: str, message: str, detail: Any = None) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "detail": detail}}
 
@@ -55,6 +63,27 @@ async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def request_validation_handler(
+    _: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """处理 FastAPI 请求校验失败（请求体/查询参数不符合模型定义）。
+
+    不交给兜底 500，而是结构化为 400，让前端能拿到可读的错误信息。
+    """
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    loc = ".".join(str(part) for part in first.get("loc", []))
+    logger.warning("请求校验失败 [%s] %s", loc, first.get("msg"))
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=_error_body(
+            "bad_request",
+            f"请求参数校验失败: {loc} {first.get('msg', '')}".strip(),
+        ),
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)
