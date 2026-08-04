@@ -792,6 +792,21 @@ button {
   white-space: nowrap;
 }
 
+.tpl-meta-sep {
+  margin: 0 5px;
+  opacity: 0.5;
+}
+
+.tpl-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.tpl-priority svg {
+  flex-shrink: 0;
+}
+
 .tpl-variants {
   max-height: 0;
   overflow: hidden;

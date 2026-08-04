@@ -35,6 +35,11 @@ export interface TemplateVariant {
   file: string
   code: string
   body: string
+  tags: string[]
+  src: string | null
+  page: string | null
+  updated: string | null
+  priority: number
 }
 
 /** 详情：与后端 TemplateDetail 对应 */

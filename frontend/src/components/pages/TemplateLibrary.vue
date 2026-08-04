@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Check, ChevronRight, Inbox, RefreshCw, Search } from 'lucide-vue-next'
+import { Check, ChevronRight, Flag, Inbox, RefreshCw, Search } from 'lucide-vue-next'
 import { NAlert, NButton, NEmpty, NInput, NSelect, NSpin } from 'naive-ui'
 import TemplateDetail from '@/components/TemplateDetail.vue'
 import { useTemplates } from '@/composables/useTemplates'
@@ -262,7 +262,14 @@ async function onReload(): Promise<void> {
                       ></span>
                       <span class="tpl-name-text">{{ template.name }}</span>
                     </span>
-                    <span class="tpl-meta">{{ template.updated ?? '' }}</span>
+                    <span class="tpl-meta">
+                      <template v-if="template.updated"
+                        >{{ template.updated }}<span class="tpl-meta-sep">·</span></template
+                      >
+                      <span class="tpl-priority" :title="`优先级 ${template.priority}（多版本取最大值）`"
+                        ><Flag :size="10" />{{ template.priority }}</span
+                      >
+                    </span>
                   </span>
                   <ChevronRight v-if="template.variant_count > 1" class="tpl-chev" :size="14" />
                 </button>

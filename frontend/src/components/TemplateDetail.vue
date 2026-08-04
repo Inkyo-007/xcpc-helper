@@ -16,6 +16,18 @@ const code = computed(() => props.variant?.code ?? props.detail.variants[0]?.cod
 const file = computed(() => props.variant?.file ?? props.detail.file)
 const lang = computed<LangId>(() => props.variant?.lang ?? props.detail.lang)
 
+// 元信息（tags/来源/更新于/优先级）随版本切换：选中版本时用该版本的值，
+// 即使为空也不回退模板级聚合值；未选中版本（无 variants 数据）时回退模板级
+const shownTags = computed(() => (props.variant ? props.variant.tags : props.detail.tags))
+const shownSrc = computed(() => (props.variant ? props.variant.src : props.detail.src))
+const shownPage = computed(() => (props.variant ? props.variant.page : props.detail.page))
+const shownUpdated = computed(() =>
+  props.variant ? props.variant.updated : props.detail.updated,
+)
+const shownPriority = computed(() =>
+  props.variant ? props.variant.priority : props.detail.priority,
+)
+
 // 说明框随版本切换显示对应版本的 README 正文；本地内容可信，直接渲染
 const desc = computed(() => props.variant?.body ?? props.detail.desc)
 // 支持 $...$ 行内公式与 $$...$$ 块级公式（KaTeX）
@@ -32,24 +44,24 @@ const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
         <span v-if="variant && detail.variant_count > 1" class="variant-badge">{{
           variant.name
         }}</span>
-        <span v-for="tag in detail.tags" :key="tag" class="tag">{{ tag }}</span>
+        <span v-for="tag in shownTags" :key="tag" class="tag">{{ tag }}</span>
       </div>
       <div class="detail-meta">
         <span class="meta-item"><b>分类</b>{{ categoryName }}</span>
-        <span v-if="detail.src" class="meta-item">
+        <span v-if="shownSrc" class="meta-item">
           <b>来源</b>
           <a
-            v-if="detail.page"
-            :href="detail.page"
+            v-if="shownPage"
+            :href="shownPage"
             target="_blank"
             rel="noopener noreferrer"
             class="src-link"
-            >{{ detail.src }}</a
+            >{{ shownSrc }}</a
           >
-          <template v-else>{{ detail.src }}</template>
+          <template v-else>{{ shownSrc }}</template>
         </span>
-        <span v-if="detail.updated" class="meta-item"><b>更新于</b>{{ detail.updated }}</span>
-        <span class="meta-item priority"><b>优先级</b>{{ detail.priority }}</span>
+        <span v-if="shownUpdated" class="meta-item"><b>更新于</b>{{ shownUpdated }}</span>
+        <span class="meta-item priority"><b>优先级</b>{{ shownPriority }}</span>
       </div>
     </div>
     <CodeView :code="code" :file="file" :lang="lang" />
