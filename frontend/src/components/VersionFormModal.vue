@@ -100,11 +100,8 @@ function toIsoDate(ts: number): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
-/** 打开弹窗时按模式初始化表单 */
-watch(
-  () => props.show,
-  (show) => {
-    if (!show) return
+/** 按模式初始化表单：新建默认当天日期等初值；编辑预填当前版本的全部字段 */
+function initForm(): void {
     codeInputMode.value = 'manual'
     readmeInputMode.value = 'manual'
     if (props.mode === 'edit' && props.variant) {
@@ -135,8 +132,12 @@ watch(
       form.code = ''
       form.readme = ''
     }
-  },
-)
+}
+
+// 弹窗以 v-if + show=true 挂载，watch 需要 immediate 才会在挂载时执行首次初始化
+watch(() => props.show, (show) => {
+  if (show) initForm()
+}, { immediate: true })
 
 // 切换扩展名时，若文件名未自定义则跟随默认值
 watch(
