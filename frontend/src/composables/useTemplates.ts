@@ -3,12 +3,15 @@
 import { ref } from 'vue'
 import {
   createTemplate as apiCreateTemplate,
+  createVersion as apiCreateVersion,
   deleteTemplate as apiDeleteTemplate,
+  deleteVersion as apiDeleteVersion,
   fetchCategories,
   fetchDiagnostics,
   fetchTemplateDetail,
   fetchTemplates,
   reloadTemplates,
+  updateVersion as apiUpdateVersion,
   type TemplateQuery,
 } from '@/api/template'
 import type {
@@ -17,6 +20,7 @@ import type {
   TemplateCreateInput,
   TemplateDetail,
   TemplateSummary,
+  VersionUpsertPayload,
 } from '@/types'
 
 /** 分类色板：按后端返回顺序循环取色，保持视觉区分度 */
@@ -113,6 +117,26 @@ async function deleteTemplate(id: string): Promise<void> {
   await refresh()
 }
 
+/** 新建/更新版本，返回该模板的最新详情 */
+async function saveVersion(
+  templateId: string,
+  token: string,
+  payload: VersionUpsertPayload,
+  isCreate: boolean,
+): Promise<TemplateDetail> {
+  const detail = isCreate
+    ? await apiCreateVersion(templateId, payload)
+    : await apiUpdateVersion(templateId, token, payload)
+  await refresh()
+  return detail
+}
+
+/** 删除版本。删光后模板成为空主标签 */
+async function removeVersion(templateId: string, token: string): Promise<void> {
+  await apiDeleteVersion(templateId, token)
+  await refresh()
+}
+
 function categoryHue(id: string): number {
   return categories.value.find((c) => c.id === id)?.hue ?? 160
 }
@@ -136,6 +160,8 @@ export function useTemplates() {
     refresh,
     createTemplate,
     deleteTemplate,
+    saveVersion,
+    removeVersion,
     categoryHue,
     categoryName,
   }

@@ -859,6 +859,17 @@ button {
 .variant-name {
 }
 
+.tpl-add {
+  padding: 4px 10px;
+  border-style: dashed;
+  color: var(--faint);
+}
+
+.tpl-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .variant-lang {
   margin-left: 2px;
   font-family: var(--font-mono);

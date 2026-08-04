@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Inbox, Trash2 } from 'lucide-vue-next'
+import { Inbox, Pencil, Trash2 } from 'lucide-vue-next'
 import { Marked } from 'marked'
 import markedKatex from 'marked-katex-extension'
 import 'katex/dist/katex.min.css'
@@ -16,6 +16,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'delete-template': []
+  'edit-version': []
+  'delete-version': []
 }>()
 
 const code = computed(() => props.variant?.code ?? props.detail.variants[0]?.code ?? '')
@@ -55,6 +57,14 @@ const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
       </n-button>
     </div>
     <template v-else>
+    <div class="detail-actions">
+      <n-button quaternary size="small" title="编辑当前版本" @click="emit('edit-version')">
+        <template #icon><Pencil :size="14" /></template>
+      </n-button>
+      <n-button quaternary size="small" title="删除当前版本" @click="emit('delete-version')">
+        <template #icon><Trash2 :size="14" /></template>
+      </n-button>
+    </div>
     <div class="detail-head">
       <div class="detail-title-row">
         <h2 class="detail-title">{{ detail.name }}</h2>
@@ -89,6 +99,19 @@ const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
 </template>
 
 <style scoped>
+.detail {
+  position: relative;
+}
+
+.detail-actions {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  gap: 2px;
+  z-index: 1;
+}
+
 .tpl-empty-state {
   flex: 1;
   display: flex;

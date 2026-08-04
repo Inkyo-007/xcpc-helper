@@ -63,6 +63,33 @@ export interface TemplateCreateInput {
   name: string
 }
 
+/** 版本元数据输入：与后端 VersionMetaInput 对应 */
+export interface VersionMetaPayload {
+  /** ISO 日期（2026-08-05），不填为 null */
+  updated: string | null
+  tags: string[]
+  source: string | null
+  page: string | null
+  priority: number
+}
+
+/** 新建/更新版本请求体：与后端 VersionUpsert 对应 */
+export interface VersionUpsertPayload {
+  /** 副标签名；新建必填，顶层单版本更新时为 null */
+  name: string | null
+  /** 代码文件名；为 null 时后端默认 code.<ext> */
+  file: string | null
+  /** 代码扩展名（不含点），如 cpp / c / py / java */
+  ext: string
+  code: string
+  meta: VersionMetaPayload
+  /** README 正文（Markdown） */
+  body: string
+}
+
+/** URL 中寻址顶层单版本的保留字（与后端 ROOT_VERSION_TOKEN 一致） */
+export const ROOT_VERSION_TOKEN = '~'
+
 export type PageId = 'lib' | 'books' | 'io' | 'stress' | 'gen' | 'settings'
 
 export interface NavChild {
