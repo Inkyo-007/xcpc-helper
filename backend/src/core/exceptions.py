@@ -4,10 +4,11 @@
 所有异常的堆栈记录与响应结构化统一由本模块的处理器完成。
 
 【本文件在全局中的位置】
-1. main.py 启动时调用 register_exception_handlers(app) 注册两个处理器；
+1. main.py 启动时调用 register_exception_handlers(app) 注册三个处理器；
 2. 之后任何层抛出 AppError（如 NotFoundError），FastAPI 会自动
    把异常交给 app_error_handler，返回统一结构的 JSON 错误响应；
-3. 其他意料之外的异常由 unhandled_error_handler 兜底返回 500。
+3. 请求参数校验失败交给 request_validation_handler（返回 400）；
+4. 其他意料之外的异常由 unhandled_error_handler 兜底返回 500。
 业务代码因此完全不需要自己写 try/except 拼错误 JSON。
 """
 
@@ -15,6 +16,7 @@ import logging
 from typing import Any  # 类型：Any 表示"什么类型都可以"
 
 from fastapi import FastAPI, Request, status  # status 提供 HTTP 状态码常量，如 status.HTTP_404_NOT_FOUND
+from fastapi.exceptions import RequestValidationError  # FastAPI 在请求参数校验失败时抛出的异常
 from fastapi.responses import JSONResponse  # FastAPI 的 JSON 响应类
 
 logger = logging.getLogger("xcpc")  # 拿到名为 "xcpc" 的日志器，用于记录异常
@@ -53,6 +55,13 @@ class BadRequestError(AppError):
     code = "bad_request"
 
 
+class ConflictError(AppError):
+    """资源冲突（409）。例如新建的目录名已存在、删除非空模板。"""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "conflict"
+
+
 def _error_body(code: str, message: str, detail: Any = None) -> dict[str, Any]:
     """拼出统一的错误响应结构：
     {"error": {"code": ..., "message": ..., "detail": ...}}
@@ -84,9 +93,32 @@ async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def request_validation_handler(
+    _: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """处理 FastAPI 请求校验失败（请求体/查询参数不符合模型定义）。
+
+    不交给兜底 500，而是结构化为 400，让前端能拿到可读的错误信息。
+    """
+    # exc.errors() 返回所有校验错误的列表；这里只取第一条展示给用户
+    errors = exc.errors()
+    first = errors[0] if errors else {}
+    # loc 是出错字段的路径，例如 ['body', 'name']，这里用 "." 拼成 "body.name"
+    loc = ".".join(str(part) for part in first.get("loc", []))
+    logger.warning("请求校验失败 [%s] %s", loc, first.get("msg"))
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=_error_body(
+            "bad_request",
+            f"请求参数校验失败: {loc} {first.get('msg', '')}".strip(),
+        ),
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
-    """把上面两个处理器注册到 FastAPI 应用上（main.py 在启动时调用一次）。"""
+    """把三个处理器注册到 FastAPI 应用上（main.py 在启动时调用一次）。"""
     # add_exception_handler(异常类型, 处理函数)：
     # 以后任何层抛出该类型异常，FastAPI 都会自动调用对应的处理函数
     app.add_exception_handler(AppError, app_error_handler)
+    app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)

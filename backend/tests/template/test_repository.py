@@ -87,3 +87,14 @@ def test_get_template(db_path: Path) -> None:
     assert row is not None
     assert row["variant_count"] == 1
     assert repository.get_template(db_path, "not/exist") is None
+
+
+def test_empty_template_row(db_path: Path) -> None:
+    """空模板行：无版本字段为 NULL，优先级取默认值，可被正常列出。"""
+    row = repository.get_template(db_path, "misc/empty-tpl")
+    assert row is not None
+    assert row["variant_count"] == 0
+    assert row["lang"] is None
+    assert row["file"] is None
+    assert row["priority"] == 2
+    assert repository.get_versions(db_path, "misc/empty-tpl") == []

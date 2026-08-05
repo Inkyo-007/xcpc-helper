@@ -4,8 +4,10 @@ import { request } from '@/api/client'
 import type {
   DiagnosticItem,
   SortMode,
+  TemplateCreateInput,
   TemplateDetail,
   TemplateSummary,
+  VersionUpsertPayload,
 } from '@/types'
 
 export interface ApiCategory {
@@ -46,4 +48,55 @@ export function reloadTemplates(): Promise<{ templates: number; diagnostics: num
   return request<{ templates: number; diagnostics: number }>('/templates/reload', {
     method: 'POST',
   })
+}
+
+/** 将 "分类/模板名" 形式的 id 编码为 URL 路径段 */
+function encodeId(id: string): string {
+  return id.split('/').map(encodeURIComponent).join('/')
+}
+
+export function createTemplate(input: TemplateCreateInput): Promise<TemplateDetail> {
+  return request<TemplateDetail>('/templates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}
+
+export function deleteTemplate(id: string): Promise<void> {
+  return request<void>(`/templates/${encodeId(id)}`, { method: 'DELETE' })
+}
+
+export function createVersion(
+  templateId: string,
+  payload: VersionUpsertPayload,
+): Promise<TemplateDetail> {
+  return request<TemplateDetail>(`/templates/${encodeId(templateId)}/versions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+/** token 为副标签名；顶层单版本传 ROOT_VERSION_TOKEN（"~"） */
+export function updateVersion(
+  templateId: string,
+  token: string,
+  payload: VersionUpsertPayload,
+): Promise<TemplateDetail> {
+  return request<TemplateDetail>(
+    `/templates/${encodeId(templateId)}/versions/${encodeURIComponent(token)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+export function deleteVersion(templateId: string, token: string): Promise<void> {
+  return request<void>(
+    `/templates/${encodeId(templateId)}/versions/${encodeURIComponent(token)}`,
+    { method: 'DELETE' },
+  )
 }

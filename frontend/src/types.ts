@@ -17,8 +17,10 @@ export interface TemplateSummary {
   id: string
   name: string
   cat: string
-  lang: LangId
-  file: string
+  /** 主版本语言；空模板（无版本）时为 null */
+  lang: LangId | null
+  /** 主版本文件名；空模板（无版本）时为 null */
+  file: string | null
   tags: string[]
   src: string | null
   page: string | null
@@ -55,16 +57,38 @@ export interface DiagnosticItem {
   message: string
 }
 
-/** 新建模板输入（可视化 CRUD 预留，本期未接入） */
-export interface NewTemplateInput {
+/** 新建空主标签输入：与后端 TemplateCreate 对应 */
+export interface TemplateCreateInput {
+  category: string
   name: string
-  cat: string
-  lang: LangId
-  priority?: number
-  src: string
-  desc: string
-  code: string
 }
+
+/** 版本元数据输入：与后端 VersionMetaInput 对应 */
+export interface VersionMetaPayload {
+  /** ISO 日期（2026-08-05），不填为 null */
+  updated: string | null
+  tags: string[]
+  source: string | null
+  page: string | null
+  priority: number
+}
+
+/** 新建/更新版本请求体：与后端 VersionUpsert 对应 */
+export interface VersionUpsertPayload {
+  /** 副标签名；新建必填，顶层单版本更新时为 null */
+  name: string | null
+  /** 代码文件名；为 null 时后端默认 code.<ext> */
+  file: string | null
+  /** 代码扩展名（不含点），如 cpp / c / py / java */
+  ext: string
+  code: string
+  meta: VersionMetaPayload
+  /** README 正文（Markdown） */
+  body: string
+}
+
+/** URL 中寻址顶层单版本的保留字（与后端 ROOT_VERSION_TOKEN 一致） */
+export const ROOT_VERSION_TOKEN = '~'
 
 export type PageId = 'lib' | 'books' | 'io' | 'stress' | 'gen' | 'settings'
 

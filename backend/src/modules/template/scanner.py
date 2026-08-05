@@ -197,8 +197,25 @@ def _scan_template(
             versions.append(version)
 
     if not versions:
-        diags.append(Diagnostic(level="error", path=rel, message="模板目录下未找到任何可用版本，已跳过"))
-        return None
+        # 目录里有内容（代码读取失败、只有 README、子目录都缺代码等）却凑不出
+        # 一个版本：属于格式错误，记 error 并跳过。
+        # 完全空的目录则是刻意的"空主标签"（前端可视化新建的占位模板），
+        # 正常载入、不产生诊断。
+        # 隐藏文件（如 .gitkeep）不算内容，与 _list_dirs 忽略点开头目录一致
+        has_any_content = (
+            has_top_code
+            or sub_dirs
+            or any(not p.name.startswith(".") for p in template_dir.iterdir())
+        )
+        if has_any_content:
+            diags.append(Diagnostic(level="error", path=rel, message="模板目录下未找到任何可用版本，已跳过"))
+            return None
+        return TemplateNode(
+            id=f"{category}/{template_dir.name}",
+            category=category,
+            slug=template_dir.name,
+            versions=[],
+        )
 
     # id 形如 "数据结构/线段树"，作为这份模板的唯一标识
     return TemplateNode(

@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Check, ChevronRight, Flag, Inbox, RefreshCw, Search } from 'lucide-vue-next'
-import { NAlert, NButton, NEmpty, NInput, NSelect, NSpin } from 'naive-ui'
+import { Check, ChevronRight, Flag, Inbox, Plus, RefreshCw, Search } from 'lucide-vue-next'
+import { NAlert, NButton, NEmpty, NInput, NSelect, NSpin, useMessage } from 'naive-ui'
+import DeleteConfirmModal from '@/components/DeleteConfirmModal.vue'
+import TemplateCreateModal from '@/components/TemplateCreateModal.vue'
 import TemplateDetail from '@/components/TemplateDetail.vue'
+import VersionFormModal from '@/components/VersionFormModal.vue'
 import { useTemplates } from '@/composables/useTemplates'
+import { ROOT_VERSION_TOKEN } from '@/types'
 import type {
   SortMode,
   TemplateDetail as TemplateDetailData,
@@ -22,10 +26,13 @@ const {
   loadList,
   loadDetail,
   reload,
+  deleteTemplate,
+  removeVersion,
   categoryHue,
   categoryName,
 } = useTemplates()
 
+const message = useMessage()
 const query = ref('')
 const category = ref('all')
 const sortMode = ref<SortMode>('updated')
@@ -34,6 +41,16 @@ const catMenuOpen = ref(false)
 const openVariants = ref<Record<string, boolean>>({})
 const activeVariantId = ref<string | null>(null)
 const reloading = ref(false)
+const showCreate = ref(false)
+const deletingTemplate = ref<TemplateDetailData | null>(null)
+const deleteLoading = ref(false)
+const versionForm = ref<{
+  mode: 'create' | 'edit'
+  templateId: string
+  variant: TemplateVariant | null
+} | null>(null)
+const deletingVersion = ref<{ templateId: string; variant: TemplateVariant } | null>(null)
+const versionDeleteLoading = ref(false)
 
 /** 已加载的详情缓存（驱动右侧详情与列表中的副标签展开） */
 const details = ref<Record<string, TemplateDetailData>>({})
@@ -102,15 +119,10 @@ async function selectTemplate(template: TemplateSummary): Promise<void> {
   for (const id of Object.keys(openVariants.value)) {
     if (id !== template.id) openVariants.value[id] = false
   }
-  void ensureDetail(template.id)
-  if (template.variant_count <= 1) {
-    activeVariantId.value = null
-    return
-  }
   const opening = !openVariants.value[template.id]
   openVariants.value[template.id] = opening
+  const detail = await ensureDetail(template.id)
   if (opening) {
-    const detail = await ensureDetail(template.id)
     activeVariantId.value = detail?.variants[0]?.id ?? null
   } else {
     activeVariantId.value = null
@@ -146,6 +158,101 @@ async function onReload(): Promise<void> {
     if (activeTemplate.value) await ensureDetail(activeTemplate.value.id)
   } finally {
     reloading.value = false
+  }
+}
+
+/** 新建空主标签成功：选中新模板（分类过滤随之切到其所属分类，保证立即可见） */
+function onTemplateCreated(id: string): void {
+  const cat = id.split('/')[0]
+  if (category.value !== 'all' && category.value !== cat) {
+    // 切到新模板所属分类，保证它立即可见；watch 会触发列表刷新
+    category.value = cat
+  }
+  activeId.value = id
+  activeVariantId.value = null
+  void ensureDetail(id)
+}
+
+/** 空主标签的"删除模板"入口：打开确认弹窗 */
+function onDeleteTemplate(): void {
+  if (activeDetail.value) deletingTemplate.value = activeDetail.value
+}
+
+async function confirmDeleteTemplate(): Promise<void> {
+  const target = deletingTemplate.value
+  if (!target) return
+  deleteLoading.value = true
+  try {
+    await deleteTemplate(target.id)
+    message.success(`已删除模板「${target.name}」`)
+    delete details.value[target.id]
+    if (activeId.value === target.id) {
+      activeId.value = null
+      activeVariantId.value = null
+    }
+    deletingTemplate.value = null
+  } catch (err) {
+    message.error(err instanceof Error ? err.message : '删除失败，请重试')
+  } finally {
+    deleteLoading.value = false
+  }
+}
+
+/** 展开区末尾的 + 按钮：为该模板新建版本 */
+function onAddVersion(template: TemplateSummary): void {
+  activeId.value = template.id
+  for (const id of Object.keys(openVariants.value)) {
+    if (id !== template.id) openVariants.value[id] = false
+  }
+  openVariants.value[template.id] = true
+  void ensureDetail(template.id)
+  versionForm.value = { mode: 'create', templateId: template.id, variant: null }
+}
+
+/** 详情页编辑按钮：编辑当前显示的版本 */
+function onEditVersion(): void {
+  const detail = activeDetail.value
+  const variant = activeDetailVariant.value
+  if (!detail || !variant) return
+  versionForm.value = { mode: 'edit', templateId: detail.id, variant }
+}
+
+/** 详情页删除按钮：删除当前显示的版本（确认后物理删除） */
+function onDeleteVersion(): void {
+  const detail = activeDetail.value
+  const variant = activeDetailVariant.value
+  if (!detail || !variant) return
+  deletingVersion.value = { templateId: detail.id, variant }
+}
+
+/** 版本表单保存成功：刷新详情缓存并选中刚保存的版本 */
+async function onVersionSaved(detailId: string, versionName: string): Promise<void> {
+  delete details.value[detailId]
+  const detail = await ensureDetail(detailId)
+  if (!detail) return
+  activeId.value = detailId
+  openVariants.value[detailId] = true
+  const variant = detail.variants.find((v) => v.name === versionName)
+  activeVariantId.value = variant?.id ?? detail.variants[0]?.id ?? null
+}
+
+async function confirmDeleteVersion(): Promise<void> {
+  const target = deletingVersion.value
+  if (!target) return
+  versionDeleteLoading.value = true
+  try {
+    const token =
+      target.variant.id === target.templateId ? ROOT_VERSION_TOKEN : target.variant.name
+    await removeVersion(target.templateId, token)
+    message.success(`已删除版本「${target.variant.name}」`)
+    delete details.value[target.templateId]
+    const detail = await ensureDetail(target.templateId)
+    activeVariantId.value = detail?.variants[0]?.id ?? null
+    deletingVersion.value = null
+  } catch (err) {
+    message.error(err instanceof Error ? err.message : '删除失败，请重试')
+  } finally {
+    versionDeleteLoading.value = false
   }
 }
 </script>
@@ -203,6 +310,14 @@ async function onReload(): Promise<void> {
             </Transition>
           </div>
           <div class="tpl-tools">
+            <n-button
+              size="small"
+              quaternary
+              title="新增模板（空主标签）"
+              @click="showCreate = true"
+            >
+              <template #icon><Plus :size="14" /></template>
+            </n-button>
             <n-button
               size="small"
               quaternary
@@ -271,10 +386,10 @@ async function onReload(): Promise<void> {
                       >
                     </span>
                   </span>
-                  <ChevronRight v-if="template.variant_count > 1" class="tpl-chev" :size="14" />
+                  <ChevronRight class="tpl-chev" :size="14" />
                 </button>
                 <div
-                  v-if="template.variant_count > 1 && (details[template.id]?.variants.length ?? 0) > 0"
+                  v-if="details[template.id]"
                   class="tpl-variants"
                 >
                   <button
@@ -290,6 +405,14 @@ async function onReload(): Promise<void> {
                   >
                     <span class="variant-name">{{ variant.name }}</span>
                     <span class="variant-lang">{{ variant.lang }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="tpl-variant tpl-add"
+                    title="新增版本"
+                    @click="onAddVersion(template)"
+                  >
+                    <Plus :size="12" />
                   </button>
                 </div>
               </div>
@@ -314,6 +437,9 @@ async function onReload(): Promise<void> {
           :detail="activeDetail"
           :variant="activeDetailVariant"
           :category-name="categoryName(activeDetail.cat)"
+          @delete-template="onDeleteTemplate"
+          @edit-version="onEditVersion"
+          @delete-version="onDeleteVersion"
         />
         <div v-else class="detail empty-detail">
           <Inbox :size="32" />
@@ -321,5 +447,34 @@ async function onReload(): Promise<void> {
         </div>
       </Transition>
     </div>
+
+    <TemplateCreateModal v-model:show="showCreate" @created="onTemplateCreated" />
+    <DeleteConfirmModal
+      :show="deletingTemplate !== null"
+      title="删除模板"
+      :target="deletingTemplate?.id ?? ''"
+      :loading="deleteLoading"
+      @update:show="deletingTemplate = null"
+      @confirm="confirmDeleteTemplate"
+    />
+    <VersionFormModal
+      v-if="versionForm"
+      :show="versionForm !== null"
+      :mode="versionForm.mode"
+      :template-id="versionForm.templateId"
+      :variant="versionForm.variant"
+      @update:show="versionForm = null"
+      @saved="onVersionSaved"
+    />
+    <DeleteConfirmModal
+      :show="deletingVersion !== null"
+      title="删除版本"
+      :target="
+        deletingVersion ? `${deletingVersion.templateId}/${deletingVersion.variant.name}` : ''
+      "
+      :loading="versionDeleteLoading"
+      @update:show="deletingVersion = null"
+      @confirm="confirmDeleteVersion"
+    />
   </div>
 </template>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Inbox, Pencil, Trash2 } from 'lucide-vue-next'
 import { Marked } from 'marked'
 import markedKatex from 'marked-katex-extension'
 import 'katex/dist/katex.min.css'
+import { NButton } from 'naive-ui'
 import CodeView from '@/components/CodeView.vue'
 import type { LangId, TemplateDetail, TemplateVariant } from '@/types'
 
@@ -12,9 +14,15 @@ const props = defineProps<{
   categoryName: string
 }>()
 
+const emit = defineEmits<{
+  'delete-template': []
+  'edit-version': []
+  'delete-version': []
+}>()
+
 const code = computed(() => props.variant?.code ?? props.detail.variants[0]?.code ?? '')
-const file = computed(() => props.variant?.file ?? props.detail.file)
-const lang = computed<LangId>(() => props.variant?.lang ?? props.detail.lang)
+const file = computed(() => props.variant?.file ?? props.detail.file ?? 'code')
+const lang = computed<LangId>(() => props.variant?.lang ?? props.detail.lang ?? 'cpp')
 
 // 元信息（tags/来源/更新于/优先级）随版本切换：选中版本时用该版本的值，
 // 即使为空也不回退模板级聚合值；未选中版本（无 variants 数据）时回退模板级
@@ -38,6 +46,25 @@ const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
 
 <template>
   <div class="detail">
+    <!-- 空主标签：没有任何版本时显示空页面，提供删除整个模板的入口 -->
+    <div v-if="detail.variant_count === 0" class="tpl-empty-state">
+      <Inbox :size="34" />
+      <p class="tpl-empty-title">「{{ detail.name }}」还没有任何版本</p>
+      <p class="tpl-empty-hint">在左侧列表展开该模板，点击末尾的 + 按钮添加第一个版本</p>
+      <n-button type="error" secondary size="small" @click="emit('delete-template')">
+        <template #icon><Trash2 :size="14" /></template>
+        删除模板
+      </n-button>
+    </div>
+    <template v-else>
+    <div class="detail-actions">
+      <n-button quaternary size="small" title="编辑当前版本" @click="emit('edit-version')">
+        <template #icon><Pencil :size="14" /></template>
+      </n-button>
+      <n-button quaternary size="small" title="删除当前版本" @click="emit('delete-version')">
+        <template #icon><Trash2 :size="14" /></template>
+      </n-button>
+    </div>
     <div class="detail-head">
       <div class="detail-title-row">
         <h2 class="detail-title">{{ detail.name }}</h2>
@@ -67,10 +94,48 @@ const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
     <CodeView :code="code" :file="file" :lang="lang" />
     <!-- eslint-disable-next-line vue/no-v-html -->
     <div v-if="descHtml" class="detail-desc" v-html="descHtml"></div>
+    </template>
   </div>
 </template>
 
 <style scoped>
+.detail {
+  position: relative;
+}
+
+.detail-actions {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  display: flex;
+  gap: 2px;
+  z-index: 1;
+}
+
+.tpl-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--faint);
+  padding: 32px;
+  text-align: center;
+}
+
+.tpl-empty-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tpl-empty-hint {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+}
+
 .variant-badge {
   padding: 2px 8px;
   border: 1px solid var(--accent);

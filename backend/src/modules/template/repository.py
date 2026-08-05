@@ -22,8 +22,8 @@ import logging
 import sqlite3  # 标准库 SQLite 驱动（类型注解会用到 Connection / Row）
 from pathlib import Path
 
-from core.database import get_connection  # 上一讲过的连接管理器
-from modules.template.models import ScanResult, TemplateNode
+from core.database import get_connection  # 连接管理器（自动提交/回滚/关闭）
+from modules.template.models import DEFAULT_PRIORITY, ScanResult, TemplateNode
 
 logger = logging.getLogger("xcpc.repository")
 
@@ -40,13 +40,14 @@ CREATE TABLE templates (
     page TEXT,
     priority INTEGER NOT NULL,
     updated TEXT,
-    lang TEXT NOT NULL,
-    file TEXT NOT NULL,
+    lang TEXT,
+    file TEXT,
     body TEXT NOT NULL,
     variant_count INTEGER NOT NULL,
     search_text TEXT NOT NULL
 )
 """
+# 注意 lang / file 没有 NOT NULL：空模板（无任何版本）时这两列为 NULL。
 
 _DDL_VERSIONS = """
 CREATE TABLE versions (
@@ -96,8 +97,10 @@ def _template_row(template: TemplateNode) -> tuple:
     """将扫描结果折算为模板级字段：主版本取第一个，标签取并集，日期取最新。
 
     返回值是一个元组，顺序对应 INSERT 语句里的 13 个字段。
+    空模板（没有任何版本）时主版本相关字段为 None，优先级取默认值。
     """
-    primary = template.versions[0]  # 第一个版本作为"主版本"，列表页信息取自它
+    # 空模板没有主版本，此时 primary 为 None，后面逐字段兜底
+    primary = template.versions[0] if template.versions else None
 
     # 标签取所有版本的并集（保持出现顺序、去重）
     tags: list[str] = []
@@ -109,8 +112,10 @@ def _template_row(template: TemplateNode) -> tuple:
     # 日期取所有版本中最新的一天；都没有则为 None
     dates = [v.meta.updated for v in template.versions if v.meta.updated is not None]
     updated = max(dates).isoformat() if dates else None
-    # 优先级取所有版本里最高的
-    priority = max(v.meta.priority for v in template.versions)
+    # 优先级取所有版本里最高的；空模板用默认值 DEFAULT_PRIORITY
+    priority = max(
+        (v.meta.priority for v in template.versions), default=DEFAULT_PRIORITY
+    )
 
     # search_text 是给 LIKE 退化检索准备的"纯文本大杂烩"：
     # 模板名 + 标签 + 所有版本的说明正文 + 所有版本的代码
@@ -124,13 +129,13 @@ def _template_row(template: TemplateNode) -> tuple:
         template.category,
         template.slug,
         json.dumps(tags, ensure_ascii=False),  # 列表转成 JSON 字符串存一个字段
-        primary.meta.source,
-        primary.meta.page,
+        primary.meta.source if primary else None,
+        primary.meta.page if primary else None,
         priority,
         updated,
-        primary.lang,
-        primary.file,
-        primary.body,
+        primary.lang if primary else None,
+        primary.file if primary else None,
+        primary.body if primary else "",
         len(template.versions),
         search_text,
     )

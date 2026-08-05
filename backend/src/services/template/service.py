@@ -1,4 +1,4 @@
-"""模板库业务编排：索引重建、列表查询、详情组装、过滤排序。
+"""模板库业务编排：索引重建、列表查询、详情组装、过滤排序、可视化增删改。
 
 【初学者导读】
 TemplateService 是后端的"业务总管"，routers/ 只跟它打交道：
@@ -6,6 +6,7 @@ TemplateService 是后端的"业务总管"，routers/ 只跟它打交道：
 - rebuild()：扫描 content/ -> 重建 SQLite 索引
 - list_templates()：给列表页（支持分类/标签/关键词过滤 + 排序）
 - get_detail()：给详情页（模板概要 + 全部版本的代码）
+- create/rename/delete：对模板和版本做可视化增删改（落盘到 content/）
 数据流向：content/ 目录 --扫描--> SQLite --查询--> 本服务 --组装--> 前端
 """
 
@@ -17,15 +18,19 @@ import threading
 
 from core.config import Settings, get_settings
 from core.exceptions import NotFoundError  # 查不到模板时抛这个异常（变成 404）
-from modules.template import repository  # 数据库读写（整个模块导入，用 repository.xxx 调用）
-from modules.template.models import Diagnostic
+from modules.template import repository, writer  # 数据库读写 + 文件系统写操作
+from modules.template.models import Diagnostic, TemplateNode, VersionNode
 from modules.template.scanner import scan_content
 from modules.template.schemas import (
+    ROOT_VERSION_TOKEN,
     CategoryInfo,
     SortMode,
+    TemplateCreate,
     TemplateDetail,
+    TemplateRename,
     TemplateSummary,
     TemplateVersion,
+    VersionUpsert,
 )
 
 logger = logging.getLogger("xcpc.service.template")
@@ -35,9 +40,12 @@ class TemplateService:
     """模板库服务。读写均作用于 SQLite 缓存，rebuild 由扫描结果驱动。"""
 
     def __init__(self, settings: Settings) -> None:
-        self._settings = settings  # 全局配置（数据库路径等）
+        self._settings = settings  # 全局配置（content 目录、数据库路径等）
         self._diagnostics: list[Diagnostic] = []  # 最近一次扫描产生的诊断列表
-        self._lock = threading.Lock()  # 锁：防止"正在重建"和"正在读取诊断"同时进行
+        # RLock 是可重入锁：同一个线程可以反复拿锁。
+        # 写操作需要在持锁状态下调用 rebuild()，而 rebuild() 内部又会再拿一次锁，
+        # 所以这里必须用 RLock 而不是普通 Lock，否则会自己锁死自己。
+        self._lock = threading.RLock()
 
     # ===== 索引生命周期 =====
 
@@ -140,6 +148,108 @@ class TemplateService:
             CategoryInfo(id=row["category"], name=row["category"], count=row["count"])
             for row in rows
         ]
+
+    # ===== 可视化增删改（写操作） =====
+
+    def _scan_for_write(self) -> list[TemplateNode]:
+        """写操作前的现场扫描：拿最新的目录结构做存在性校验。"""
+        return scan_content(self._settings.content_dir).templates
+
+    @staticmethod
+    def _find_node(
+        templates: list[TemplateNode], category: str, name: str
+    ) -> TemplateNode:
+        """在扫描结果里按分类+模板名找节点，找不到抛 404。"""
+        for node in templates:
+            if node.category == category and node.slug == name:
+                return node
+        raise NotFoundError(f"模板不存在: {category}/{name}")
+
+    @staticmethod
+    def _find_version(node: TemplateNode, slug: str) -> VersionNode:
+        """在模板节点里按副标签 slug 找版本，找不到抛 404。"""
+        for version in node.versions:
+            if version.slug == slug:
+                return version
+        # slug 为空字符串是"顶层单版本"，显示名用 ROOT_VERSION_TOKEN（~）
+        label = slug or ROOT_VERSION_TOKEN
+        raise NotFoundError(f"版本不存在: {node.id}/{label}")
+
+    def create_template(self, payload: TemplateCreate) -> TemplateDetail:
+        """新建空主标签目录并重建索引，返回新建模板的详情。"""
+        with self._lock:
+            # writer 负责在 content/ 下真正创建目录
+            category, name = writer.create_template_dir(
+                self._settings.content_dir, payload.category, payload.name
+            )
+            self.rebuild()  # 目录落盘后重建索引，让新模板立刻可见
+        return self.get_detail(f"{category}/{name}")
+
+    def rename_template(
+        self, category: str, name: str, payload: TemplateRename
+    ) -> TemplateDetail:
+        """主标签重命名/换分类，返回新位置上的模板详情。"""
+        with self._lock:
+            new_category, new_name = writer.rename_template_dir(
+                self._settings.content_dir,
+                category,
+                name,
+                new_category=payload.new_category,
+                new_name=payload.new_name,
+            )
+            self.rebuild()
+        return self.get_detail(f"{new_category}/{new_name}")
+
+    def delete_template(self, category: str, name: str) -> None:
+        """删除空主标签目录（非空目录由 writer 拒绝，防误删整棵树）。"""
+        with self._lock:
+            writer.delete_template_dir(self._settings.content_dir, category, name)
+            self.rebuild()
+
+    def create_version(
+        self, category: str, name: str, payload: VersionUpsert
+    ) -> TemplateDetail:
+        """在模板下新建副标签版本，返回整个模板的最新详情。"""
+        with self._lock:
+            writer.create_version_dir(
+                self._settings.content_dir, category, name, payload
+            )
+            self.rebuild()
+        return self.get_detail(f"{category}/{name}")
+
+    def update_version(
+        self, category: str, name: str, version_token: str, payload: VersionUpsert
+    ) -> TemplateDetail:
+        """更新版本内容（代码/元数据/正文/改名/换扩展名），返回模板最新详情。"""
+        # URL 里的 "~" 翻译成空字符串，表示"顶层单版本"
+        slug = "" if version_token == ROOT_VERSION_TOKEN else version_token
+        with self._lock:
+            node = self._find_node(self._scan_for_write(), category, name)
+            current = self._find_version(node, slug)
+            writer.update_version_dir(
+                self._settings.content_dir,
+                category,
+                name,
+                current.slug,
+                current.file,
+                payload,
+            )
+            self.rebuild()
+        return self.get_detail(f"{category}/{name}")
+
+    def delete_version(
+        self, category: str, name: str, version_token: str
+    ) -> TemplateDetail:
+        """删除一个版本。删光后模板成为空主标签，返回模板最新详情。"""
+        slug = "" if version_token == ROOT_VERSION_TOKEN else version_token
+        with self._lock:
+            node = self._find_node(self._scan_for_write(), category, name)
+            current = self._find_version(node, slug)
+            writer.delete_version_dir(
+                self._settings.content_dir, category, name, current.slug, current.file
+            )
+            self.rebuild()
+        return self.get_detail(f"{category}/{name}")
 
 
 def _row_to_summary(row: sqlite3.Row) -> TemplateSummary:

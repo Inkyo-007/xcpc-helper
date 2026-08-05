@@ -21,7 +21,7 @@ FastAPI 用 async 函数处理请求，同一个进程可以同时服务很多�
 import asyncio
 from typing import Annotated  # Annotated：把类型和附加信息（如 Query）组合在一起
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
 
 from modules.template.schemas import (
     CategoryInfo,
@@ -29,8 +29,11 @@ from modules.template.schemas import (
     DiagnosticsResponse,
     ReloadResponse,
     SortMode,
+    TemplateCreate,
     TemplateDetail,
+    TemplateRename,
     TemplateSummary,
+    VersionUpsert,
 )
 from services.template.service import TemplateService, get_template_service
 
@@ -100,3 +103,68 @@ async def get_diagnostics(service: ServiceDep) -> DiagnosticsResponse:
         # **item.model_dump()：把对象的字段摊开成关键字参数
         items=[DiagnosticItem(**item.model_dump()) for item in items]
     )
+
+
+# ===== 可视化增删改 =====
+# 写路由一律用 {category}/{name} 双路径段（名称校验已禁止名称内含 "/"），
+# 不使用 :path 转换器，避免与版本子路由产生匹配歧义。
+# 顶层单版本（代码直接在模板目录下）在 URL 中用保留字 "~" 寻址。
+
+
+@router.post(
+    "/templates", response_model=TemplateDetail, status_code=status.HTTP_201_CREATED
+)
+async def create_template(
+    payload: TemplateCreate, service: ServiceDep
+) -> TemplateDetail:
+    """POST /api/templates：新建空主标签（仅分类 + 模板名）。"""
+    return await asyncio.to_thread(service.create_template, payload)
+
+
+@router.put("/templates/{category}/{name}", response_model=TemplateDetail)
+async def rename_template(
+    category: str, name: str, payload: TemplateRename, service: ServiceDep
+) -> TemplateDetail:
+    """PUT /api/templates/{category}/{name}：主标签重命名/换分类。"""
+    return await asyncio.to_thread(service.rename_template, category, name, payload)
+
+
+@router.delete("/templates/{category}/{name}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_template(category: str, name: str, service: ServiceDep) -> None:
+    """DELETE /api/templates/{category}/{name}：删除空主标签。"""
+    await asyncio.to_thread(service.delete_template, category, name)
+
+
+@router.post(
+    "/templates/{category}/{name}/versions",
+    response_model=TemplateDetail,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_version(
+    category: str, name: str, payload: VersionUpsert, service: ServiceDep
+) -> TemplateDetail:
+    """POST .../versions：在模板下新建副标签版本。"""
+    return await asyncio.to_thread(service.create_version, category, name, payload)
+
+
+@router.put(
+    "/templates/{category}/{name}/versions/{version}", response_model=TemplateDetail
+)
+async def update_version(
+    category: str, name: str, version: str, payload: VersionUpsert, service: ServiceDep
+) -> TemplateDetail:
+    """PUT .../versions/{version}：更新版本（"~" 表示顶层单版本）。"""
+    return await asyncio.to_thread(
+        service.update_version, category, name, version, payload
+    )
+
+
+@router.delete(
+    "/templates/{category}/{name}/versions/{version}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_version(
+    category: str, name: str, version: str, service: ServiceDep
+) -> None:
+    """DELETE .../versions/{version}：删除版本（"~" 表示顶层单版本）。"""
+    await asyncio.to_thread(service.delete_version, category, name, version)

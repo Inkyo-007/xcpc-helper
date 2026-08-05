@@ -5,6 +5,7 @@ models.py 是程序内部用的结构，本文件是"给前端看"的结构。
 两者分开的好处：内部结构随便改，对外接口保持稳定。
 FastAPI 路由函数上的 response_model=... 就用这里的类，
 返回的 JSON 字段名、类型都由这里决定。
+本文件后半部分（可视化增删改的输入模型）则是前端发给后端的请求体结构。
 """
 
 import datetime
@@ -34,8 +35,8 @@ class TemplateSummary(BaseModel):
     id: str  # 模板唯一标识，如 "数据结构/线段树"
     name: str  # 显示名（模板目录名）
     cat: str  # 所属分类
-    lang: str  # 主版本语言
-    file: str  # 主版本文件名
+    lang: str | None  # 主版本语言；空模板（无版本）时为 None
+    file: str | None  # 主版本文件名；空模板（无版本）时为 None
     tags: list[str]  # 所有版本标签的并集
     src: str | None  # 出处链接
     page: str | None  # 原文页面链接
@@ -89,3 +90,59 @@ class ReloadResponse(BaseModel):
 
     templates: int
     diagnostics: int
+
+
+# ===== 可视化增删改的输入模型 =====
+
+# 寻址"顶层单版本"（代码直接在模板目录下）时 URL 中使用的保留版本名。
+# 顶层版本没有副标签名，但 URL 又必须有这个位置，
+# 所以约定用 "~" 代替，服务层再把它翻译成空字符串 ""。
+ROOT_VERSION_TOKEN = "~"
+
+
+class TemplateCreate(BaseModel):
+    """新建空主标签的请求体：仅需分类与模板名。"""
+
+    category: str  # 分类名（目录名）
+    name: str  # 模板名（目录名）
+
+
+class TemplateRename(BaseModel):
+    """主标签重命名/换分类的请求体。两个字段至少填一个。
+
+    new_category：新的分类名；new_name：新的模板名。
+    都为 None 时表示不改（写操作层会视为无操作）。
+    """
+
+    new_category: str | None = None
+    new_name: str | None = None
+
+
+class VersionMetaInput(BaseModel):
+    """版本元数据输入：与 README front matter 一一对应。
+
+    前端表单填的这些字段，会由 writer.render_readme() 转成 README 头部 YAML。
+    """
+
+    updated: datetime.date | None = None  # 更新日期，可留空
+    tags: list[str] = []  # 标签列表
+    source: str | None = None  # 出处链接（网站）
+    page: str | None = None  # 原文页面链接
+    priority: int = 2  # 优先级，默认 2
+
+
+class VersionUpsert(BaseModel):
+    """新建/更新版本的请求体。
+
+    name：副标签名。新建时必填（一律建为副标签子目录）；
+    更新时可选，用于副标签改名（顶层单版本不支持改名）。
+    file：代码文件名，可选，默认为 code.<ext>。
+    ext：代码扩展名（不含点，大小写不敏感），如 cpp / c / py / java。
+    """
+
+    name: str | None = None
+    file: str | None = None
+    ext: str
+    code: str
+    meta: VersionMetaInput = VersionMetaInput()
+    body: str = ""

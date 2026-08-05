@@ -37,6 +37,10 @@ class _DebouncedHandler(FileSystemEventHandler):
         """watchdog 每次检测到文件变化时调用本方法。"""
         if event.is_directory:
             return  # 目录本身的变化不触发重建，只关心文件
+        # 写操作（writer.py）的暂存文件以 .tmp- 开头，它们随后会被原子替换/移动，
+        # 属于中间态，不触发重建（最终落盘的那次 rename 会产生正常事件）
+        if any(part.startswith(".tmp-") for part in Path(event.src_path).parts):
+            return
         # with self._lock: 拿到锁，保证同一时间只有一个线程修改 _timer
         with self._lock:
             if self._timer is not None:

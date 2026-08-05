@@ -2,14 +2,26 @@
 
 import { ref } from 'vue'
 import {
+  createTemplate as apiCreateTemplate,
+  createVersion as apiCreateVersion,
+  deleteTemplate as apiDeleteTemplate,
+  deleteVersion as apiDeleteVersion,
   fetchCategories,
   fetchDiagnostics,
   fetchTemplateDetail,
   fetchTemplates,
   reloadTemplates,
+  updateVersion as apiUpdateVersion,
   type TemplateQuery,
 } from '@/api/template'
-import type { Category, DiagnosticItem, TemplateDetail, TemplateSummary } from '@/types'
+import type {
+  Category,
+  DiagnosticItem,
+  TemplateCreateInput,
+  TemplateDetail,
+  TemplateSummary,
+  VersionUpsertPayload,
+} from '@/types'
 
 /** 分类色板：按后端返回顺序循环取色，保持视觉区分度 */
 const HUE_PALETTE = [160, 25, 280, 200, 340, 80, 120, 300, 0, 220]
@@ -86,6 +98,45 @@ async function reload(): Promise<void> {
   await init()
 }
 
+/** 写操作成功后的本地刷新：清详情缓存，重新拉取列表/分类/诊断 */
+async function refresh(): Promise<void> {
+  detailCache.clear()
+  await Promise.all([loadList(), loadCategories(), loadDiagnostics()])
+}
+
+/** 新建空主标签，返回新建模板的 id（用于选中） */
+async function createTemplate(input: TemplateCreateInput): Promise<string> {
+  const detail = await apiCreateTemplate(input)
+  await refresh()
+  return detail.id
+}
+
+/** 删除空主标签（后端拒绝非空模板） */
+async function deleteTemplate(id: string): Promise<void> {
+  await apiDeleteTemplate(id)
+  await refresh()
+}
+
+/** 新建/更新版本，返回该模板的最新详情 */
+async function saveVersion(
+  templateId: string,
+  token: string,
+  payload: VersionUpsertPayload,
+  isCreate: boolean,
+): Promise<TemplateDetail> {
+  const detail = isCreate
+    ? await apiCreateVersion(templateId, payload)
+    : await apiUpdateVersion(templateId, token, payload)
+  await refresh()
+  return detail
+}
+
+/** 删除版本。删光后模板成为空主标签 */
+async function removeVersion(templateId: string, token: string): Promise<void> {
+  await apiDeleteVersion(templateId, token)
+  await refresh()
+}
+
 function categoryHue(id: string): number {
   return categories.value.find((c) => c.id === id)?.hue ?? 160
 }
@@ -106,6 +157,11 @@ export function useTemplates() {
     loadList,
     loadDetail,
     reload,
+    refresh,
+    createTemplate,
+    deleteTemplate,
+    saveVersion,
+    removeVersion,
     categoryHue,
     categoryName,
   }

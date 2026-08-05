@@ -34,5 +34,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(resp.status, code, message)
   }
+  // 204 No Content（如 DELETE 成功）没有响应体，直接返回 undefined
+  if (resp.status === 204) return undefined as T
   return (await resp.json()) as T
 }
