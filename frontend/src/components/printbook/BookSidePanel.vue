@@ -34,7 +34,9 @@ const selected = computed({
 
 const bookOptions = computed(() => [
   { label: '＋ 新建打印册', value: '__new__' },
-  ...props.books.map((b) => ({ label: b.title || b.name, value: b.name })),
+  // 下拉显示册名（身份标识）：封面标题可在"封面与选项"中独立设置，
+  // 若显示标题会导致仅重命名册名时下拉框看起来"没有更新"
+  ...props.books.map((b) => ({ label: b.name, value: b.name })),
 ])
 </script>
 
@@ -51,11 +53,11 @@ const bookOptions = computed(() => [
         />
       </div>
       <div class="pb-book-actions">
-        <n-button quaternary size="small" title="封面与选项设置" @click="emit('settings')">
-          <template #icon><Settings2 :size="14" /></template>
-        </n-button>
         <n-button quaternary size="small" title="重命名打印册" @click="emit('rename')">
           <template #icon><Pencil :size="14" /></template>
+        </n-button>
+        <n-button quaternary size="small" title="封面与选项设置" @click="emit('settings')">
+          <template #icon><Settings2 :size="14" /></template>
         </n-button>
         <n-button
           quaternary

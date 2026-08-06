@@ -114,7 +114,8 @@ export function usePrintBooks() {
     return { ok: true }
   }
 
-  function renameBook(name: string, newName: string, title: string): { ok: boolean; message?: string } {
+  /** 仅改册名；封面标题由"封面与选项"（updateSettings）独立维护 */
+  function renameBook(name: string, newName: string): { ok: boolean; message?: string } {
     const detail = detailMap[name]
     if (!detail) return { ok: false, message: '打印册不存在' }
     const clean = newName.trim()
@@ -122,7 +123,6 @@ export function usePrintBooks() {
     if (clean !== name && detailMap[clean]) return { ok: false, message: `打印册「${clean}」已存在` }
     delete detailMap[name]
     detail.name = clean
-    detail.cover.title = title.trim() || clean
     detailMap[clean] = detail
     const index = books.value.findIndex((b) => b.name === name)
     if (index >= 0) books.value[index] = summaryOf(detail)

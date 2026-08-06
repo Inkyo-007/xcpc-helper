@@ -54,7 +54,8 @@ function submit(): void {
           placeholder="如 ICPC区域赛版"
         />
       </n-form-item>
-      <n-form-item label="封面标题">
+      <!-- 封面标题由"封面与选项"统一维护，重命名时不再出现 -->
+      <n-form-item v-if="mode === 'create'" label="封面标题">
         <n-input
           v-model:value="form.title"
           maxlength="40"

@@ -74,10 +74,10 @@ function onBookCreated(name: string, title: string): void {
   }
 }
 
-function onBookRenamed(name: string, title: string): void {
+function onBookRenamed(name: string): void {
   const book = activeBook.value
   if (!book) return
-  const result = renameBook(book.name, name, title)
+  const result = renameBook(book.name, name)
   if (result.ok) {
     message.success(`已重命名为「${name}」`)
   } else {
@@ -142,10 +142,10 @@ function confirmDeleteBook(): void {
       v-model:show="showBookName"
       :mode="bookNameMode"
       :initial-name="bookNameMode === 'rename' ? (activeBook?.name ?? '') : ''"
-      :initial-title="bookNameMode === 'rename' ? (activeBook?.title ?? '') : ''"
+      :initial-title="''"
       @submit="
         (name, title) =>
-          bookNameMode === 'create' ? onBookCreated(name, title) : onBookRenamed(name, title)
+          bookNameMode === 'create' ? onBookCreated(name, title) : onBookRenamed(name)
       "
     />
     <BookSettingsModal
