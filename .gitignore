@@ -24,3 +24,6 @@ backend/data/*.db-shm
 
 # 可视化写操作的原子暂存目录（正常会自动清理，防御崩溃残留）
 backend/content/.tmp-*/
+
+# 打印册写操作的原子暂存文件（正常会自动清理，防御崩溃残留）
+backend/books/**/.tmp-*

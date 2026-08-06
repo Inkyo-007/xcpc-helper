@@ -28,6 +28,8 @@ class Settings(BaseSettings):
 
     # 模板库内容目录（唯一事实来源）
     content_dir: Path = BACKEND_ROOT / "content"
+    # 打印册配置目录（唯一事实来源，每册一个子目录：book.yaml + assets/）
+    books_dir: Path = BACKEND_ROOT / "books"
     # SQLite 检索索引缓存目录
     data_dir: Path = BACKEND_ROOT / "data"
     db_name: str = "index.db"
