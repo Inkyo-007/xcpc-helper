@@ -165,9 +165,12 @@ watch(
 watch(
   () => props.detail?.name,
   () => {
-    // 换册：旧页面立即失效，立即重排
+    // 换册：旧页面立即失效，立即重排。
+    // watcher 默认在 DOM 更新前回调：首次进入（或换册）时 docModel 刚就绪，
+    // 渲染农场（v-if="docModel"）尚未挂载，同步重排会读到空 farm 而停在 idle。
+    // 等 nextTick 让农场渲染完成后再排。
     window.clearTimeout(timer)
-    void runPagination()
+    void nextTick(() => runPagination())
   },
 )
 
