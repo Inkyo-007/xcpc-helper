@@ -1,16 +1,23 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Check, ChevronRight, Flag, Plus, Search } from 'lucide-vue-next'
 import { NButton, NEmpty, NInput, NSelect } from 'naive-ui'
-import { MOCK_TEMPLATE_DETAIL_MAP } from '@/mock/printbook'
-import type { SortMode, TemplateSummary, TemplateVariant } from '@/types'
+import type { SortMode, TemplateDetail, TemplateSummary, TemplateVariant } from '@/types'
 
 const props = defineProps<{
   templates: TemplateSummary[]
+  /** 全量模板摘要：分类计数不受当前筛选影响 */
+  allTemplates: TemplateSummary[]
+  /** 已拉取的模板详情缓存；展开版本列表前由 request-detail 触发加载 */
+  details: Record<string, TemplateDetail>
 }>()
 
 const emit = defineEmits<{
   'add-template': [{ templateId: string; version: string | null; after: number }]
+  /** 搜索/分类/排序变化（父级 200ms 防抖后走后端查询） */
+  'query-change': [{ category: string; keyword: string; sort: SortMode }]
+  /** 展开某模板的版本列表前请求其详情 */
+  'request-detail': [templateId: string]
 }>()
 
 const HUE_PALETTE = [160, 25, 280, 200, 340, 80, 120, 300, 0, 220]
@@ -24,11 +31,11 @@ const activeId = ref<string | null>(null)
 
 const categories = computed(() => {
   const counts = new Map<string, number>()
-  for (const t of props.templates) {
+  for (const t of props.allTemplates) {
     counts.set(t.cat, (counts.get(t.cat) ?? 0) + 1)
   }
   return [
-    { id: 'all', name: '全部', count: props.templates.length, hue: null as number | null },
+    { id: 'all', name: '全部', count: props.allTemplates.length, hue: null as number | null },
     ...[...counts.entries()].map(([id, count], index) => ({
       id,
       name: id,
@@ -44,36 +51,18 @@ const SORT_OPTIONS = [
   { label: '按优先级', value: 'priority' },
 ]
 
-const filtered = computed(() => {
-  const keyword = query.value.trim().toLowerCase()
-  let list = props.templates.filter((t) => {
-    if (category.value !== 'all' && t.cat !== category.value) return false
-    if (!keyword) return true
-    const detail = MOCK_TEMPLATE_DETAIL_MAP[t.id]
-    const haystack = [
-      t.name,
-      t.cat,
-      ...t.tags,
-      detail?.desc ?? '',
-      ...(detail?.variants.map((v) => v.body + ' ' + v.code) ?? []),
-    ]
-      .join(' ')
-      .toLowerCase()
-    return haystack.includes(keyword)
-  })
-  const sorted = [...list]
-  if (sortMode.value === 'name') {
-    sorted.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-  } else if (sortMode.value === 'priority') {
-    sorted.sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name, 'zh-CN'))
-  } else {
-    sorted.sort(
-      (a, b) =>
-        (b.updated ?? '').localeCompare(a.updated ?? '') ||
-        a.name.localeCompare(b.name, 'zh-CN'),
-    )
-  }
-  return sorted
+// 搜索/分类/排序均由后端完成：本地变更 200ms 防抖后通知父级查询
+let queryTimer: ReturnType<typeof setTimeout> | null = null
+
+watch([query, category, sortMode], () => {
+  if (queryTimer) clearTimeout(queryTimer)
+  queryTimer = setTimeout(() => {
+    emit('query-change', {
+      category: category.value,
+      keyword: query.value.trim(),
+      sort: sortMode.value,
+    })
+  }, 200)
 })
 
 function categoryHue(cat: string): number {
@@ -96,6 +85,7 @@ function toggleTemplate(template: TemplateSummary): void {
     if (id !== template.id) openVariants.value[id] = false
   }
   openVariants.value[template.id] = !openVariants.value[template.id]
+  if (openVariants.value[template.id]) emit('request-detail', template.id)
 }
 
 function addVariant(template: TemplateSummary, variant: TemplateVariant): void {
@@ -148,14 +138,14 @@ function addVariant(template: TemplateSummary, variant: TemplateVariant): void {
       </div>
       <div class="tpl-tools">
         <n-select v-model:value="sortMode" class="sort-select" size="small" :options="SORT_OPTIONS" />
-        <span class="toolbar-meta">{{ filtered.length }} 个模板</span>
+        <span class="toolbar-meta">{{ templates.length }} 个模板</span>
       </div>
     </div>
 
     <div class="tpl-list pb-picker-list">
       <TransitionGroup name="tpl-list" tag="div" class="tpl-list-inner">
         <div
-          v-for="(template, index) in filtered"
+          v-for="(template, index) in templates"
           :key="template.id"
           class="tpl-item"
           :class="{ open: openVariants[template.id] }"
@@ -186,9 +176,9 @@ function addVariant(template: TemplateSummary, variant: TemplateVariant): void {
             </span>
             <ChevronRight class="tpl-chev" :size="14" />
           </button>
-          <div v-if="MOCK_TEMPLATE_DETAIL_MAP[template.id]" class="tpl-variants">
+          <div v-if="openVariants[template.id] && details[template.id]" class="tpl-variants">
             <button
-              v-for="variant in MOCK_TEMPLATE_DETAIL_MAP[template.id]?.variants ?? []"
+              v-for="variant in details[template.id]?.variants ?? []"
               :key="variant.id"
               type="button"
               class="tpl-variant"
@@ -202,7 +192,7 @@ function addVariant(template: TemplateSummary, variant: TemplateVariant): void {
         </div>
       </TransitionGroup>
       <n-empty
-        v-if="!filtered.length"
+        v-if="!templates.length"
         class="empty-panel"
         description="没有匹配的模板"
       >

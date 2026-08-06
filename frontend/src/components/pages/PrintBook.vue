@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
 import DeleteConfirmModal from '@/components/DeleteConfirmModal.vue'
 import BookNameModal from '@/components/printbook/BookNameModal.vue'
@@ -21,12 +21,15 @@ const message = useMessage()
 const {
   books,
   templates,
+  allTemplates,
+  details,
   activeBook,
   activeDetail,
   headingLevel,
   templateLevel,
   rememberHeadingLevel,
   rememberTemplateLevel,
+  init,
   selectBook,
   createBook,
   renameBook,
@@ -38,7 +41,14 @@ const {
   updateBlock,
   removeBlock,
   moveBlock,
+  pickerQuery,
+  ensureTemplateDetail,
 } = usePrintBooks()
+
+onMounted(async () => {
+  const result = await init()
+  if (!result.ok) message.error(result.message ?? '打印册加载失败')
+})
 
 const showBookName = ref(false)
 const bookNameMode = ref<'create' | 'rename'>('create')
@@ -49,24 +59,44 @@ const deletingBook = ref<PrintBookSummary | null>(null)
 const blockCount = computed(() => activeDetail.value?.blocks.length ?? 0)
 const blocks = computed(() => activeDetail.value?.blocks ?? [])
 
-function onAddBlock(type: BookBlockType, after: number): void {
-  addBlock(type, after)
+function report(result: { ok: boolean; message?: string }): void {
+  if (!result.ok) message.error(result.message ?? '操作失败')
 }
 
-function onAddImage(file: File, after: number): void {
-  addImage(file, after)
+async function onAddBlock(type: BookBlockType, after: number): Promise<void> {
+  report(await addBlock(type, after))
 }
 
-function onAddTemplate(templateId: string, version: string | null, after: number): void {
-  addTemplate(templateId, version, after)
+async function onAddImage(file: File, after: number): Promise<void> {
+  report(await addImage(file, after))
 }
 
-function onSaveBlock(block: BookBlock): void {
-  updateBlock(block)
+async function onAddTemplate(
+  templateId: string,
+  version: string | null,
+  after: number,
+): Promise<void> {
+  report(await addTemplate(templateId, version, after))
 }
 
-function onBookCreated(name: string, title: string): void {
-  const result = createBook(name, title)
+async function onSaveBlock(block: BookBlock, imageFile?: File): Promise<void> {
+  report(await updateBlock(block, imageFile))
+}
+
+async function onRemoveBlock(id: string): Promise<void> {
+  report(await removeBlock(id))
+}
+
+async function onMoveBlock(from: number, to: number): Promise<void> {
+  report(await moveBlock(from, to))
+}
+
+async function onSelectBook(name: string): Promise<void> {
+  report(await selectBook(name))
+}
+
+async function onBookCreated(name: string, title: string): Promise<void> {
+  const result = await createBook(name, title)
   if (result.ok) {
     message.success(`已创建打印册「${name}」`)
   } else {
@@ -74,10 +104,10 @@ function onBookCreated(name: string, title: string): void {
   }
 }
 
-function onBookRenamed(name: string): void {
+async function onBookRenamed(name: string): Promise<void> {
   const book = activeBook.value
   if (!book) return
-  const result = renameBook(book.name, name)
+  const result = await renameBook(book.name, name)
   if (result.ok) {
     message.success(`已重命名为「${name}」`)
   } else {
@@ -85,26 +115,34 @@ function onBookRenamed(name: string): void {
   }
 }
 
-function onSettingsSaved(
+async function onSettingsSaved(
   cover: PrintBookCover,
   options: PrintBookOptions,
   headingLevelValue: number,
   templateLevelValue: number,
-): void {
+): Promise<void> {
   const book = activeBook.value
   if (!book) return
-  updateSettings(book.name, cover, options)
-  rememberHeadingLevel(headingLevelValue)
-  rememberTemplateLevel(templateLevelValue)
-  message.success('已保存封面与选项')
+  const result = await updateSettings(book.name, cover, options)
+  if (result.ok) {
+    rememberHeadingLevel(headingLevelValue)
+    rememberTemplateLevel(templateLevelValue)
+    message.success('已保存封面与选项')
+  } else {
+    message.error(result.message ?? '保存失败')
+  }
 }
 
-function confirmDeleteBook(): void {
+async function confirmDeleteBook(): Promise<void> {
   const book = deletingBook.value
   if (!book) return
-  deleteBook(book.name)
-  message.success(`已删除打印册「${book.title || book.name}」`)
-  deletingBook.value = null
+  const result = await deleteBook(book.name)
+  if (result.ok) {
+    message.success(`已删除打印册「${book.title || book.name}」`)
+    deletingBook.value = null
+  } else {
+    message.error(result.message ?? '删除失败')
+  }
 }
 </script>
 
@@ -115,9 +153,11 @@ function confirmDeleteBook(): void {
         class="pb-panel pb-panel-left"
         :books="books"
         :templates="templates"
+        :all-templates="allTemplates"
+        :details="details"
         :active-name="activeBook?.name ?? null"
         :block-count="blockCount"
-        @select-book="selectBook"
+        @select-book="onSelectBook"
         @new-book="bookNameMode = 'create'; showBookName = true"
         @settings="showSettings = true"
         @rename="bookNameMode = 'rename'; showBookName = true"
@@ -125,14 +165,16 @@ function confirmDeleteBook(): void {
         @add-block="onAddBlock"
         @add-image="onAddImage"
         @add-template="onAddTemplate"
+        @picker-query="pickerQuery"
+        @request-detail="ensureTemplateDetail"
       />
 
       <EntryList
         class="pb-panel pb-panel-mid"
         :blocks="blocks"
         @edit="editingBlock = $event"
-        @delete="removeBlock"
-        @move="moveBlock"
+        @delete="onRemoveBlock"
+        @move="onMoveBlock"
       />
 
       <BookPreview class="pb-panel pb-panel-right" :detail="activeDetail" />

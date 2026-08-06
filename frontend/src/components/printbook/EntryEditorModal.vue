@@ -19,11 +19,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [show: boolean]
-  save: [block: BookBlock]
+  save: [block: BookBlock, imageFile?: File]
 }>()
 
 const message = useMessage()
 const draft = ref<BookBlock | null>(null)
+const pendingImageFile = ref<File | null>(null)
 const imageInput = ref<HTMLInputElement | null>(null)
 
 const headingDraft = computed(() => (draft.value?.type === 'heading' ? draft.value : null))
@@ -48,6 +49,7 @@ watch(
     if (show && props.block) {
       // 块对象经 Vue 响应式代理包裹，structuredClone 无法克隆 Proxy
       draft.value = JSON.parse(JSON.stringify(props.block)) as BookBlock
+      pendingImageFile.value = null
     }
   },
 )
@@ -82,6 +84,8 @@ function onImagePicked(event: Event): void {
   const file = input.files?.[0]
   const block = draft.value
   if (file && block && block.type === 'image') {
+    // 本地 blob 仅供弹窗内预览；保存时由父级上传后替换为资源 URL
+    pendingImageFile.value = file
     block.src = URL.createObjectURL(file)
     if (!block.caption) block.caption = file.name.replace(/\.[^.]+$/, '')
   }
@@ -95,7 +99,7 @@ function save(): void {
     message.error('章节标题不能为空')
     return
   }
-  emit('save', block)
+  emit('save', block, pendingImageFile.value ?? undefined)
   emit('update:show', false)
 }
 
@@ -213,7 +217,7 @@ function setImageWidth(value: string): void {
         <template v-else-if="imageDraft">
           <div class="pb-editor-image">
             <img
-              v-if="imageDraft.src.startsWith('blob:')"
+              v-if="imageDraft.src"
               :src="imageDraft.src"
               alt=""
               class="pb-editor-thumb"

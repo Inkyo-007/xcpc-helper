@@ -4,11 +4,19 @@ import { BookOpen, Pencil, Settings2, Trash2 } from 'lucide-vue-next'
 import { NButton, NSelect } from 'naive-ui'
 import BlockAddBar from '@/components/printbook/BlockAddBar.vue'
 import TemplatePicker from '@/components/printbook/TemplatePicker.vue'
-import type { BookBlockType, PrintBookSummary, TemplateSummary } from '@/types'
+import type {
+  BookBlockType,
+  PrintBookSummary,
+  SortMode,
+  TemplateDetail,
+  TemplateSummary,
+} from '@/types'
 
 const props = defineProps<{
   books: PrintBookSummary[]
   templates: TemplateSummary[]
+  allTemplates: TemplateSummary[]
+  details: Record<string, TemplateDetail>
   activeName: string | null
   blockCount: number
 }>()
@@ -22,6 +30,8 @@ const emit = defineEmits<{
   'add-block': [type: BookBlockType, after: number]
   'add-image': [file: File, after: number]
   'add-template': [templateId: string, version: string | null, after: number]
+  'picker-query': [query: { category: string; keyword: string; sort: SortMode }]
+  'request-detail': [templateId: string]
 }>()
 
 const selected = computed({
@@ -83,7 +93,11 @@ const bookOptions = computed(() => [
     </div>
     <TemplatePicker
       :templates="templates"
+      :all-templates="allTemplates"
+      :details="details"
       @add-template="emit('add-template', $event.templateId, $event.version, $event.after)"
+      @query-change="emit('picker-query', $event)"
+      @request-detail="emit('request-detail', $event)"
     />
   </div>
 </template>

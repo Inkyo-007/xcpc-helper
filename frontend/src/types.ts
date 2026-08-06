@@ -115,7 +115,7 @@ export interface PlaceholderMeta {
   hint: string
 }
 
-/* ============ 打印册（原型阶段，与后端 print_book 设计对齐） ============ */
+/* ============ 打印册（与后端 printbook 模块对齐） ============ */
 
 export type BookBlockType = 'heading' | 'template' | 'markdown' | 'image' | 'page_break'
 
@@ -124,7 +124,7 @@ export interface BookBlockBase {
   type: BookBlockType
 }
 
-/** template 块解析后携带的渲染素材（原型阶段直接内联） */
+/** template 块解析后携带的渲染素材（服务端实时解析并内联返回） */
 export interface ResolvedTemplateInfo {
   name: string
   cat: string
