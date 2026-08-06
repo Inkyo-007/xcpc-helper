@@ -12,6 +12,7 @@ import {
 import SideNav from '@/components/SideNav.vue'
 import TopBar from '@/components/TopBar.vue'
 import PlaceholderPage from '@/components/pages/PlaceholderPage.vue'
+import PrintBook from '@/components/pages/PrintBook.vue'
 import TemplateLibrary from '@/components/pages/TemplateLibrary.vue'
 import { useTheme } from '@/composables/useTheme'
 import { NAV_GROUPS, PLACEHOLDER_PAGES } from '@/data/nav'
@@ -187,6 +188,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
               <TemplateLibrary
                 v-if="activePage === 'lib'"
               />
+              <PrintBook v-else-if="activePage === 'books'" />
               <PlaceholderPage v-else :page="activePage" :meta="placeholderMeta" />
             </Transition>
           </section>
