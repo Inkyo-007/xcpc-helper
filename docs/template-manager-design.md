@@ -378,7 +378,7 @@ backend/
 - 前端新增 `src/api/` 请求层，`useTemplates` 异步拉取 API，分类由后端动态返回；
 - 扫描器对三种目录形态统一处理：模板目录直接含代码文件（单版本）、含多个副标签子目录（多版本）、只含一个子目录（折叠为单版本）；路径含中文名时须正确识别，不乱码不报错；完全为空的模板目录作为"空主标签"正常载入。
 
-### 5.6 打印册功能（print_book，2026-08-06 定稿）
+### 5.6 打印册功能（printbook，2026-08-06 定稿）
 
 打印册按 5.3 的扩展约定落地为新功能目录，产品与交互设计见第 4 节"打印册"。
 
@@ -390,20 +390,20 @@ backend/
 └── src/
     ├── common/
     │   └── validation.py        # 名称校验（自 modules/template/writer.py 纯搬移提升，模板/打印册共用）
-    ├── modules/print_book/
-    │   ├── models.py            # 内部模型：PrintBook / BookBlock（type 判别联合）/ BookOptions / BookIssue
+    ├── modules/printbook/
+    │   ├── models.py            # 内部模型：BookConfig / 五种块（type 判别联合）/ BookCover / BookOptions / StoredBookInfo
     │   ├── schemas.py           # API 契约
-    │   ├── store.py             # books/ 目录读写（tempfile+os.replace 原子写、threading.Lock）与 assets 管理
-    │   └── document.py          # 引用解析：块 → 解析后块 + 状态标注 + issues
-    ├── services/print_book/
-    │   └── service.py           # 编排：持有 TemplateService 引用，组装详情
-    └── routers/print_book/
+    │   ├── store.py             # books/ 目录读写（tempfile+os.replace 原子写）与 assets 管理
+    │   └── document.py          # 存储 ⇄ API 双向转换与模板引用解析（resolved 实时解析，不持久化）
+    ├── services/printbook/
+    │   └── service.py           # 编排：持有 TemplateService 引用，组装详情（threading.RLock 保护写操作）
+    └── routers/printbook/
         └── router.py            # 薄层，asyncio.to_thread 模式同模板路由
 ```
 
-- `main.py`：lifespan 中 `init_print_book_service(settings, template_service)`，一行 `include_router`；依赖方向严格单向 `print_book → template`，模板侧不感知打印册。
+- `main.py`：lifespan 中 `init_print_book_service(settings, template_service)`，一行 `include_router`；依赖方向严格单向 `printbook → template`，模板侧不感知打印册。
 - `config.py`：新增 `books_dir`（默认 `backend/books`，`XCPC_BOOKS_DIR` 覆盖）。
-- 后端无新增第三方依赖。
+- 后端新增依赖 `python-multipart`（图片上传 UploadFile 所需）。
 
 #### API
 
@@ -411,7 +411,7 @@ backend/
 | --- | --- | --- |
 | GET | `/api/print-books` | 册列表摘要（name、title、block_count、updated、error） |
 | POST | `/api/print-books` | 新建册 `{name, title?}`（201；重名 409） |
-| GET | `/api/print-books/{name}` | 册详情：cover/options + 解析后 blocks + issues |
+| GET | `/api/print-books/{name}` | 册详情：cover/options + 解析后 blocks（template 块内联 resolved） |
 | PUT | `/api/print-books/{name}` | 更新 cover/options，支持改名 `new_name`（冲突 409） |
 | DELETE | `/api/print-books/{name}` | 删除册（物理删除目录，204） |
 | PUT | `/api/print-books/{name}/blocks` | 全量替换块列表，**返回最新完整详情** |
@@ -426,15 +426,15 @@ backend/
 - `components/pages/PrintBook.vue` 替换 books 占位页 + `components/printbook/` 子组件目录（册下拉与操作菜单、块按钮组与插入位置控件、模板列表面板、条目列表、各类型编辑弹窗、预览、打印视图）。
 - 从 `TemplateDetail.vue` 抽出共享 `MarkdownView.vue`（marked + marked-katex-extension），预览说明框与模板库说明框同源渲染。
 - heading_level 按块类型的用户偏好记忆存 localStorage（`utils/storage.ts`）。
-- 左栏模板列表复用 `useTemplates` 数据（进入页面时 `init()`）。
-- 新依赖：vuedraggable@next（拖拽排序与自动滚动）、Paged.js（分页与页码目录）、highlight.js（打印静态高亮）。
+- 左栏模板列表由 `usePrintBooks` 经 `fetchTemplates` 独立拉取（服务端搜索/排序，200ms 防抖），展开版本时按需拉取模板详情缓存。
+- 新依赖：Paged.js（分页与页码目录）、highlight.js（打印静态高亮）；拖拽排序用原生 HTML5 DnD 实现（含边缘自动滚动）。
 - `.gitignore` 新增 `backend/books/.tmp-*`（原子写崩溃残留防御）；`books/` 本身入库。
 
 #### 测试计划
 
-- `tests/print_book/test_store.py`：yaml 读写回环、缺省字段省略、名称校验透传、重名 409、改名、损坏 yaml 的 error 标记、assets 上传限制；
-- `tests/print_book/test_document.py`：四种块状态、missing_version 回退、图片缺失、悬空 heading 警告；
-- `tests/print_book/test_router.py`：httpx 端到端（临时 content/ + books/），含 404/409/400 错误结构与全量替换返回详情；
+- `tests/printbook/test_store.py`：yaml 读写回环、缺省字段省略、名称校验透传、重名 409、改名、损坏 yaml 的 error 标记、assets 上传限制；
+- `tests/printbook/test_document.py`：双向转换、version 语义（null/`~`/副标签名/未命中回退）、模板缺失 resolved 为 None、assets URL 展开与还原；
+- `tests/printbook/test_service.py`：服务层链路与 TestClient 端到端（临时 content/ + books/），含 404/409/400 错误结构、blocks 全量替换返回详情、assets 上传与下载；
 - 前端：`npm run typecheck` + `npm run build` 通过；手动走查"新建册 → 添加块/模板版本 → 指定位置插入 → 拖拽排序 → 编辑 → 实时预览 → 导出 PDF"全链路。
 
 #### 实施顺序（原子化提交）
