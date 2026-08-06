@@ -18,52 +18,13 @@ from typing import Any
 
 import yaml
 
+from common.validation import FORBIDDEN_CHARS, RESERVED_NAMES, validate_name
 from core.exceptions import BadRequestError, ConflictError, NotFoundError
 from modules.template.models import DEFAULT_PRIORITY
 from modules.template.scanner import CODE_EXTENSIONS
 from modules.template.schemas import VersionMetaInput, VersionUpsert
 
-# Windows 保留设备名（不分大小写，目录名与文件名主名都禁止使用）
-_RESERVED_NAMES = {
-    "CON",
-    "PRN",
-    "AUX",
-    "NUL",
-    *(f"COM{i}" for i in range(1, 10)),
-    *(f"LPT{i}" for i in range(1, 10)),
-}
-
-# 目录名/文件名中禁止出现的字符（Windows 非法字符 + 路径分隔符）
-_FORBIDDEN_CHARS = set('/\\:*?"<>|')
-
-# 名称长度上限（防止超长路径在 Windows 上踩 MAX_PATH 坑）
-_MAX_NAME_LEN = 100
-
-
-def validate_name(name: str, kind: str) -> str:
-    """校验目录名（分类/模板/副标签），返回去空白后的名字，非法时抛 400。
-
-    kind 是"分类"/"模板"/"副标签"这类中文称呼，用于拼装错误信息。
-    """
-    cleaned = name.strip()
-    if not cleaned:
-        raise BadRequestError(f"{kind}名称不能为空")
-    if len(cleaned) > _MAX_NAME_LEN:
-        raise BadRequestError(f"{kind}名称过长（最多 {_MAX_NAME_LEN} 个字符）")
-    bad = sorted(set(cleaned) & _FORBIDDEN_CHARS)
-    if bad:
-        raise BadRequestError(f"{kind}名称包含非法字符: {' '.join(bad)}")
-    if cleaned.startswith("."):
-        raise BadRequestError(f"{kind}名称不能以点开头（会被扫描器忽略）")
-    if cleaned != cleaned.rstrip(" ."):
-        raise BadRequestError(f"{kind}名称不能以空格或点结尾")
-    if cleaned in (".", "..") or ".." in cleaned:
-        raise BadRequestError(f"{kind}名称不能包含 '..'")
-    if cleaned == "~":
-        raise BadRequestError(f"{kind}名称不能使用保留字 '~'")
-    if cleaned.upper() in _RESERVED_NAMES:
-        raise BadRequestError(f"{kind}名称不能使用 Windows 保留名: {cleaned}")
-    return cleaned
+# 名称校验规则已提升至 common.validation（打印册功能共用）
 
 
 def validate_ext(ext: str) -> str:
@@ -84,12 +45,12 @@ def validate_code_filename(file: str, ext: str) -> str:
     stem = cleaned[: -len(suffix)]
     if not stem or stem.startswith(".") or stem != stem.rstrip(" ."):
         raise BadRequestError(f"代码文件名不合法: {file!r}")
-    bad = sorted(set(cleaned) & _FORBIDDEN_CHARS)
+    bad = sorted(set(cleaned) & FORBIDDEN_CHARS)
     if bad:
         raise BadRequestError(f"代码文件名包含非法字符: {' '.join(bad)}")
     if ".." in cleaned:
         raise BadRequestError("代码文件名不能包含 '..'")
-    if stem.upper() in _RESERVED_NAMES:
+    if stem.upper() in RESERVED_NAMES:
         raise BadRequestError(f"代码文件名不能使用 Windows 保留名: {stem}")
     return cleaned
 
