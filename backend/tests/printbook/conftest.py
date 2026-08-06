@@ -3,8 +3,13 @@
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from core.config import Settings
+from core.exceptions import register_exception_handlers
+from routers.printbook.router import router as printbook_router
+from services.printbook.service import PrintBookService, get_print_book_service
 from services.template.service import TemplateService
 
 CPP = "#include <bits/stdc++.h>\nusing namespace std;\n"
@@ -51,3 +56,18 @@ def template_service(content_dir: Path, tmp_path: Path) -> TemplateService:
     )
     service.rebuild()
     return service
+
+
+@pytest.fixture
+def service(books_dir: Path, template_service: TemplateService) -> PrintBookService:
+    return PrintBookService(Settings(books_dir=books_dir), template_service)
+
+
+@pytest.fixture
+def client(service: PrintBookService) -> TestClient:
+    """仅挂载打印册路由的最小应用，service 依赖覆盖为临时目录实例。"""
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(printbook_router)
+    app.dependency_overrides[get_print_book_service] = lambda: service
+    return TestClient(app)

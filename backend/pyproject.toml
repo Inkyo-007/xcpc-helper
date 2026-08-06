@@ -10,6 +10,7 @@ dependencies = [
     "pydantic-settings>=2.7",
     "pyyaml>=6.0",
     "watchdog>=6.0",
+    "python-multipart>=0.0.32",
 ]
 
 [dependency-groups]
