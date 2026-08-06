@@ -7,6 +7,7 @@ import BookSettingsModal from '@/components/printbook/BookSettingsModal.vue'
 import BookSidePanel from '@/components/printbook/BookSidePanel.vue'
 import EntryEditorModal from '@/components/printbook/EntryEditorModal.vue'
 import EntryList from '@/components/printbook/EntryList.vue'
+import BookPreview from '@/components/printbook/preview/BookPreview.vue'
 import { usePrintBooks } from '@/composables/usePrintBooks'
 import type {
   BookBlock,
@@ -134,7 +135,7 @@ function confirmDeleteBook(): void {
         @move="moveBlock"
       />
 
-      <div class="pb-panel pb-panel-right"></div>
+      <BookPreview class="pb-panel pb-panel-right" :detail="activeDetail" />
     </div>
 
     <BookNameModal

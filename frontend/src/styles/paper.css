@@ -1,0 +1,540 @@
+/* ============================================================
+   打印册纸面样式：固定浅色（纸白墨黑），不随应用主题变化。
+   作用于屏幕预览的 Paged.js 页框与打印输出，二者同源同构。
+   ============================================================ */
+
+.pb-doc {
+  --paper-ink: #1f2328;
+  --paper-muted: #57606a;
+  --paper-faint: #8b949e;
+  --paper-border: #d0d4da;
+  --paper-code-bg: #f6f8fa;
+  --paper-code-border: #d8dce2;
+  --paper-accent: #0e6b5c;
+  --paper-accent-soft: #eef7f4;
+
+  color: var(--paper-ink);
+  font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+  font-size: 10pt;
+  line-height: 1.6;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.pb-doc *,
+.pb-doc *::before,
+.pb-doc *::after {
+  box-sizing: border-box;
+}
+
+/* ---------------- 封面 ---------------- */
+
+.pb-doc-cover {
+  page: cover;
+  /* 内容区高 267mm，留出余量避免溢出产生空白页 */
+  min-height: 264mm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  break-inside: avoid;
+}
+
+.pb-cover-logo {
+  max-width: 40mm;
+  max-height: 40mm;
+  margin-bottom: 12mm;
+}
+
+.pb-cover-title {
+  font-size: 30pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0 0 6mm;
+}
+
+.pb-cover-subtitle {
+  font-size: 14pt;
+  color: var(--paper-muted);
+  margin: 0 0 4mm;
+}
+
+.pb-cover-author {
+  font-size: 11pt;
+  color: var(--paper-muted);
+  margin: 0;
+}
+
+.pb-cover-rule {
+  width: 42mm;
+  border: 0;
+  border-top: 2px solid var(--paper-accent);
+  margin: 10mm 0;
+}
+
+.pb-cover-date {
+  font-size: 10pt;
+  color: var(--paper-faint);
+  margin: 0;
+}
+
+/* ---------------- 目录 ---------------- */
+
+.pb-doc-toc {
+  break-before: page;
+  /* 目录独占整页，正文始终从新的一页开始 */
+  break-after: page;
+}
+
+.pb-toc-head {
+  font-size: 17pt;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 8mm;
+  padding-bottom: 3mm;
+  border-bottom: 1.5px solid var(--paper-ink);
+}
+
+.pb-toc-empty {
+  color: var(--paper-faint);
+  text-align: center;
+  margin: 10mm 0 0;
+}
+
+.pb-toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pb-toc-entry {
+  display: flex;
+  align-items: baseline;
+  margin: 0 0 2.2mm;
+  break-inside: avoid;
+}
+
+.pb-toc-title {
+  flex: none;
+  max-width: 75%;
+  color: var(--paper-ink);
+}
+
+.pb-toc-dots {
+  flex: 1;
+  min-width: 8mm;
+  margin: 0 2mm;
+  border-bottom: 1px dotted var(--paper-faint);
+  transform: translateY(-1mm);
+}
+
+.pb-toc-pg {
+  flex: none;
+  color: var(--paper-ink);
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 目录页码规则不在此处：target-counter 必须经 Paged.js polisher 处理，
+   见 printbook/pagination.ts 的 PAGE_CSS。 */
+
+.pb-toc-l1 { font-size: 11.5pt; font-weight: 700; margin-top: 3mm; }
+.pb-toc-l2 { font-size: 10.5pt; font-weight: 600; padding-left: 5mm; }
+.pb-toc-l3 { font-size: 10pt; padding-left: 10mm; }
+.pb-toc-l4 { font-size: 9.5pt; padding-left: 15mm; color: var(--paper-muted); }
+.pb-toc-l5 { font-size: 9.5pt; padding-left: 20mm; color: var(--paper-muted); }
+.pb-toc-l6 { font-size: 9pt; padding-left: 25mm; color: var(--paper-muted); }
+
+.pb-toc-l4 .pb-toc-title,
+.pb-toc-l5 .pb-toc-title,
+.pb-toc-l6 .pb-toc-title,
+.pb-toc-l4 .pb-toc-pg,
+.pb-toc-l5 .pb-toc-pg,
+.pb-toc-l6 .pb-toc-pg {
+  color: var(--paper-muted);
+}
+
+/* ---------------- 分页边界 ---------------- */
+
+.pb-brk {
+  break-before: page;
+}
+
+/* ---------------- 标题层级 ---------------- */
+
+.pb-h {
+  margin: 5mm 0 2.5mm;
+  line-height: 1.3;
+  break-inside: avoid;
+  break-after: avoid;
+}
+
+.pb-h1 {
+  font-size: 19pt;
+  font-weight: 700;
+  padding-bottom: 2mm;
+  border-bottom: 2px solid var(--paper-accent);
+  margin-top: 0;
+}
+
+.pb-h2 {
+  font-size: 15pt;
+  font-weight: 700;
+  border-bottom: 1px solid var(--paper-border);
+  padding-bottom: 1.5mm;
+}
+
+.pb-h3 {
+  font-size: 12.5pt;
+  font-weight: 700;
+  color: var(--paper-accent);
+}
+
+.pb-h4 { font-size: 11pt; font-weight: 700; }
+.pb-h5 { font-size: 10.5pt; font-weight: 600; }
+.pb-h6 { font-size: 10pt; font-weight: 600; color: var(--paper-muted); }
+
+/* ---------------- 模板节 ---------------- */
+
+.pb-doc-sec {
+  margin: 0 0 4mm;
+}
+
+.pb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.5mm 3mm;
+  font-size: 8.5pt;
+  color: var(--paper-muted);
+  margin: 0 0 2mm;
+  break-inside: avoid;
+  break-after: avoid;
+}
+
+.pb-meta b {
+  color: var(--paper-faint);
+  font-weight: 600;
+  margin-right: 1mm;
+}
+
+.pb-meta-ver {
+  font-weight: 700;
+  color: var(--paper-accent);
+  border: 1px solid var(--paper-accent);
+  border-radius: 3px;
+  padding: 0 1.5mm;
+  font-size: 8pt;
+}
+
+.pb-meta-tag {
+  border: 1px solid var(--paper-border);
+  border-radius: 3px;
+  padding: 0 1.5mm;
+  font-size: 8pt;
+  color: var(--paper-muted);
+}
+
+.pb-meta a {
+  color: var(--paper-accent);
+  text-decoration: none;
+}
+
+/* ---------------- 代码块（逐行渲染，行间分页，绝不截断半行） ---------------- */
+
+.pb-code {
+  margin: 0 0 2.5mm;
+  padding: 2mm 0;
+  background: var(--paper-code-bg);
+  border: 1px solid var(--paper-code-border);
+  border-radius: 4px;
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
+  font-size: 8.5pt;
+  line-height: 1.5;
+  white-space: normal;
+}
+
+.pb-code-line {
+  position: relative;
+  padding-left: 3.6em;
+  padding-right: 2mm;
+  break-inside: avoid;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.pb-code-ln {
+  position: absolute;
+  left: 0;
+  width: 2.9em;
+  text-align: right;
+  color: var(--paper-faint);
+  font-size: 7.5pt;
+  user-select: none;
+}
+
+.pb-code-tx {
+  color: var(--paper-ink);
+}
+
+/* highlight.js 纸面配色（浅底高对比，黑白打印靠字重区分关键字） */
+.pb-code .hljs-comment,
+.pb-code .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.pb-code .hljs-keyword,
+.pb-code .hljs-selector-tag,
+.pb-code .hljs-meta {
+  color: #d73a49;
+  font-weight: 600;
+}
+
+.pb-code .hljs-string,
+.pb-code .hljs-regexp {
+  color: #032f62;
+}
+
+.pb-code .hljs-number,
+.pb-code .hljs-literal {
+  color: #005cc5;
+}
+
+.pb-code .hljs-title,
+.pb-code .hljs-name,
+.pb-code .hljs-section {
+  color: #6f42c1;
+}
+
+.pb-code .hljs-type,
+.pb-code .hljs-built_in,
+.pb-code .hljs-class .hljs-title {
+  color: #005cc5;
+}
+
+.pb-code .hljs-attr,
+.pb-code .hljs-attribute,
+.pb-code .hljs-variable,
+.pb-code .hljs-template-variable {
+  color: #1f2328;
+}
+
+.pb-code .hljs-preprocessor {
+  color: #d73a49;
+}
+
+/* ---------------- 说明框（紧贴代码下方） ---------------- */
+
+.pb-body {
+  margin: 0 0 2.5mm;
+  padding: 2mm 3mm;
+  background: var(--paper-accent-soft);
+  border-left: 3px solid var(--paper-accent);
+  border-radius: 0 4px 4px 0;
+  font-size: 9pt;
+}
+
+/* ---------------- Markdown 内容 ---------------- */
+
+.pb-md {
+  font-size: 10pt;
+}
+
+.pb-md > :first-child { margin-top: 0; }
+.pb-md > :last-child { margin-bottom: 0; }
+
+.pb-md p {
+  margin: 0 0 2mm;
+  break-inside: avoid;
+}
+
+.pb-md h1,
+.pb-md h2,
+.pb-md h3,
+.pb-md h4,
+.pb-md h5,
+.pb-md h6 {
+  margin: 3mm 0 1.5mm;
+  line-height: 1.35;
+  break-inside: avoid;
+  break-after: avoid;
+}
+
+.pb-md h1 { font-size: 14pt; }
+.pb-md h2 { font-size: 12.5pt; }
+.pb-md h3 { font-size: 11.5pt; }
+.pb-md h4 { font-size: 10.5pt; }
+.pb-md h5 { font-size: 10pt; }
+.pb-md h6 { font-size: 9.5pt; color: var(--paper-muted); }
+
+.pb-md ul,
+.pb-md ol {
+  margin: 0 0 2mm;
+  padding-left: 6mm;
+}
+
+.pb-md li {
+  margin: 0 0 1mm;
+  break-inside: avoid;
+}
+
+.pb-md code {
+  font-family: "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+  font-size: 8.5pt;
+  background: var(--paper-code-bg);
+  border: 1px solid var(--paper-code-border);
+  border-radius: 3px;
+  padding: 0 1mm;
+}
+
+.pb-md pre {
+  margin: 0 0 2.5mm;
+  padding: 2mm 3mm;
+  background: var(--paper-code-bg);
+  border: 1px solid var(--paper-code-border);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 8.5pt;
+  line-height: 1.5;
+}
+
+.pb-md pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.pb-md blockquote {
+  margin: 0 0 2mm;
+  padding: 1mm 3mm;
+  border-left: 3px solid var(--paper-border);
+  color: var(--paper-muted);
+}
+
+.pb-md table {
+  border-collapse: collapse;
+  margin: 0 0 2.5mm;
+  width: 100%;
+  font-size: 9pt;
+}
+
+.pb-md th,
+.pb-md td {
+  border: 1px solid var(--paper-border);
+  padding: 1mm 2mm;
+  text-align: left;
+}
+
+.pb-md th {
+  background: var(--paper-code-bg);
+}
+
+.pb-md hr {
+  border: 0;
+  border-top: 1px solid var(--paper-border);
+  margin: 4mm 0;
+}
+
+.pb-md a {
+  color: var(--paper-accent);
+  text-decoration: none;
+}
+
+.pb-md img {
+  max-width: 100%;
+}
+
+.pb-md .katex-display {
+  margin: 2mm 0;
+  font-size: 0.98em;
+}
+
+/* ---------------- 图片块 ---------------- */
+
+.pb-fig {
+  margin: 0 0 3mm;
+  text-align: center;
+  break-inside: avoid;
+}
+
+.pb-fig img {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.pb-fig figcaption {
+  margin-top: 1.5mm;
+  font-size: 8.5pt;
+  color: var(--paper-muted);
+}
+
+.pb-img-missing {
+  display: inline-block;
+  width: 60%;
+  padding: 8mm 4mm;
+  border: 1px dashed var(--paper-faint);
+  border-radius: 4px;
+  color: var(--paper-faint);
+  font-size: 9pt;
+}
+
+/* ---------------- 屏幕侧：页框陈列（仅 screen，打印时被 Paged.js 基础样式重置） ---------------- */
+
+@media screen {
+  .pb-pages-host .pagedjs_pages {
+    padding: 20px 0;
+  }
+
+  .pb-pages-host .pagedjs_page {
+    margin: 0 auto 20px;
+    box-shadow: 0 2px 12px rgb(25 20 10 / 0.22);
+    background: #ffffff;
+  }
+}
+
+/* ---------------- 打印舞台 ---------------- */
+
+.pb-print-stage {
+  display: none;
+}
+
+@media print {
+  body.pb-printing #app {
+    display: none !important;
+  }
+
+  body.pb-printing .pb-print-stage {
+    display: block !important;
+  }
+
+  body.pb-printing {
+    background: #ffffff;
+  }
+}
+
+/* ---------------- 渲染农场（隐藏态文档源，仅供序列化） ---------------- */
+
+.pb-flow-farm {
+  position: fixed;
+  top: 0;
+  left: -12000px;
+  width: 180mm;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* 离屏分页沙盒：Paged.js 布局需要真实测量，
+   必须保持布局（visibility 隐藏而非 display:none） */
+
+.pb-paginate-sandbox {
+  position: fixed;
+  top: 0;
+  left: -12000px;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+}

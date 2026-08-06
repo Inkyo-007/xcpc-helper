@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Inbox, Pencil, Trash2 } from 'lucide-vue-next'
-import { Marked } from 'marked'
-import markedKatex from 'marked-katex-extension'
-import 'katex/dist/katex.min.css'
 import { NButton } from 'naive-ui'
 import CodeView from '@/components/CodeView.vue'
+import MarkdownView from '@/components/MarkdownView.vue'
 import type { LangId, TemplateDetail, TemplateVariant } from '@/types'
 
 const props = defineProps<{
@@ -38,10 +36,6 @@ const shownPriority = computed(() =>
 
 // 说明框随版本切换显示对应版本的 README 正文；本地内容可信，直接渲染
 const desc = computed(() => props.variant?.body ?? props.detail.desc)
-// 支持 $...$ 行内公式与 $$...$$ 块级公式（KaTeX）
-const marked = new Marked()
-marked.use(markedKatex({ throwOnError: false }))
-const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
 </script>
 
 <template>
@@ -92,8 +86,7 @@ const descHtml = computed(() => (desc.value ? marked.parse(desc.value) : ''))
       </div>
     </div>
     <CodeView :code="code" :file="file" :lang="lang" />
-    <!-- eslint-disable-next-line vue/no-v-html -->
-    <div v-if="descHtml" class="detail-desc" v-html="descHtml"></div>
+    <MarkdownView v-if="desc" class="detail-desc" :content="desc" />
     </template>
   </div>
 </template>
