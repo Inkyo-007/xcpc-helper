@@ -8,25 +8,38 @@ options:
   include_body: true
   h1_page_break: true
 blocks:
-  - type: heading
-    title: 数学
-    heading_level: 1
-  - type: template
-    template: 数学/快速幂
-  - type: template
-    template: 数学/线性筛
-  - type: page_break
-  - type: heading
-    title: 数据结构
-    heading_level: 1
-  - type: template
-    template: 数据结构/并查集
-    version: 带权
-  - type: markdown
-    title: 使用说明
-    content: 以上为常用数据结构模板，按队伍习惯增删。
-  - type: heading
-    title: 字符串
-    heading_level: 1
-  - type: template
-    template: 字符串/KMP
+- id: heading-1
+  type: heading
+  title: 数学
+  heading_level: 1
+- id: template-2
+  type: template
+  template: 数学/快速幂
+  heading_level: 3
+- id: template-3
+  type: template
+  template: 数学/线性筛
+  heading_level: 3
+- id: page_break-4
+  type: page_break
+- id: heading-5
+  type: heading
+  title: 数据结构
+  heading_level: 1
+- id: template-6
+  type: template
+  template: 数据结构/并查集
+  version: 带权
+  heading_level: 3
+- id: markdown-7
+  type: markdown
+  title: 使用说明
+  content: 以上为常用数据结构模板，按队伍习惯增删。
+- id: heading-8
+  type: heading
+  title: 字符串
+  heading_level: 1
+- id: template-9
+  type: template
+  template: 字符串/KMP
+  heading_level: 3
