@@ -65,7 +65,6 @@ function isTemplate(sec: DocSection): sec is TemplateSection {
       <p v-if="doc.subtitle" class="pb-cover-subtitle">{{ doc.subtitle }}</p>
       <hr class="pb-cover-rule" />
       <p v-if="doc.author" class="pb-cover-author">{{ doc.author }}</p>
-      <p class="pb-cover-date">{{ doc.date }}</p>
     </section>
 
     <!-- 目录：页码由 target-counter 在分页后回填 -->

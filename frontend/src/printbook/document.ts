@@ -82,8 +82,6 @@ export interface BookDocument {
   subtitle: string | null
   author: string | null
   logo: string | null
-  /** 生成日期（封面落款） */
-  date: string
   /** null=不生成目录 */
   toc: TocEntry[] | null
   sections: DocSection[]
@@ -102,7 +100,7 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n)
 }
 
-export function buildDocument(input: BuildInput, now: Date = new Date()): BookDocument {
+export function buildDocument(input: BuildInput): BookDocument {
   const { cover, options, blocks } = input
   const issues: BookIssue[] = []
   const sections: DocSection[] = []
@@ -234,7 +232,6 @@ export function buildDocument(input: BuildInput, now: Date = new Date()): BookDo
     subtitle: cover.subtitle,
     author: cover.author,
     logo: cover.logo,
-    date: now.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
     toc: options.include_toc ? tocEntries : null,
     sections,
     issues,

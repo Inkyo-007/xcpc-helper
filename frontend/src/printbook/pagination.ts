@@ -24,8 +24,9 @@ export const PAGE_CSS = `
   @bottom-right {
     content: counter(page);
     font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
-    font-size: 8.5pt;
-    color: #8a8f98;
+    font-size: 11pt;
+    font-weight: 700;
+    color: #3d4451;
   }
 }
 @page cover {

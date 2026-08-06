@@ -73,12 +73,6 @@
   margin: 10mm 0;
 }
 
-.pb-cover-date {
-  font-size: 10pt;
-  color: var(--paper-faint);
-  margin: 0;
-}
-
 /* ---------------- 目录 ---------------- */
 
 .pb-doc-toc {

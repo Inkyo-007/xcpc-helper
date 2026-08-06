@@ -78,10 +78,7 @@ const img = (): ImageBlock => ({
 const brk = (): PageBreakBlock => ({ id: nid(), type: 'page_break' })
 
 function build(blocks: BuildInput['blocks'], options: Partial<PrintBookOptions> = {}) {
-  return buildDocument(
-    { cover: COVER, options: { ...OPTIONS, ...options }, blocks },
-    new Date('2026-08-06T12:00:00'),
-  )
+  return buildDocument({ cover: COVER, options: { ...OPTIONS, ...options }, blocks })
 }
 
 describe('buildDocument · 目录选项', () => {
