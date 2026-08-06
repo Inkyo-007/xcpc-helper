@@ -86,6 +86,23 @@ button {
   font: inherit;
 }
 
+/* Naive UI 对 :focus（而非仅 :focus-visible）套用加深底色，
+   导致鼠标点击按钮、或弹窗关闭把焦点归还给触发按钮后，按钮看起来"卡住"。
+   这里让鼠标获得的焦点恢复默认配色，键盘焦点（:focus-visible）不受影响。
+   特异性高于 .n-button:not(.n-button--disabled):focus，加载顺序无关。 */
+.n-button:not(.n-button--disabled):focus:not(:focus-visible):not(:hover):not(:active) {
+  background-color: var(--n-color);
+  color: var(--n-text-color);
+}
+
+.n-button:not(.n-button--disabled):focus:not(:focus-visible):not(:hover):not(:active) .n-button__state-border {
+  border: var(--n-border);
+}
+
+.n-button:not(.n-button--disabled):focus:not(:focus-visible):not(:hover):not(:active) .n-button__border {
+  border-color: var(--n-border-color);
+}
+
 ::selection {
   background: var(--accent-soft);
 }
