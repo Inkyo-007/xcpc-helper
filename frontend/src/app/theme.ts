@@ -77,6 +77,16 @@ export function createThemeOverrides(light: boolean, hue: number): GlobalThemeOv
       color: 'var(--text)',
       textColor: 'var(--bg)',
       borderRadius: '6px',
+      // NTooltip 内部复用 NPopover 渲染：背景色取自 Popover 主题而非 Tooltip.color，
+      // 必须同步覆盖 peers.Popover，否则背景会沿用全局 Popover 的 var(--surface)，
+      // 与文字色 var(--bg) 撞色（明暗主题下文字均不可读）
+      peers: {
+        Popover: {
+          color: 'var(--text)',
+          textColor: 'var(--bg)',
+          borderRadius: '6px',
+        },
+      },
     },
     Message: {
       color: 'var(--text)',

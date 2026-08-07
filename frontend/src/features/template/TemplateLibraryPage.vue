@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { Check, ChevronRight, Flag, Inbox, Plus, RefreshCw, Search } from 'lucide-vue-next'
-import { NAlert, NButton, NEmpty, NInput, NSelect, NSpin, useMessage } from 'naive-ui'
+import { NAlert, NButton, NEmpty, NInput, NSelect, NSpin, NTooltip, useMessage } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
 import TemplateCreateModal from '@/features/template/components/TemplateCreateModal.vue'
 import TemplateDetail from '@/features/template/components/TemplateDetail.vue'
@@ -310,23 +310,31 @@ async function confirmDeleteVersion(): Promise<void> {
             </Transition>
           </div>
           <div class="tpl-tools">
-            <n-button
-              size="small"
-              quaternary
-              title="新增模板（空主标签）"
-              @click="showCreate = true"
-            >
-              <template #icon><Plus :size="14" /></template>
-            </n-button>
-            <n-button
-              size="small"
-              quaternary
-              :loading="reloading"
-              title="重建索引（content/ 变更后同步）"
-              @click="onReload"
-            >
-              <template #icon><RefreshCw :size="14" /></template>
-            </n-button>
+            <n-tooltip>
+              <template #trigger>
+                <n-button
+                  size="small"
+                  quaternary
+                  @click="showCreate = true"
+                >
+                  <template #icon><Plus :size="14" /></template>
+                </n-button>
+              </template>
+              新增模板
+            </n-tooltip>
+            <n-tooltip>
+              <template #trigger>
+                <n-button
+                  size="small"
+                  quaternary
+                  :loading="reloading"
+                  @click="onReload"
+                >
+                  <template #icon><RefreshCw :size="14" /></template>
+                </n-button>
+              </template>
+              手动刷新
+            </n-tooltip>
             <n-select
               v-model:value="sortMode"
               class="sort-select"
@@ -381,9 +389,14 @@ async function confirmDeleteVersion(): Promise<void> {
                       <template v-if="template.updated"
                         >{{ template.updated }}<span class="tpl-meta-sep">·</span></template
                       >
-                      <span class="tpl-priority" :title="`优先级 ${template.priority}（多版本取最大值）`"
-                        ><Flag :size="10" />{{ template.priority }}</span
-                      >
+                      <n-tooltip>
+                        <template #trigger>
+                          <span class="tpl-priority"
+                            ><Flag :size="10" />{{ template.priority }}</span
+                          >
+                        </template>
+                        优先级 {{ template.priority }}（多版本取最大值）
+                      </n-tooltip>
                     </span>
                   </span>
                   <ChevronRight class="tpl-chev" :size="14" />
@@ -406,14 +419,18 @@ async function confirmDeleteVersion(): Promise<void> {
                     <span class="variant-name">{{ variant.name }}</span>
                     <span class="variant-lang">{{ variant.lang }}</span>
                   </button>
-                  <button
-                    type="button"
-                    class="tpl-variant tpl-add"
-                    title="新增版本"
-                    @click="onAddVersion(template)"
-                  >
-                    <Plus :size="12" />
-                  </button>
+                  <n-tooltip>
+                    <template #trigger>
+                      <button
+                        type="button"
+                        class="tpl-variant tpl-add"
+                        @click="onAddVersion(template)"
+                      >
+                        <Plus :size="12" />
+                      </button>
+                    </template>
+                    新增版本
+                  </n-tooltip>
                 </div>
               </div>
             </TransitionGroup>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Check, Monitor, Moon, Palette, Sun } from 'lucide-vue-next'
-import { NPopover, NSlider } from 'naive-ui'
+import { NPopover, NSlider, NTooltip } from 'naive-ui'
 import type { ThemeMode } from '@/shared/composables/useTheme'
 
 defineProps<{
@@ -57,15 +57,19 @@ function chooseTheme(value: ThemeMode): void {
         @update:show="hueOpen = $event"
       >
         <template #trigger>
-          <button
-            type="button"
-            class="icon-btn"
-            aria-label="调整主题色相"
-            title="调整主题色相"
-            @click="hueOpen = !hueOpen"
-          >
-            <Palette :size="17" />
-          </button>
+          <n-tooltip>
+            <template #trigger>
+              <button
+                type="button"
+                class="icon-btn"
+                aria-label="调整主题色相"
+                @click="hueOpen = !hueOpen"
+              >
+                <Palette :size="17" />
+              </button>
+            </template>
+            调整主题色相
+          </n-tooltip>
         </template>
         <div class="hue-pop">
           <div class="hue-pop-head">
@@ -80,16 +84,18 @@ function chooseTheme(value: ThemeMode): void {
             @update:value="setHue"
           />
           <div class="hue-presets">
-            <button
-              v-for="h in PRESETS"
-              :key="h"
-              type="button"
-              class="swatch"
-              :class="{ active: h === hue }"
-              :style="{ background: `hsl(${h} 60% 50%)` }"
-              :title="`色相 ${h}°`"
-              @click="setHue(h)"
-            ></button>
+            <n-tooltip v-for="h in PRESETS" :key="h">
+              <template #trigger>
+                <button
+                  type="button"
+                  class="swatch"
+                  :class="{ active: h === hue }"
+                  :style="{ background: `hsl(${h} 60% 50%)` }"
+                  @click="setHue(h)"
+                ></button>
+              </template>
+              色相 {{ h }}°
+            </n-tooltip>
           </div>
         </div>
       </n-popover>

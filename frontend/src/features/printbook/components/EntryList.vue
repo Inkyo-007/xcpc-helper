@@ -11,7 +11,7 @@ import {
   SeparatorHorizontal,
   Trash2,
 } from 'lucide-vue-next'
-import { NButton, NEmpty } from 'naive-ui'
+import { NButton, NEmpty, NTooltip } from 'naive-ui'
 import type { BookBlock, BookBlockType } from '@/features/printbook/types'
 
 defineProps<{
@@ -151,24 +151,27 @@ function onDragEnd(): void {
             <span class="pb-entry-meta">{{ typeMeta(block).detail }}</span>
           </span>
           <span class="pb-entry-actions">
-            <n-button
-              v-if="block.type !== 'page_break'"
-              quaternary
-              size="tiny"
-              title="编辑"
-              @click="emit('edit', block)"
-            >
-              <template #icon><Pencil :size="13" /></template>
-            </n-button>
-            <n-button
-              quaternary
-              size="tiny"
-              title="删除"
-              class="pb-entry-delete"
-              @click="emit('delete', block.id)"
-            >
-              <template #icon><Trash2 :size="13" /></template>
-            </n-button>
+            <n-tooltip v-if="block.type !== 'page_break'">
+              <template #trigger>
+                <n-button quaternary size="tiny" @click="emit('edit', block)">
+                  <template #icon><Pencil :size="13" /></template>
+                </n-button>
+              </template>
+              编辑
+            </n-tooltip>
+            <n-tooltip>
+              <template #trigger>
+                <n-button
+                  quaternary
+                  size="tiny"
+                  class="pb-entry-delete"
+                  @click="emit('delete', block.id)"
+                >
+                  <template #icon><Trash2 :size="13" /></template>
+                </n-button>
+              </template>
+              删除
+            </n-tooltip>
           </span>
         </div>
       </TransitionGroup>

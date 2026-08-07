@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { BookOpen, Pencil, Settings2, Trash2 } from 'lucide-vue-next'
-import { NButton, NSelect } from 'naive-ui'
+import { NButton, NSelect, NTooltip } from 'naive-ui'
 import BlockAddBar from '@/features/printbook/components/BlockAddBar.vue'
 import TemplatePicker from '@/features/printbook/components/TemplatePicker.vue'
 import type { BookBlockType, PrintBookSummary } from '@/features/printbook/types'
@@ -58,21 +58,35 @@ const bookOptions = computed(() => [
         />
       </div>
       <div class="pb-book-actions">
-        <n-button quaternary size="small" title="重命名打印册" @click="emit('rename')">
-          <template #icon><Pencil :size="14" /></template>
-        </n-button>
-        <n-button quaternary size="small" title="封面与选项设置" @click="emit('settings')">
-          <template #icon><Settings2 :size="14" /></template>
-        </n-button>
-        <n-button
-          quaternary
-          size="small"
-          title="删除打印册"
-          class="pb-book-delete"
-          @click="emit('delete-book')"
-        >
-          <template #icon><Trash2 :size="14" /></template>
-        </n-button>
+        <n-tooltip>
+          <template #trigger>
+            <n-button quaternary size="small" @click="emit('rename')">
+              <template #icon><Pencil :size="14" /></template>
+            </n-button>
+          </template>
+          重命名打印册
+        </n-tooltip>
+        <n-tooltip>
+          <template #trigger>
+            <n-button quaternary size="small" @click="emit('settings')">
+              <template #icon><Settings2 :size="14" /></template>
+            </n-button>
+          </template>
+          封面与选项设置
+        </n-tooltip>
+        <n-tooltip>
+          <template #trigger>
+            <n-button
+              quaternary
+              size="small"
+              class="pb-book-delete"
+              @click="emit('delete-book')"
+            >
+              <template #icon><Trash2 :size="14" /></template>
+            </n-button>
+          </template>
+          删除打印册
+        </n-tooltip>
       </div>
     </div>
 

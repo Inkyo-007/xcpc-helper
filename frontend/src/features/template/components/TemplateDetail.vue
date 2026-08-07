@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Inbox, Pencil, Trash2 } from 'lucide-vue-next'
-import { NButton } from 'naive-ui'
+import { NButton, NTooltip } from 'naive-ui'
 import CodeView from '@/shared/components/CodeView.vue'
 import MarkdownView from '@/shared/components/MarkdownView.vue'
 import type { LangId } from '@/shared/types'
@@ -53,12 +53,22 @@ const desc = computed(() => props.variant?.body ?? props.detail.desc)
     </div>
     <template v-else>
     <div class="detail-actions">
-      <n-button quaternary size="small" title="编辑当前版本" @click="emit('edit-version')">
-        <template #icon><Pencil :size="14" /></template>
-      </n-button>
-      <n-button quaternary size="small" title="删除当前版本" @click="emit('delete-version')">
-        <template #icon><Trash2 :size="14" /></template>
-      </n-button>
+      <n-tooltip>
+        <template #trigger>
+          <n-button quaternary size="small" @click="emit('edit-version')">
+            <template #icon><Pencil :size="14" /></template>
+          </n-button>
+        </template>
+        编辑当前版本
+      </n-tooltip>
+      <n-tooltip>
+        <template #trigger>
+          <n-button quaternary size="small" @click="emit('delete-version')">
+            <template #icon><Trash2 :size="14" /></template>
+          </n-button>
+        </template>
+        删除当前版本
+      </n-tooltip>
     </div>
     <div class="detail-head">
       <div class="detail-title-row">

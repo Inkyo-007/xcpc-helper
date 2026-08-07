@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Check, ChevronRight, Flag, Plus, Search } from 'lucide-vue-next'
-import { NButton, NEmpty, NInput, NSelect } from 'naive-ui'
+import { NButton, NEmpty, NInput, NSelect, NTooltip } from 'naive-ui'
 import type { SortMode, TemplateDetail, TemplateSummary, TemplateVariant } from '@/features/template/types'
 
 const props = defineProps<{
@@ -169,9 +169,14 @@ function addVariant(template: TemplateSummary, variant: TemplateVariant): void {
                 <template v-if="template.updated"
                   >{{ template.updated }}<span class="tpl-meta-sep">·</span></template
                 >
-                <span class="tpl-priority" :title="`优先级 ${template.priority}`">
-                  <Flag :size="10" />{{ template.priority }}
-                </span>
+                <n-tooltip>
+                  <template #trigger>
+                    <span class="tpl-priority">
+                      <Flag :size="10" />{{ template.priority }}
+                    </span>
+                  </template>
+                  优先级 {{ template.priority }}
+                </n-tooltip>
               </span>
             </span>
             <ChevronRight class="tpl-chev" :size="14" />
