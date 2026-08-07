@@ -15,6 +15,25 @@ alwaysApply: false
 - pytest + pytest-asyncio + httpx（测试）
 - ruff（lint，配置在 pyproject.toml）
 
+## 目录结构
+
+```plaintext
+backend/
+├── content/            # 模板库数据（git 管理的事实来源）
+├── books/              # 打印册配置（git 管理的事实来源）
+├── data/               # SQLite 索引缓存（可删除重建，不入库）
+├── src/
+│   ├── main.py         # FastAPI 入口：挂路由、全局异常处理、托管前端 dist/
+│   ├── core/           # 基础设施：config / database / exceptions / logging
+│   ├── common/         # 跨功能通用件（通用响应模型、工具函数、名称校验）
+│   ├── modules/<功能>/  # 领域核心（models / schemas / 存储与解析）
+│   ├── services/<功能>/ # 业务编排层
+│   └── routers/<功能>/  # API 路由层（薄层）
+└── tests/<功能>/        # 测试按功能目录镜像组织
+```
+
+各层职责与功能扩展方式详见 [../design/conventions.md](../design/conventions.md)。
+
 ## 规范
 
 - 执行完全严格的类型注解，除非必要不使用 `# type: ignore` 等方式忽略类型错误
