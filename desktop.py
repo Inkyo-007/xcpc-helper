@@ -1,9 +1,8 @@
 """XCPC Helper desktop entry (pywebview + FastAPI backend).
 
 Usage:
-    pip install pywebview
-    cd frontend && npm install && npm run build
-    python desktop.py
+    scripts/dev.ps1 -Desktop   # 或手动：uv sync --group desktop（backend/ 下）+ 前端构建
+    uv run --directory backend --group desktop python ../desktop.py
 
 后端（backend/，uv 管理）负责托管 frontend/dist 并提供 /api，
 桌面窗口加载本地服务地址。前端开发时仍可使用 `npm run dev`。
