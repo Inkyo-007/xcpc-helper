@@ -7,16 +7,15 @@ import {
   NConfigProvider,
   NMessageProvider,
   zhCN,
-  type GlobalThemeOverrides,
 } from 'naive-ui'
-import SideNav from '@/app/SideNav.vue'
-import TopBar from '@/app/TopBar.vue'
+import AppShell from '@/app/AppShell.vue'
 import PlaceholderPage from '@/app/PlaceholderPage.vue'
 import PrintBook from '@/features/printbook/PrintBookPage.vue'
 import TemplateLibrary from '@/features/template/TemplateLibraryPage.vue'
 import { useTheme } from '@/shared/composables/useTheme'
 import { NAV_GROUPS, PLACEHOLDER_PAGES } from '@/app/nav'
 import type { PageId, PlaceholderMeta } from '@/app/nav'
+import { createThemeOverrides } from '@/app/theme'
 
 const { mode, hue, isDark, modeIcon, modeLabel, cycleMode, setMode, setHue } = useTheme()
 
@@ -37,90 +36,7 @@ const pageMeta = computed(() => {
   return { group: group.label, sub: child?.label ?? '' }
 })
 
-const themeOverrides = computed<GlobalThemeOverrides>(() => {
-  const light = !isDark.value
-  const accent = `hsl(${hue.value}, 68%, ${light ? 48 : 24}%)`
-  const accentHover = `hsl(${hue.value}, 72%, ${light ? 36 : 32}%)`
-  const accentPressed = `hsl(${hue.value}, 70%, ${light ? 40 : 28}%)`
-  const accentSoft = `hsla(${hue.value}, 60%, 40%, 0.16)`
-
-  return {
-    common: {
-      primaryColor: accent,
-      primaryColorHover: accentHover,
-      primaryColorPressed: accentPressed,
-      primaryColorSuppl: accentHover,
-      borderRadius: '8px',
-      borderRadiusSmall: '6px',
-      fontFamily: 'var(--font-ui)',
-      fontFamilyMono: 'var(--font-mono)',
-      textColorBase: 'var(--text)',
-      bodyColor: 'var(--bg)',
-    },
-    Button: {
-      textColorPrimary: 'var(--on-accent)',
-      colorPrimary: accent,
-      colorHoverPrimary: accentHover,
-      colorPressedPrimary: accentPressed,
-      colorFocusPrimary: accentHover,
-      borderPrimary: `1px solid ${accent}`,
-      borderHoverPrimary: `1px solid ${accentHover}`,
-      borderPressedPrimary: `1px solid ${accentPressed}`,
-      borderRadiusMedium: '6px',
-      borderRadiusSmall: '6px',
-    },
-    Input: {
-      color: 'var(--surface)',
-      colorFocus: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderHover: '1px solid var(--border-strong)',
-      borderFocus: '1px solid var(--accent)',
-      boxShadowFocus: `0 0 0 3px ${accentSoft}`,
-      textColor: 'var(--text)',
-      placeholderColor: 'var(--faint)',
-      caretColor: 'var(--accent)',
-    },
-    Select: {
-      color: 'var(--surface)',
-      colorHover: 'var(--surface)',
-      colorActive: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderHover: '1px solid var(--border-strong)',
-      borderFocus: '1px solid var(--accent)',
-      boxShadowFocus: `0 0 0 3px ${accentSoft}`,
-      textColor: 'var(--text)',
-      placeholderColor: 'var(--faint)',
-    },
-    Modal: {
-      color: 'var(--surface)',
-      borderRadius: '12px',
-    },
-    Popover: {
-      color: 'var(--surface)',
-      borderRadius: '8px',
-      boxShadow: 'var(--shadow-pop)',
-      border: '1px solid var(--border)',
-    },
-    Slider: {
-      fillColor: accent,
-      fillColorHover: accent,
-      railColor: 'var(--border)',
-      railColorHover: 'var(--border-strong)',
-      handleColor: '#ffffff',
-      handleBoxShadow: '0 1px 4px rgb(0 0 0 / 0.35)',
-    },
-    Tooltip: {
-      color: 'var(--text)',
-      textColor: 'var(--bg)',
-      borderRadius: '6px',
-    },
-    Message: {
-      color: 'var(--text)',
-      textColor: 'var(--bg)',
-      borderRadius: '6px',
-    },
-  }
-})
+const themeOverrides = computed(() => createThemeOverrides(!isDark.value, hue.value))
 
 function navigate(page: PageId): void {
   activePage.value = page
@@ -165,35 +81,26 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
     :date-locale="dateZhCN"
   >
     <n-message-provider placement="bottom">
-      <div class="app-shell">
-        <SideNav
-          :active-page="activePage"
-          :open-groups="openGroups"
-          @navigate="navigate"
-          @toggle="toggleGroup"
-        />
-        <main class="main-pane">
-          <TopBar
-            :page-meta="pageMeta"
-            :mode="mode"
-            :mode-icon="modeIcon"
-            :mode-label="modeLabel"
-            :hue="hue"
-            @cycle-theme="cycleMode"
-            @set-mode="setMode"
-            @set-hue="setHue"
-          />
-          <section class="page-stage">
-            <Transition name="page-swap" mode="out-in">
-              <TemplateLibrary
-                v-if="activePage === 'lib'"
-              />
-              <PrintBook v-else-if="activePage === 'books'" />
-              <PlaceholderPage v-else :page="activePage" :meta="placeholderMeta" />
-            </Transition>
-          </section>
-        </main>
-      </div>
+      <AppShell
+        :active-page="activePage"
+        :open-groups="openGroups"
+        :page-meta="pageMeta"
+        :mode="mode"
+        :mode-icon="modeIcon"
+        :mode-label="modeLabel"
+        :hue="hue"
+        @navigate="navigate"
+        @toggle="toggleGroup"
+        @cycle-theme="cycleMode"
+        @set-mode="setMode"
+        @set-hue="setHue"
+      >
+        <Transition name="page-swap" mode="out-in">
+          <TemplateLibrary v-if="activePage === 'lib'" />
+          <PrintBook v-else-if="activePage === 'books'" />
+          <PlaceholderPage v-else :page="activePage" :meta="placeholderMeta" />
+        </Transition>
+      </AppShell>
     </n-message-provider>
   </n-config-provider>
 </template>
