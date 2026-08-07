@@ -107,6 +107,14 @@ button {
   background: var(--accent-soft);
 }
 
+/* Naive UI 的 NSelect（非搜索型）选中标签 div 自带与可见文本重复的 title，
+   悬停时弹出系统默认提示。该 div 纯展示，禁用指针事件即可隐藏提示，
+   点击穿透到外层 label 后仍由组件统一处理下拉开合；filterable 变体的
+   同名类是真实 input 元素，元素选择器 div 使其不受影响。 */
+div.n-base-selection-input {
+  pointer-events: none;
+}
+
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
