@@ -18,8 +18,8 @@
 
 ## 最近完成
 
-> 保留最近约 10 条，更早的以 git log 为准。
 
+- 2026-08-08 docs: 精简 AGENTS.md（删项目简介、开发类硬约束下沉 global.md、指引节置顶）
 - 2026-08-08 docs: 新增全局开发规范 global.md（项目摘要/开发规范/开发指南），文档地图自 AGENTS.md 下沉；backend.md 补目录结构
 - 2026-08-08 docs: 命令改为逐行写法以兼容 Windows PowerShell；规则文件改用 .md 扩展名并同步引用
 - 2026-08-07 docs: 重组文档体系（AGENTS.md 薄入口、docs/rules、docs/design、PROGRESS.md）
