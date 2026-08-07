@@ -28,17 +28,9 @@
 
 前后端都改动时两端的命令都要跑。
 
-## 文档地图
+## 开发规范与文档
 
-| 位置 | 内容 |
-| --- | --- |
-| [docs/rules/frontend.md](docs/rules/frontend.md) | 前端开发规范（技术栈、目录结构、组件与测试要求） |
-| [docs/rules/backend.md](docs/rules/backend.md) | 后端开发规范（类型注解、异步、异常处理、分层） |
-| [docs/design/README.md](docs/design/README.md) | 设计文档索引（按功能分文档，含状态与新功能流程） |
-| [docs/design/conventions.md](docs/design/conventions.md) | 跨功能公共架构约定（分层、扩展方式、写入约定、鲁棒哲学） |
-| [docs/requirements.md](docs/requirements.md) | 功能清单（含优先级）与非功能需求 |
-| [PROGRESS.md](PROGRESS.md) | 跨会话进度状态 |
-| [README.md](README.md) | 项目介绍、目录结构、快速部署指南、API 概览 |
+项目摘要、开发规范、文档地图与新功能流程统一维护在 [docs/rules/global.md](docs/rules/global.md)。
 
 规则正文统一维护在 `docs/rules/`；`.cursor/rules/` 下的同名文件只是指向它们的转发壳，不要改壳文件的正文。
 
