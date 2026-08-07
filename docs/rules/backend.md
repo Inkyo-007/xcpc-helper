@@ -32,7 +32,11 @@ backend/
 └── tests/<功能>/        # 测试按功能目录镜像组织
 ```
 
-各层职责与功能扩展方式详见 [../design/conventions.md](../design/conventions.md)。
+- `routers/`：仅做参数校验与调用 service，不写业务逻辑；不宽泛 try/except，不记录堆栈，异常统一交由全局异常处理器；
+- `modules/<功能>/`：SQLModel 表模型放 `models.py`，API 请求/响应的 Pydantic 模型放 `schemas.py`（对外契约与内部存储分离）；某 schema 被多功能共用时再提升至 `common/`；
+- 不单独设立 `api/` 目录：路由聚合由 `main.py` / `routers/__init__.py` 承担，API 公共件归属 `common/`；
+- 测试在 `backend/tests/<功能>/` 按功能目录镜像组织；
+- 功能间依赖必须单向（如 `printbook → template`），被依赖方不感知依赖方。
 
 ## 规范
 

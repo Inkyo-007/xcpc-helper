@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## 项目摘要
 
-面向 XCPC 竞赛选手的本地训练辅助 Web 软件。前后端分离：前端 Vue 3 + Vite，后端 FastAPI + uv；本地部署、离线可用、Windows 优先。已上线「模板整理」大功能下的模板库与打印册，后续会持续增加新功能（做题统计、在线比赛信息等规划见 [../requirements.md](../requirements.md)）。
+面向 XCPC 竞赛选手的本地训练辅助 Web 软件。前后端分离：前端 Vue 3 + Vite，后端 FastAPI + uv；本地部署、离线可用、Windows 优先。已上线部分功能（具体内容见设计文档索引 [../design/README.md](../design/README.md)），后续会持续增加新功能。
 
 ## 开发规范
 
@@ -41,8 +41,4 @@ alwaysApply: true
 1. 涉及新数据存储或新 API 域时，先在 `docs/design/` 按 [_template.md](../design/_template.md) 写设计文档，并在[索引](../design/README.md)登记状态；
 2. 前端 `src/features/<x>/` 与后端 `modules/<x>/` 使用同一域名（纯小写英文字母）；
 3. 按原子化提交推进，提交信息遵循 git-commit-zh skill（中文约定式提交）；
-4. 功能上线后更新设计文档状态与 PROGRESS.md。
-
-### 运行与部署
-
-见 [README.md](../../README.md)「快速部署指南」：本地服务（推荐）、桌面应用、前后端分离开发三种方式；常用命令（测试、类型检查、构建、重建索引）见同文件「常用命令」。
+4. 功能上线后更新设计文档状态。
