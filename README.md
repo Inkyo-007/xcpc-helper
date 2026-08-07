@@ -28,10 +28,11 @@ xcpc-helper/
 ├── docs/                   # 需求与设计文档
 ├── frontend/               # 前端（Vue 3 + Vite）
 │   └── src/
-│       ├── api/            # API 客户端封装
-│       ├── components/     # 页面与组件（模板库、代码展示等）
-│       ├── composables/    # 组合式状态（useTemplates 等）
-│       └── types.ts        # 与后端对齐的类型定义
+│       ├── app/            # 应用装配层（入口、路由、布局、导航、主题）
+│       ├── shared/         # 跨功能复用（组件、工具、样式、API 封装、基础类型）
+│       └── features/       # 功能域（与后端模块命名对齐，各自包含 api/store/types/components）
+│           ├── template/   # 模板库
+│           └── printbook/  # 打印册（另含 model/ 纯函数文档模型层）
 └── backend/                # 后端（FastAPI + uv）
     ├── content/            # 模板内容库（唯一事实来源，纳入 git 管理）
     │   └── <分类>/<模板>/[版本/]   # 每版本：一份代码文件 + 一份 README.md
