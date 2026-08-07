@@ -54,9 +54,10 @@ xcpc-helper/
 
 ### 环境要求
 
-- Node.js 18+ 与 npm
+- Node.js ≥ 20（`frontend/.nvmrc` 锁定 24）与 npm
 - Python 3.12+ 与 [uv](https://docs.astral.sh/uv/)
-- （可选，桌面模式）`pip install pywebview`
+
+也可以直接运行 `scripts/dev.ps1` 一键完成依赖安装与前端构建。
 
 ### 方式一：本地服务（推荐）
 
@@ -79,12 +80,11 @@ uv run uvicorn --app-dir src main:app --host 127.0.0.1 --port 8000
 ### 方式二：桌面应用
 
 ```bash
-pip install pywebview
-cd frontend
-npm install
-npm run build
-cd ..
-python desktop.py
+# 1. 搭建环境（-Desktop 额外安装 pywebview 依赖组）
+scripts/dev.ps1 -Desktop
+
+# 2. 启动桌面窗口
+uv run --directory backend --group desktop python ../desktop.py
 ```
 
 `desktop.py` 会自动拉起后端服务（127.0.0.1:8000），就绪后打开桌面窗口；关闭窗口时后端随之退出。

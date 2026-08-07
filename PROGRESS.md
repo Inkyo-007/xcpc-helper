@@ -18,7 +18,7 @@
 
 ## 最近完成
 
-- 2026-08-08 chore: 环境子系统补缺（.nvmrc + engines 锁定 Node、desktop 依赖组纳管 pywebview、scripts/dev.ps1 一键搭建）
+- 2026-08-08 chore: 环境子系统补缺（.nvmrc + engines 锁定 Node、desktop 依赖组纳管 pywebview、scripts/dev.ps1 一键搭建、README 部署指南同步）
 - 2026-08-08 docs: 精简 AGENTS.md（删项目简介、开发类硬约束下沉 global.md、指引节置顶）
 - 2026-08-08 docs: 新增全局开发规范 global.md（项目摘要/开发规范/开发指南），文档地图自 AGENTS.md 下沉；backend.md 补目录结构
 - 2026-08-08 docs: 命令改为逐行写法以兼容 Windows PowerShell；规则文件改用 .md 扩展名并同步引用
