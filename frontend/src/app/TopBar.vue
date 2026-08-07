@@ -53,23 +53,13 @@ function chooseTheme(value: ThemeMode): void {
         :show="hueOpen"
         :offset="10"
         placement="bottom-end"
-        trigger="click"
+        trigger="hover"
         @update:show="hueOpen = $event"
       >
         <template #trigger>
-          <n-tooltip>
-            <template #trigger>
-              <button
-                type="button"
-                class="icon-btn"
-                aria-label="调整主题色相"
-                @click="hueOpen = !hueOpen"
-              >
-                <Palette :size="17" />
-              </button>
-            </template>
-            调整主题色相
-          </n-tooltip>
+          <button type="button" class="icon-btn" aria-label="调整主题色相">
+            <Palette :size="17" />
+          </button>
         </template>
         <div class="hue-pop">
           <div class="hue-pop-head">
