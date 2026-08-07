@@ -108,6 +108,6 @@ priority: 5
 
 ## 6. 验证方式
 
-- 后端：`cd backend && uv run pytest`（`tests/template/` 覆盖 scanner/parser/repository/service/writer）；
+- 后端：在 `backend/` 下运行 `uv run pytest`（`tests/template/` 覆盖 scanner/parser/repository/service/writer）；
 - 涉及 API 契约变更时：起服务后 `curl http://127.0.0.1:8000/api/diagnostics` 应正常返回；
 - 中文路径、三种目录形态、空主标签是重点回归场景。

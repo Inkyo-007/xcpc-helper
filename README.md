@@ -80,7 +80,10 @@ uv run uvicorn --app-dir src main:app --host 127.0.0.1 --port 8000
 
 ```bash
 pip install pywebview
-cd frontend && npm install && npm run build && cd ..
+cd frontend
+npm install
+npm run build
+cd ..
 python desktop.py
 ```
 
@@ -103,12 +106,12 @@ npm run dev
 
 ## 常用命令
 
-| 目的 | 命令 |
-| --- | --- |
-| 后端测试 | `cd backend && uv run pytest` |
-| 前端类型检查 | `cd frontend && npm run typecheck` |
-| 前端生产构建 | `cd frontend && npm run build` |
-| 手动重建索引 | `curl -X POST http://127.0.0.1:8000/api/templates/reload` |
+| 目的 | 命令 | 执行目录 |
+| --- | --- | --- |
+| 后端测试 | `uv run pytest` | `backend/` |
+| 前端类型检查 | `npm run typecheck` | `frontend/` |
+| 前端生产构建 | `npm run build` | `frontend/` |
+| 手动重建索引 | `curl -X POST http://127.0.0.1:8000/api/templates/reload` | 任意 |
 
 ## API 概览
 
