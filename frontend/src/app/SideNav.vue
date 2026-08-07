@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { Code2, ChevronRight, LayoutTemplate, Settings, Timer } from 'lucide-vue-next'
 import { NAV_GROUPS } from '@/app/nav'
-import type { NavGroup, PageId } from '@/app/nav'
+import type { NavGroup } from '@/app/nav'
 
 const props = defineProps<{
-  activePage: PageId
+  activePath: string
   openGroups: Record<string, boolean>
 }>()
 
 const emit = defineEmits<{
-  navigate: [page: PageId]
+  navigate: [path: string]
   toggle: [id: string]
 }>()
 
@@ -20,13 +20,13 @@ const iconMap = {
 }
 
 function isGroupActive(group: NavGroup): boolean {
-  if (group.page === props.activePage) return true
-  return group.children?.some((child) => child.page === props.activePage) ?? false
+  if (group.to === props.activePath) return true
+  return group.children?.some((child) => child.to === props.activePath) ?? false
 }
 
 function onGroupClick(group: NavGroup): void {
   if (group.children) emit('toggle', group.id)
-  else if (group.page) emit('navigate', group.page)
+  else if (group.to) emit('navigate', group.to)
 }
 </script>
 
@@ -61,8 +61,8 @@ function onGroupClick(group: NavGroup): void {
             :key="child.id"
             type="button"
             class="nav-sub-item"
-            :class="{ active: activePage === child.page }"
-            @click="emit('navigate', child.page)"
+            :class="{ active: activePath === child.to }"
+            @click="emit('navigate', child.to)"
           >
             <span class="sub-dot"></span>
             <span>{{ child.label }}</span>

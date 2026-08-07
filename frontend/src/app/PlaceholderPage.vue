@@ -1,11 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { BookOpen, FileUp, Settings, Timer } from 'lucide-vue-next'
-import type { PageId, PlaceholderMeta } from '@/app/nav'
 
-defineProps<{
-  page: Exclude<PageId, 'lib'>
-  meta: PlaceholderMeta
-}>()
+const route = useRoute()
+const meta = computed(() => route.meta.placeholder)
 
 const iconMap = {
   book: BookOpen,
@@ -16,7 +15,7 @@ const iconMap = {
 </script>
 
 <template>
-  <div class="placeholder-page">
+  <div v-if="meta" class="placeholder-page">
     <div class="ph-icon">
       <component :is="iconMap[meta.icon]" :size="27" />
     </div>

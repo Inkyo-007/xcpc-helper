@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   darkTheme,
   dateZhCN,
@@ -9,41 +10,27 @@ import {
   zhCN,
 } from 'naive-ui'
 import AppShell from '@/app/AppShell.vue'
-import PlaceholderPage from '@/app/PlaceholderPage.vue'
-import PrintBook from '@/features/printbook/PrintBookPage.vue'
-import TemplateLibrary from '@/features/template/TemplateLibraryPage.vue'
-import { useTheme } from '@/shared/composables/useTheme'
-import { NAV_GROUPS, PLACEHOLDER_PAGES } from '@/app/nav'
-import type { PageId, PlaceholderMeta } from '@/app/nav'
+import { NAV_GROUPS } from '@/app/nav'
 import { createThemeOverrides } from '@/app/theme'
+import { useTheme } from '@/shared/composables/useTheme'
 
 const { mode, hue, isDark, modeIcon, modeLabel, cycleMode, setMode, setHue } = useTheme()
 
-const activePage = ref<PageId>('lib')
+const route = useRoute()
+const router = useRouter()
+
+const activePath = computed(() => route.path)
 const openGroups = ref<Record<string, boolean>>({ templates: true })
 
-const placeholderMeta = computed<PlaceholderMeta>(() =>
-  activePage.value === 'lib' ? PLACEHOLDER_PAGES.books : PLACEHOLDER_PAGES[activePage.value],
-)
-
-const pageMeta = computed(() => {
-  const group = NAV_GROUPS.find(
-    (g) => g.page === activePage.value || g.children?.some((c) => c.page === activePage.value),
-  )
-  if (!group) return { group: '', sub: '' }
-  if (group.page === activePage.value) return { group: group.label, sub: '' }
-  const child = group.children?.find((c) => c.page === activePage.value)
-  return { group: group.label, sub: child?.label ?? '' }
-})
+const pageMeta = computed(() => ({
+  group: route.meta.group ?? '',
+  sub: route.meta.sub ?? '',
+}))
 
 const themeOverrides = computed(() => createThemeOverrides(!isDark.value, hue.value))
 
-function navigate(page: PageId): void {
-  activePage.value = page
-  const group = NAV_GROUPS.find(
-    (g) => g.page === page || g.children?.some((c) => c.page === page),
-  )
-  if (group) openGroups.value[group.id] = true
+function navigate(path: string): void {
+  void router.push(path)
 }
 
 function toggleGroup(id: string): void {
@@ -53,16 +40,28 @@ function toggleGroup(id: string): void {
   if (
     openGroups.value[id] &&
     group.children &&
-    !group.children.some((c) => c.page === activePage.value)
+    !group.children.some((c) => c.to === activePath.value)
   ) {
-    activePage.value = group.children[0].page
+    navigate(group.children[0].to)
   }
 }
+
+// 路由变化（含深链接进入）时自动展开所属分组
+watch(
+  activePath,
+  (path) => {
+    const group = NAV_GROUPS.find(
+      (g) => g.to === path || g.children?.some((c) => c.to === path),
+    )
+    if (group) openGroups.value[group.id] = true
+  },
+  { immediate: true },
+)
 
 function onKeydown(event: KeyboardEvent): void {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
     event.preventDefault()
-    if (activePage.value !== 'lib') navigate('lib')
+    if (activePath.value !== '/template/library') navigate('/template/library')
     requestAnimationFrame(() => {
       document.querySelector<HTMLInputElement>('.search-input input')?.focus()
     })
@@ -82,7 +81,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   >
     <n-message-provider placement="bottom">
       <AppShell
-        :active-page="activePage"
+        :active-path="activePath"
         :open-groups="openGroups"
         :page-meta="pageMeta"
         :mode="mode"
@@ -95,11 +94,11 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
         @set-mode="setMode"
         @set-hue="setHue"
       >
-        <Transition name="page-swap" mode="out-in">
-          <TemplateLibrary v-if="activePage === 'lib'" />
-          <PrintBook v-else-if="activePage === 'books'" />
-          <PlaceholderPage v-else :page="activePage" :meta="placeholderMeta" />
-        </Transition>
+        <router-view v-slot="{ Component }">
+          <Transition name="page-swap" mode="out-in">
+            <component :is="Component" />
+          </Transition>
+        </router-view>
       </AppShell>
     </n-message-provider>
   </n-config-provider>

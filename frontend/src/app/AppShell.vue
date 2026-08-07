@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import SideNav from '@/app/SideNav.vue'
 import TopBar from '@/app/TopBar.vue'
-import type { PageId } from '@/app/nav'
 import type { ThemeMode } from '@/shared/composables/useTheme'
 
 defineProps<{
-  activePage: PageId
+  activePath: string
   openGroups: Record<string, boolean>
   pageMeta: { group: string; sub: string }
   mode: ThemeMode
@@ -15,7 +14,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  navigate: [page: PageId]
+  navigate: [path: string]
   toggle: [id: string]
   'cycle-theme': []
   'set-mode': [mode: ThemeMode]
@@ -26,9 +25,9 @@ const emit = defineEmits<{
 <template>
   <div class="app-shell">
     <SideNav
-      :active-page="activePage"
+      :active-path="activePath"
       :open-groups="openGroups"
-      @navigate="(page) => emit('navigate', page)"
+      @navigate="(path) => emit('navigate', path)"
       @toggle="(id) => emit('toggle', id)"
     />
     <main class="main-pane">
