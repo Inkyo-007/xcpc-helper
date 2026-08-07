@@ -48,7 +48,7 @@ xcpc-helper/
     └── tests/              # pytest 测试
 ```
 
-模板目录约定与元数据格式详见 [docs/template-manager-design.md](docs/template-manager-design.md)。
+模板目录约定与元数据格式详见 [docs/design/template-library.md](docs/design/template-library.md)，各功能设计文档索引见 [docs/design/](docs/design/README.md)。
 
 ## 快速部署指南
 

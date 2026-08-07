@@ -1,0 +1,45 @@
+# 公共架构约定
+
+> 状态：长期有效。本文档记录跨功能的架构与工程约定，新功能必须遵循；
+> 各功能自身的设计见同目录对应文档。
+
+## 1. 整体拓扑
+
+- 前端 Vue 3 + Vite，后端 FastAPI，开发环境经 Vite proxy 转发 `/api`，生产环境由 FastAPI 托管 `frontend/dist/`；
+- 需要持久化的业务数据以 **git 管理的文件目录**为事实来源（如 `backend/content/`、`backend/books/`），可手改、可备份迁移；
+- SQLite 不作为业务数据库，仅作索引/缓存用途，必须可随时删除重建（`backend/data/` 不入库）。
+
+## 2. 后端分层职责
+
+```plaintext
+backend/src/
+├── main.py                 # FastAPI 入口：创建 app、挂路由、全局异常处理、CORS、托管前端 dist/
+├── core/                   # 基础设施：config / database / exceptions / logging
+├── common/                 # 跨功能通用件（通用响应模型、工具函数、名称校验）
+├── routers/<功能>/         # 路由（薄层：参数校验 + 调 service）
+├── services/<功能>/        # 业务编排（组合 modules 能力，对外提供用例级接口）
+└── modules/<功能>/         # 领域核心（models / schemas / 存储与解析等）
+```
+
+- `routers/`：仅做参数校验与调用 service，不写业务逻辑；不宽泛 try/except，不记录堆栈，异常统一交由全局异常处理器；
+- `modules/<功能>/`：SQLModel 表模型放 `models.py`，API 请求/响应的 Pydantic 模型放 `schemas.py`（对外契约与内部存储分离）；某 schema 被多功能共用时再提升至 `common/`；
+- 不单独设立 `api/` 目录：路由聚合由 `main.py` / `routers/__init__.py` 承担，API 公共件归属 `common/`；
+- 测试在 `backend/tests/<功能>/` 按功能目录镜像组织；
+- 功能间依赖必须单向（如 `printbook → template`），被依赖方不感知依赖方。
+
+## 3. 功能扩展方式
+
+新功能（如做题统计、比赛信息等）在后端 `routers/`、`services/`、`modules/` 下各开一个平级功能目录，在 `main.py` 一行挂载路由；前端在 `src/features/` 下开同名功能域（含 `api/store/types/components`，需要时加 `model/` 纯函数层）。**前后端功能域命名必须对齐**，模块间零耦合。
+
+## 4. 文件写入约定
+
+- 名称统一校验：禁止 Windows 非法字符与保留名、点开头、尾部空格/点、`..`、长度 ≤ 100，中文正常放行；实现集中于 `common/validation.py`，各功能复用；
+- 写操作必须原子化：新建经 `.tmp` 暂存目录就位，更新走临时文件 + `os.replace` 原子替换；删除为物理删除（前端需明确提示不可找回）；
+- `.tmp-*` 暂存残留已加入 `.gitignore` 防御，新功能新增暂存目录时同步补充；
+- 并发写同一资源用锁串行化（如 `threading.RLock`）。
+
+## 5. 鲁棒哲学：诊断不阻断
+
+- 用户数据（模板目录、册配置等）格式错误时不阻断整体功能：能加载的部分照常加载，问题汇总为诊断信息（如 `/api/diagnostics`、册列表的 error 字段、块的 issues）呈现给前端；
+- 失效引用**只报告、不改写配置**：源数据恢复后引用自动复原；
+- 索引重建期间读取走事务读，要么旧要么新，不读半成品。
