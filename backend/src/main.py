@@ -8,9 +8,11 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core.config import get_settings
 from core.exceptions import register_exception_handlers
@@ -49,6 +51,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         watcher.stop()
 
 
+async def spa_fallback_handler(request: Request, exc: StarletteHTTPException) -> Response:
+    """SPA 回退：非 /api 的 GET 请求 404 时返回 index.html，交给前端路由处理。
+
+    前端使用 history 模式路由后，刷新 /template/library 之类的深链接
+    会直接打到后端；静态托管找不到对应文件会抛 404，这里回退到入口页。
+    /api 路径保持 JSON 错误响应，与全局异常结构一致。
+    """
+    index = get_settings().frontend_dist / "index.html"
+    if (
+        exc.status_code == 404
+        and request.method == "GET"
+        and not request.url.path.startswith("/api")
+        and index.is_file()
+    ):
+        return FileResponse(index)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": "http_error", "message": str(exc.detail), "detail": None}},
+    )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="XCPC Helper", lifespan=lifespan)
@@ -60,6 +83,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     register_exception_handlers(app)
+    app.add_exception_handler(StarletteHTTPException, spa_fallback_handler)
     app.include_router(template_router)
     app.include_router(printbook_router)
 
