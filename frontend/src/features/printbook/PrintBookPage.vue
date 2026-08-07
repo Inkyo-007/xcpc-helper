@@ -15,7 +15,7 @@ import type {
   PrintBookCover,
   PrintBookOptions,
   PrintBookSummary,
-} from '@/types'
+} from '@/features/printbook/types'
 
 const message = useMessage()
 const {

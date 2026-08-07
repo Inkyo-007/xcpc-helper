@@ -34,9 +34,8 @@ import type {
   PrintBookSummary,
   ResolvedTemplateInfo,
   TemplateBlock,
-  TemplateDetail,
-  TemplateSummary,
-} from '@/types'
+} from '@/features/printbook/types'
+import type { TemplateDetail, TemplateSummary } from '@/features/template/types'
 
 const HEADING_LEVEL_KEY = 'xc-pb-heading-level'
 const TEMPLATE_LEVEL_KEY = 'xc-pb-template-level'

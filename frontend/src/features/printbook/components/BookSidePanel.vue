@@ -4,13 +4,8 @@ import { BookOpen, Pencil, Settings2, Trash2 } from 'lucide-vue-next'
 import { NButton, NSelect } from 'naive-ui'
 import BlockAddBar from '@/features/printbook/components/BlockAddBar.vue'
 import TemplatePicker from '@/features/printbook/components/TemplatePicker.vue'
-import type {
-  BookBlockType,
-  PrintBookSummary,
-  SortMode,
-  TemplateDetail,
-  TemplateSummary,
-} from '@/types'
+import type { BookBlockType, PrintBookSummary } from '@/features/printbook/types'
+import type { SortMode, TemplateDetail, TemplateSummary } from '@/features/template/types'
 
 const props = defineProps<{
   books: PrintBookSummary[]

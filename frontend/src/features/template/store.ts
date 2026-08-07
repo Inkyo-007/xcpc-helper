@@ -21,7 +21,7 @@ import type {
   TemplateDetail,
   TemplateSummary,
   VersionUpsertPayload,
-} from '@/types'
+} from '@/features/template/types'
 
 /** 分类色板：按后端返回顺序循环取色，保持视觉区分度 */
 const HUE_PALETTE = [160, 25, 280, 200, 340, 80, 120, 300, 0, 220]

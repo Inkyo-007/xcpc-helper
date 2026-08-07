@@ -8,7 +8,7 @@ import type {
   TemplateDetail,
   TemplateSummary,
   VersionUpsertPayload,
-} from '@/types'
+} from '@/features/template/types'
 
 export interface ApiCategory {
   id: string

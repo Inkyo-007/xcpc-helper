@@ -7,13 +7,13 @@ import TemplateCreateModal from '@/features/template/components/TemplateCreateMo
 import TemplateDetail from '@/features/template/components/TemplateDetail.vue'
 import VersionFormModal from '@/features/template/components/VersionFormModal.vue'
 import { useTemplates } from '@/features/template/store'
-import { ROOT_VERSION_TOKEN } from '@/types'
+import { ROOT_VERSION_TOKEN } from '@/features/template/types'
 import type {
   SortMode,
   TemplateDetail as TemplateDetailData,
   TemplateSummary,
   TemplateVariant,
-} from '@/types'
+} from '@/features/template/types'
 
 const {
   templates,

@@ -1,4 +1,29 @@
-import type { NavGroup, PageId, PlaceholderMeta } from '@/types'
+/** 应用级导航配置与类型：侧边栏分组、页面标识与占位页文案。 */
+
+export type PageId = 'lib' | 'books' | 'io' | 'stress' | 'gen' | 'settings'
+
+export interface NavChild {
+  id: string
+  label: string
+  page: PageId
+}
+
+export interface NavGroup {
+  id: string
+  label: string
+  icon: 'template' | 'timer' | 'settings'
+  badge?: string
+  page?: PageId
+  children?: NavChild[]
+}
+
+export interface PlaceholderMeta {
+  group: string
+  sub: string
+  icon: 'book' | 'import' | 'timer' | 'settings'
+  title: string
+  hint: string
+}
 
 export const NAV_GROUPS: NavGroup[] = [
   {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { BookOpen, FileUp, Settings, Timer } from 'lucide-vue-next'
-import type { PageId, PlaceholderMeta } from '@/types'
+import type { PageId, PlaceholderMeta } from '@/app/nav'
 
 defineProps<{
   page: Exclude<PageId, 'lib'>

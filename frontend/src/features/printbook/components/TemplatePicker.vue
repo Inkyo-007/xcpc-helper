@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { Check, ChevronRight, Flag, Plus, Search } from 'lucide-vue-next'
 import { NButton, NEmpty, NInput, NSelect } from 'naive-ui'
-import type { SortMode, TemplateDetail, TemplateSummary, TemplateVariant } from '@/types'
+import type { SortMode, TemplateDetail, TemplateSummary, TemplateVariant } from '@/features/template/types'
 
 const props = defineProps<{
   templates: TemplateSummary[]

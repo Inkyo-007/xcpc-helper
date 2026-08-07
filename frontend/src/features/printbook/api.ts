@@ -7,7 +7,7 @@ import type {
   PrintBookDetail,
   PrintBookOptions,
   PrintBookSummary,
-} from '@/types'
+} from '@/features/printbook/types'
 
 export interface PrintBookUpdatePayload {
   cover?: PrintBookCover

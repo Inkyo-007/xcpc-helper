@@ -14,7 +14,7 @@ import BookFlowSource from '@/features/printbook/components/preview/BookFlowSour
 import { buildDocument } from '@/features/printbook/model/document'
 import { PaginationRun, PAGE_WIDTH_PX, type PaginationReport } from '@/features/printbook/model/pagination'
 import { printPages } from '@/features/printbook/model/print'
-import type { PrintBookDetail } from '@/types'
+import type { PrintBookDetail } from '@/features/printbook/types'
 
 const props = defineProps<{
   detail: PrintBookDetail | null

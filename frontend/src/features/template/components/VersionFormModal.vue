@@ -24,7 +24,7 @@ import {
   ROOT_VERSION_TOKEN,
   type TemplateVariant,
   type VersionUpsertPayload,
-} from '@/types'
+} from '@/features/template/types'
 
 const props = defineProps<{
   show: boolean

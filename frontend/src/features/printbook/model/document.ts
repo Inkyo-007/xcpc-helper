@@ -9,7 +9,7 @@ import type {
   PrintBookOptions,
   ResolvedTemplateInfo,
   BookBlock,
-} from '@/types'
+} from '@/features/printbook/types'
 
 export type IssueLevel = 'error' | 'warning'
 

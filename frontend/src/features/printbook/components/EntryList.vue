@@ -12,7 +12,7 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import { NButton, NEmpty } from 'naive-ui'
-import type { BookBlock, BookBlockType } from '@/types'
+import type { BookBlock, BookBlockType } from '@/features/printbook/types'
 
 defineProps<{
   blocks: BookBlock[]

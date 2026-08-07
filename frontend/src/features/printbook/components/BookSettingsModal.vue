@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import { NButton, NForm, NFormItem, NInput, NModal, NSelect, NSwitch } from 'naive-ui'
-import type { PrintBookCover, PrintBookDetail, PrintBookOptions } from '@/types'
+import type { PrintBookCover, PrintBookDetail, PrintBookOptions } from '@/features/printbook/types'
 
 const props = defineProps<{
   show: boolean

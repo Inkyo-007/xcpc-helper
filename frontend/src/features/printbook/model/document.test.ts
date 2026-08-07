@@ -9,7 +9,7 @@ import type {
   PrintBookOptions,
   ResolvedTemplateInfo,
   TemplateBlock,
-} from '@/types'
+} from '@/features/printbook/types'
 
 const COVER: PrintBookCover = { title: '测试册', subtitle: null, author: null, logo: null }
 

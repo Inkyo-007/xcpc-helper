@@ -16,7 +16,7 @@ import PrintBook from '@/features/printbook/PrintBookPage.vue'
 import TemplateLibrary from '@/features/template/TemplateLibraryPage.vue'
 import { useTheme } from '@/shared/composables/useTheme'
 import { NAV_GROUPS, PLACEHOLDER_PAGES } from '@/app/nav'
-import type { PageId, PlaceholderMeta } from '@/types'
+import type { PageId, PlaceholderMeta } from '@/app/nav'
 
 const { mode, hue, isDark, modeIcon, modeLabel, cycleMode, setMode, setHue } = useTheme()
 

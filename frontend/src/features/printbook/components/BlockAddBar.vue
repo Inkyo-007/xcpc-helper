@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { FileText, Heading1, ImagePlus, SeparatorHorizontal } from 'lucide-vue-next'
 import { NButton, NInputNumber } from 'naive-ui'
-import type { BookBlockType } from '@/types'
+import type { BookBlockType } from '@/features/printbook/types'
 
 const props = defineProps<{
   blockCount: number

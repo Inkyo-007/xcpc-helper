@@ -10,7 +10,7 @@ import {
   NSelect,
   useMessage,
 } from 'naive-ui'
-import type { BookBlock, TemplateBlock } from '@/types'
+import type { BookBlock, TemplateBlock } from '@/features/printbook/types'
 
 const props = defineProps<{
   show: boolean
