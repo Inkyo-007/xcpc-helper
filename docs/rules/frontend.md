@@ -46,6 +46,8 @@ frontend/src/
 
 ## 验证命令
 
-- `cd frontend && npm run typecheck`：类型检查（改动后必跑）
-- `cd frontend && npm run test`：vitest 单元测试
-- `cd frontend && npm run build`：生产构建（含 vue-tsc）
+以下命令均在 `frontend/` 目录下逐行执行：
+
+- `npm run typecheck`：类型检查（改动后必跑）
+- `npm run test`：vitest 单元测试
+- `npm run build`：生产构建（含 vue-tsc）

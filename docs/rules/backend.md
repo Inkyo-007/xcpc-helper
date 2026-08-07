@@ -28,5 +28,7 @@ alwaysApply: false
 
 ## 验证命令
 
-- `cd backend && uv run pytest`：全部测试（改动后必跑）
-- `cd backend && uv run ruff check src tests`：lint
+以下命令均在 `backend/` 目录下逐行执行：
+
+- `uv run pytest`：全部测试（改动后必跑）
+- `uv run ruff check src tests`：lint
