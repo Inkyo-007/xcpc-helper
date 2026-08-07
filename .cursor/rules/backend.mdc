@@ -1,0 +1,9 @@
+---
+description: 后端开发规范（FastAPI + Pydantic v2 + uv）
+globs: backend/**
+alwaysApply: false
+---
+
+# 后端开发规范
+
+本规则的正文统一维护在 `docs/rules/backend.mdc`，请阅读并严格遵循该文件。

@@ -1,0 +1,32 @@
+---
+description: 后端开发规范（FastAPI + Pydantic v2 + uv）
+globs: backend/**
+alwaysApply: false
+---
+
+# 后端开发规范
+
+## 技术栈
+
+- Python 3.12+ + FastAPI + Pydantic v2
+- SQLModel + SQLite（FTS5，仅作索引/缓存）
+- uv（依赖与虚拟环境管理）
+- watchdog（文件监听）
+- pytest + pytest-asyncio + httpx（测试）
+- ruff（lint，配置在 pyproject.toml）
+
+## 规范
+
+- 执行完全严格的类型注解，除非必要不使用 `# type: ignore` 等方式忽略类型错误
+- 任何与外部系统交互的数据第一时间转化为 Pydantic 模型，尽可能不使用 `dict[key]` 来获取数据
+- 异步优先原则，禁止同步阻塞；确实需要同步调用的走 `asyncio.to_thread`
+- 路由层禁止宽泛 `try/except`，仅捕获特定异常；其他异常交由全局异常处理器
+- 路由层禁止 `logger.exception`，统一由全局异常处理器记录堆栈
+- API 返回使用标准 HTTP 状态码，错误响应由全局处理器统一结构化
+- 分层职责、功能扩展方式、文件写入与名称校验等架构约定见 [../design/conventions.md](../design/conventions.md)
+- 新功能在 `routers/`、`services/`、`modules/` 下开平级功能目录，并在 `tests/<功能>/` 镜像组织测试
+
+## 验证命令
+
+- `cd backend && uv run pytest`：全部测试（改动后必跑）
+- `cd backend && uv run ruff check src tests`：lint
