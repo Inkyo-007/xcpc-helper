@@ -35,7 +35,7 @@ const {
 const message = useMessage()
 const query = ref('')
 const category = ref('all')
-const sortMode = ref<SortMode>('updated')
+const sortMode = ref<SortMode>('priority')
 const activeId = ref<string | null>(null)
 const catMenuOpen = ref(false)
 const openVariants = ref<Record<string, boolean>>({})
