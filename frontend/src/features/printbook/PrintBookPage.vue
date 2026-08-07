@@ -220,7 +220,6 @@ async function confirmDeleteBook(): Promise<void> {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  animation: page-in 0.4s ease both;
 }
 
 .pb-content {

@@ -1184,7 +1184,6 @@ button {
   color: var(--faint);
   padding: 40px;
   text-align: center;
-  animation: page-in 0.4s ease both;
 }
 
 .ph-icon {
@@ -1346,6 +1345,10 @@ button {
 
 /* ---------------- 页面切换动效 ---------------- */
 
+/* 注意：路由页面根元素不要常驻 animation（含已播完的 fill 动画）。
+   Vue Transition 判定过渡结束取 max(transition, animation) 时长并等待
+   animationend，常驻动画会让离开过渡拖延到动画时长（out-in 下新页面
+   必须等其结束才能挂载），表现为切换卡顿。入场效果统一由 page-swap 承担。 */
 .page-swap-enter-active {
   transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.22, 0.8, 0.28, 1);
 }
@@ -1380,17 +1383,6 @@ button {
 .detail-swap-leave-to {
   opacity: 0;
   transform: translateX(-6px);
-}
-
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 /* ---------------- 响应式 ---------------- */
