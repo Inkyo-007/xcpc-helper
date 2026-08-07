@@ -2,8 +2,8 @@
 import { computed } from 'vue'
 import { BookOpen, Pencil, Settings2, Trash2 } from 'lucide-vue-next'
 import { NButton, NSelect } from 'naive-ui'
-import BlockAddBar from '@/components/printbook/BlockAddBar.vue'
-import TemplatePicker from '@/components/printbook/TemplatePicker.vue'
+import BlockAddBar from '@/features/printbook/components/BlockAddBar.vue'
+import TemplatePicker from '@/features/printbook/components/TemplatePicker.vue'
 import type {
   BookBlockType,
   PrintBookSummary,

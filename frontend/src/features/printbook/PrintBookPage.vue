@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useMessage } from 'naive-ui'
-import DeleteConfirmModal from '@/components/DeleteConfirmModal.vue'
-import BookNameModal from '@/components/printbook/BookNameModal.vue'
-import BookSettingsModal from '@/components/printbook/BookSettingsModal.vue'
-import BookSidePanel from '@/components/printbook/BookSidePanel.vue'
-import EntryEditorModal from '@/components/printbook/EntryEditorModal.vue'
-import EntryList from '@/components/printbook/EntryList.vue'
-import BookPreview from '@/components/printbook/preview/BookPreview.vue'
-import { usePrintBooks } from '@/composables/usePrintBooks'
+import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
+import BookNameModal from '@/features/printbook/components/BookNameModal.vue'
+import BookSettingsModal from '@/features/printbook/components/BookSettingsModal.vue'
+import BookSidePanel from '@/features/printbook/components/BookSidePanel.vue'
+import EntryEditorModal from '@/features/printbook/components/EntryEditorModal.vue'
+import EntryList from '@/features/printbook/components/EntryList.vue'
+import BookPreview from '@/features/printbook/components/preview/BookPreview.vue'
+import { usePrintBooks } from '@/features/printbook/store'
 import type {
   BookBlock,
   BookBlockType,

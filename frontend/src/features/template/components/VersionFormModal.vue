@@ -16,10 +16,10 @@ import {
   type FormInst,
   type SelectOption,
 } from 'naive-ui'
-import { ApiError } from '@/api/client'
-import CodeEditor from '@/components/CodeEditor.vue'
-import TagCapsuleInput from '@/components/TagCapsuleInput.vue'
-import { useTemplates } from '@/composables/useTemplates'
+import { ApiError } from '@/shared/api/client'
+import CodeEditor from '@/shared/components/CodeEditor.vue'
+import TagCapsuleInput from '@/shared/components/TagCapsuleInput.vue'
+import { useTemplates } from '@/features/template/store'
 import {
   ROOT_VERSION_TOKEN,
   type TemplateVariant,

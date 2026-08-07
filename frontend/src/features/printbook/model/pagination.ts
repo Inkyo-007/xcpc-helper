@@ -14,7 +14,7 @@
  */
 
 import { Previewer } from 'pagedjs'
-import paperCss from '../styles/paper.css?raw'
+import paperCss from '@/shared/styles/paper.css?raw'
 
 /** A4 = 210×297mm，内容区 = 180×267mm（边距 15mm）；封面无页脚页码。 */
 export const PAGE_CSS = `

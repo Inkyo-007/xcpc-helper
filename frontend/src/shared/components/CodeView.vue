@@ -14,7 +14,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { syntaxHighlighting } from '@codemirror/language'
 import { cpp } from '@codemirror/lang-cpp'
 import type { LangId } from '@/types'
-import { xcpcHighlight, xcpcTheme } from '@/utils/codemirror'
+import { xcpcHighlight, xcpcTheme } from '@/shared/utils/codemirror'
 
 const props = defineProps<{
   code: string

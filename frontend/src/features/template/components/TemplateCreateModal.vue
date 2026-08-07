@@ -12,8 +12,8 @@ import {
   type FormInst,
   type SelectOption,
 } from 'naive-ui'
-import { ApiError } from '@/api/client'
-import { useTemplates } from '@/composables/useTemplates'
+import { ApiError } from '@/shared/api/client'
+import { useTemplates } from '@/features/template/store'
 
 const props = defineProps<{
   show: boolean

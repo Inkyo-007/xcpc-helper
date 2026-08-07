@@ -1,6 +1,6 @@
 /** 打印册相关 API。 */
 
-import { request } from '@/api/client'
+import { request } from '@/shared/api/client'
 import type {
   BookBlock,
   PrintBookCover,

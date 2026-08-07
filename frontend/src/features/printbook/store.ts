@@ -18,9 +18,9 @@ import {
   replaceBlocks,
   updateBook as apiUpdateBook,
   uploadAsset,
-} from '@/api/printbook'
-import { fetchTemplateDetail, fetchTemplates, type TemplateQuery } from '@/api/template'
-import { load, save } from '@/utils/storage'
+} from '@/features/printbook/api'
+import { fetchTemplateDetail, fetchTemplates, type TemplateQuery } from '@/features/template/api'
+import { load, save } from '@/shared/utils/storage'
 import type {
   BookBlock,
   BookBlockType,

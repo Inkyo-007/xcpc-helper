@@ -2,8 +2,8 @@
 import { computed } from 'vue'
 import { Inbox, Pencil, Trash2 } from 'lucide-vue-next'
 import { NButton } from 'naive-ui'
-import CodeView from '@/components/CodeView.vue'
-import MarkdownView from '@/components/MarkdownView.vue'
+import CodeView from '@/shared/components/CodeView.vue'
+import MarkdownView from '@/shared/components/MarkdownView.vue'
 import type { LangId, TemplateDetail, TemplateVariant } from '@/types'
 
 const props = defineProps<{

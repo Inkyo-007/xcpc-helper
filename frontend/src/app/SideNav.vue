@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Code2, ChevronRight, LayoutTemplate, Settings, Timer } from 'lucide-vue-next'
-import { NAV_GROUPS } from '@/data/nav'
+import { NAV_GROUPS } from '@/app/nav'
 import type { NavGroup, PageId } from '@/types'
 
 const props = defineProps<{

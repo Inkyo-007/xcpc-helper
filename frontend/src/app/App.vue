@@ -9,13 +9,13 @@ import {
   zhCN,
   type GlobalThemeOverrides,
 } from 'naive-ui'
-import SideNav from '@/components/SideNav.vue'
-import TopBar from '@/components/TopBar.vue'
-import PlaceholderPage from '@/components/pages/PlaceholderPage.vue'
-import PrintBook from '@/components/pages/PrintBook.vue'
-import TemplateLibrary from '@/components/pages/TemplateLibrary.vue'
-import { useTheme } from '@/composables/useTheme'
-import { NAV_GROUPS, PLACEHOLDER_PAGES } from '@/data/nav'
+import SideNav from '@/app/SideNav.vue'
+import TopBar from '@/app/TopBar.vue'
+import PlaceholderPage from '@/app/PlaceholderPage.vue'
+import PrintBook from '@/features/printbook/PrintBookPage.vue'
+import TemplateLibrary from '@/features/template/TemplateLibraryPage.vue'
+import { useTheme } from '@/shared/composables/useTheme'
+import { NAV_GROUPS, PLACEHOLDER_PAGES } from '@/app/nav'
 import type { PageId, PlaceholderMeta } from '@/types'
 
 const { mode, hue, isDark, modeIcon, modeLabel, cycleMode, setMode, setHue } = useTheme()

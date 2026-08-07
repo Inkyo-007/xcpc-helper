@@ -6,9 +6,9 @@
  */
 
 import { computed } from 'vue'
-import MarkdownView from '@/components/MarkdownView.vue'
-import { highlightCode } from '@/utils/highlight'
-import type { BookDocument, DocSection, ImageSection, TemplateSection } from '@/printbook/document'
+import MarkdownView from '@/shared/components/MarkdownView.vue'
+import { highlightCode } from '@/shared/utils/highlight'
+import type { BookDocument, DocSection, ImageSection, TemplateSection } from '@/features/printbook/model/document'
 
 const props = defineProps<{
   document: BookDocument

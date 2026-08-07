@@ -1,5 +1,5 @@
 import { computed, ref, watchEffect } from 'vue'
-import { load, save } from '@/utils/storage'
+import { load, save } from '@/shared/utils/storage'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 

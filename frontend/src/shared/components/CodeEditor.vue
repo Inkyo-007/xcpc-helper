@@ -12,7 +12,7 @@ import {
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { syntaxHighlighting } from '@codemirror/language'
 import { cpp } from '@codemirror/lang-cpp'
-import { xcpcHighlight, xcpcTheme } from '@/utils/codemirror'
+import { xcpcHighlight, xcpcTheme } from '@/shared/utils/codemirror'
 
 const props = defineProps<{
   modelValue: string

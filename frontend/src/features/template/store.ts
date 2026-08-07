@@ -13,7 +13,7 @@ import {
   reloadTemplates,
   updateVersion as apiUpdateVersion,
   type TemplateQuery,
-} from '@/api/template'
+} from '@/features/template/api'
 import type {
   Category,
   DiagnosticItem,

@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { Check, Monitor, Moon, Palette, Sun } from 'lucide-vue-next'
 import { NPopover, NSlider } from 'naive-ui'
-import type { ThemeMode } from '@/composables/useTheme'
+import type { ThemeMode } from '@/shared/composables/useTheme'
 
 defineProps<{
   pageMeta: { group: string; sub: string }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { renderMarkdownCached } from '@/utils/markdown'
+import { renderMarkdownCached } from '@/shared/utils/markdown'
 
 const props = defineProps<{
   content: string

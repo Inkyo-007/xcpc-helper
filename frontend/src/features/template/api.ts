@@ -1,6 +1,6 @@
 /** 模板库相关 API。 */
 
-import { request } from '@/api/client'
+import { request } from '@/shared/api/client'
 import type {
   DiagnosticItem,
   SortMode,

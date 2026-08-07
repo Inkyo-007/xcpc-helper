@@ -2,11 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Check, ChevronRight, Flag, Inbox, Plus, RefreshCw, Search } from 'lucide-vue-next'
 import { NAlert, NButton, NEmpty, NInput, NSelect, NSpin, useMessage } from 'naive-ui'
-import DeleteConfirmModal from '@/components/DeleteConfirmModal.vue'
-import TemplateCreateModal from '@/components/TemplateCreateModal.vue'
-import TemplateDetail from '@/components/TemplateDetail.vue'
-import VersionFormModal from '@/components/VersionFormModal.vue'
-import { useTemplates } from '@/composables/useTemplates'
+import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
+import TemplateCreateModal from '@/features/template/components/TemplateCreateModal.vue'
+import TemplateDetail from '@/features/template/components/TemplateDetail.vue'
+import VersionFormModal from '@/features/template/components/VersionFormModal.vue'
+import { useTemplates } from '@/features/template/store'
 import { ROOT_VERSION_TOKEN } from '@/types'
 import type {
   SortMode,
