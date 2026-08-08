@@ -15,6 +15,9 @@ $pkgName = "xcpc-helper-$Version-windows-x64"
 $releaseDir = Join-Path $root 'release'
 $stage = Join-Path $releaseDir "stage/$pkgName"
 
+# 全新环境（如 CI）下 release/ 可能不存在，Invoke-WebRequest 不会自动创建父目录
+New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+
 # ---------- 1. 构建前端静态产物 ----------
 Push-Location (Join-Path $root 'frontend')
 try {
