@@ -1,7 +1,7 @@
 @echo off
-rem XCPC Helper 启动脚本：双击即用。
-rem 免安装包内自带 uv.exe 则优先使用；源码目录下则使用 PATH 中的 uv。
-rem 内容保持纯 ASCII，避免 cmd 中文编码问题。
+rem XCPC Helper launcher: double-click to start.
+rem Prefers the bundled uv.exe (portable package); falls back to uv on PATH
+rem (source checkout). Keep this file pure ASCII to avoid cmd encoding issues.
 cd /d "%~dp0"
 
 if exist "%~dp0uv.exe" (set "UV=%~dp0uv.exe") else (set "UV=uv")
