@@ -34,7 +34,8 @@ alwaysApply: true
 | [../design/conventions.md](../design/conventions.md) | 跨功能公共架构约定（分层、扩展方式、写入约定、鲁棒哲学） |
 | [../requirements.md](../requirements.md) | 功能清单（含优先级）与非功能需求 |
 | [../../PROGRESS.md](../../PROGRESS.md) | 跨会话进度状态（会话开始读取、结束更新） |
-| [../../README.md](../../README.md) | 项目介绍、目录结构、快速部署指南、API 概览 |
+| [../../README.md](../../README.md) | 项目介绍（面向用户：功能说明、快速上手、反馈入口） |
+| [../development.md](../development.md) | 开发者文档（技术栈、目录结构、部署方式、API 概览） |
 
 ### 新功能开发流程
 
