@@ -105,6 +105,7 @@ npm run dev
 | 前端测试 | `npm run test` | `frontend/` |
 | 前端生产构建 | `npm run build` | `frontend/` |
 | 手动重建索引 | `curl -X POST http://127.0.0.1:8000/api/templates/reload` | 任意 |
+| 打包免安装压缩包 | `scripts/package.ps1 -Version <版本>` | 仓库根目录 |
 
 ## API 概览
 
