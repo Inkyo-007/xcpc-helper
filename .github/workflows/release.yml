@@ -1,0 +1,62 @@
+# Release 流水线：推送 v* 标签时自动构建免安装压缩包并发布 Release。
+#
+# 发版方式（日常维护只需这一条）：
+#   git tag v0.1.0
+#   git push origin v0.1.0
+#
+# 也可以在 Actions 页面手动触发（workflow_dispatch）做一次不产生 Release 的试构建，
+# 构建产物会以 artifact 形式保留 90 天，用于验证打包流程是否正常。
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "试构建版本号（如 v0.1.0-rc1），不创建 Release"
+        required: true
+
+# GITHUB_TOKEN 由 Actions 自动注入，创建 Release 需要写权限
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 确定版本号
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            "PACKAGE_VERSION=${{ inputs.version }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          } else {
+            "PACKAGE_VERSION=${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          }
+
+      - name: 构建免安装压缩包
+        shell: pwsh
+        run: scripts/package.ps1 -Version $env:PACKAGE_VERSION
+
+      - name: 上传构建产物（artifact）
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcpc-helper-${{ env.PACKAGE_VERSION }}-windows-x64
+          path: release/*.zip
+          retention-days: 90
+
+      - name: 创建 Release 并附加压缩包
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.zip
+          generate_release_notes: true
