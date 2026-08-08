@@ -32,7 +32,7 @@ ServiceDep = Annotated[TemplateService, Depends(get_template_service)]
 async def list_templates(
     service: ServiceDep,
     category: Annotated[str | None, Query(description="分类目录名")] = None,
-    tags: Annotated[list[str], Query(description="标签过滤，多值取交集")] = [],
+    tags: Annotated[list[str] | None, Query(description="标签过滤，多值取交集")] = None,
     keyword: Annotated[str | None, Query(description="关键词，搜标题/标签/说明/代码")] = None,
     sort: Annotated[SortMode, Query(description="排序方式")] = "priority",
 ) -> list[TemplateSummary]:

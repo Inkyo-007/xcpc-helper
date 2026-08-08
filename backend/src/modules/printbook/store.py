@@ -10,7 +10,7 @@
 import os
 import shutil
 import tempfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -85,7 +85,7 @@ def list_books(books_dir: Path) -> list[StoredBookInfo]:
                 name=path.name,
                 config=config,
                 error=error,
-                updated=datetime.fromtimestamp(book_file.stat().st_mtime),
+                updated=datetime.fromtimestamp(book_file.stat().st_mtime, tz=UTC).astimezone(),
             )
         )
     return infos

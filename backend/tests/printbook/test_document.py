@@ -1,9 +1,5 @@
 """document 层测试：引用解析、版本选择语义、资源 URL 展开与还原。"""
 
-from pathlib import Path
-
-import pytest
-
 from modules.printbook import document
 from modules.printbook.models import (
     BookConfig,

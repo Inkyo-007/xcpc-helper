@@ -212,7 +212,7 @@ def create_version_dir(
     if payload.name is None:
         raise BadRequestError("新建版本时必须填写版本名（副标签）")
     slug = validate_name(payload.name, "副标签")
-    ext, filename = validate_version_payload(payload)
+    _ext, filename = validate_version_payload(payload)
     target = template_dir / slug
     if target.exists():
         raise ConflictError(f"版本已存在: {category}/{name}/{slug}")
@@ -249,7 +249,7 @@ def update_version_dir(
     template_dir = content_dir / category / name
     if not template_dir.is_dir():
         raise NotFoundError(f"模板不存在: {category}/{name}")
-    ext, filename = validate_version_payload(payload)
+    _ext, filename = validate_version_payload(payload)
 
     if not current_slug:
         if payload.name and payload.name.strip():
