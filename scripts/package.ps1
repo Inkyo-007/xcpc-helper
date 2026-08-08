@@ -1,5 +1,5 @@
 # 构建免安装绿色压缩包：预构建前端 + 独立 uv.exe + 后端源码与内容库。
-# 产出 release/xcpc-helper-<版本>-windows-x64.zip，用户解压后双击「启动.bat」即可使用。
+# 产出 release/xcpc-helper-<版本>-windows-x64.zip，用户解压后双击 start.bat 即可使用。
 # 用法：
 #   scripts/package.ps1                      # 本地构建，版本号默认为 dev
 #   scripts/package.ps1 -Version v0.1.0      # 指定版本号（CI 发版时使用）
@@ -56,29 +56,10 @@ Copy-Item -Recurse (Join-Path $root 'backend/content') "$stage/backend/"
 Copy-Item -Recurse (Join-Path $root 'backend/books') "$stage/backend/"
 Copy-Item -Recurse (Join-Path $root 'frontend/dist') "$stage/frontend/"
 Copy-Item $uvExe "$stage/"
+Copy-Item (Join-Path $root 'start.bat') "$stage/"
 
 # 清理可能残留的原子暂存目录
 Get-ChildItem -Path $stage -Recurse -Force -Directory -Filter '.tmp-*' | Remove-Item -Recurse -Force
-
-# 启动脚本：内容保持纯 ASCII，避免 cmd 编码问题
-$bat = @'
-@echo off
-cd /d "%~dp0"
-echo ============================================================
-echo   XCPC Helper
-echo.
-echo   First run will download Python and dependencies
-echo   automatically, which takes a few minutes (needs network).
-echo   Subsequent starts are instant and work offline.
-echo.
-echo   After startup, open this address in your browser:
-echo   http://127.0.0.1:8000
-echo ============================================================
-echo.
-uv.exe run --directory backend --frozen uvicorn --app-dir src main:app --host 127.0.0.1 --port 8000
-pause
-'@
-[System.IO.File]::WriteAllText((Join-Path $stage '启动.bat'), $bat, [System.Text.Encoding]::ASCII)
 
 # ---------- 4. 压缩 ----------
 $zipPath = Join-Path $releaseDir "$pkgName.zip"
