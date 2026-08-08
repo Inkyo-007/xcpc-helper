@@ -1,5 +1,8 @@
 # XCPC Helper
 
+[![CI](https://github.com/Inkyo-007/xcpc-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/Inkyo-007/xcpc-helper/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 面向 XCPC 竞赛选手的本地训练辅助工具：管理你的算法模板库，并把模板编排成可以打印带赛场的册子。
 
 本地运行、离线可用、数据都在你自己电脑上，无需注册登录。
@@ -50,7 +53,7 @@ Windows 用户无需安装任何环境：
 
 ```powershell
 # 1. 获取源码
-git clone https://github.com/<你的用户名>/xcpc-helper.git
+git clone https://github.com/Inkyo-007/xcpc-helper.git
 cd xcpc-helper
 
 # 2. 一键安装依赖并构建（PowerShell）
