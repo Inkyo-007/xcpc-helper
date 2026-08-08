@@ -116,22 +116,6 @@ npm run dev
 | `GET /api/diagnostics` | 内容库诊断信息 |
 | `POST /api/templates/reload` | 手动重建索引 |
 
-## 添加新模板
-
-在 `backend/content/<分类>/<模板>/` 下放置代码文件与 `README.md` 即可，watcher 会自动重建索引。多版本模板为每个版本建立子目录。README 采用 YAML front matter：
-
-```markdown
----
-updated: 2026-07-05
-tags: ['连通性']
-source: '洛谷 P3367'        # 可选，与 page 配合展示
-page: 'https://...'          # 可选
-priority: 5                  # 可选，1-5，影响排序
----
-
-正文（Markdown，支持 $O(1)$ 公式）……
-```
-
 ## 参与贡献
 
-开发前请先阅读 [rules/global.md](rules/global.md) 中的开发规范与文档地图；新功能开发流程、提交信息规范与验证命令见根目录 [AGENTS.md](../AGENTS.md)。
+开发前请先阅读 [rules/global.md](rules/global.md) 中的开发规范与文档地图；使用 Agent 进行开发的开发流程、提交信息规范与验证命令见根目录 [AGENTS.md](../AGENTS.md)。
