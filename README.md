@@ -123,5 +123,3 @@ curl -X POST http://127.0.0.1:8000/api/templates/reload
 ## 许可证
 
 本项目的代码以 [MIT 许可证](LICENSE) 开源。
-
-注意：`backend/content/` 目录下的算法模板内容归各自作者所有，不适用 MIT 许可证；如需转载或二次分发其中的模板，请遵循模板内标注的来源信息。
