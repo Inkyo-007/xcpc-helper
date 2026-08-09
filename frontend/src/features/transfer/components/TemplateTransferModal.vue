@@ -197,17 +197,21 @@ async function confirmExport(): Promise<void> {
           {{ w.path }}：{{ w.message }}
         </div>
       </n-alert>
-      <div v-if="analysis.conflicts.length" class="conflict-block">
-        <n-alert type="warning" :bordered="false">
-          与现有库存在 {{ analysis.conflicts.length }} 个同名模板：{{
-            analysis.conflicts.join('、')
-          }}
-        </n-alert>
+      <n-alert v-if="analysis.conflicts.length" type="warning" :bordered="false">
+        与现有库存在 {{ analysis.conflicts.length }} 个同名模板：{{
+          analysis.conflicts.join('、')
+        }}
+      </n-alert>
+      <div class="conflict-block">
         <n-radio-group v-model:value="strategy" class="strategy-group">
-          <n-radio value="skip">跳过冲突项（保留现有模板）</n-radio>
-          <n-radio value="overwrite">用压缩包内容覆盖现有模板</n-radio>
-          <n-radio value="rename">自动重命名导入（两者都保留）</n-radio>
+          <n-radio value="skip">合并导入（同名模板保留现有，跳过导入）</n-radio>
+          <n-radio value="rename">合并导入（同名模板自动重命名，两者都保留）</n-radio>
+          <n-radio value="overwrite">整体替代（清空现有模板库后导入）</n-radio>
         </n-radio-group>
+        <n-alert v-if="strategy === 'overwrite'" type="error" :bordered="false">
+          现有模板库中的全部模板将被清除（无论是否同名），此操作不可撤销。
+          如需保留，请先导出备份。
+        </n-alert>
       </div>
       <div class="modal-actions">
         <n-button @click="step = 'import-upload'">重新选择</n-button>

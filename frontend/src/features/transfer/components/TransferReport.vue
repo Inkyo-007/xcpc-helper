@@ -10,7 +10,7 @@ const props = defineProps<{
 const summary = computed(() => {
   const r = props.report
   const parts = [`新建 ${r.created.length}`]
-  if (r.overwritten.length) parts.push(`覆盖 ${r.overwritten.length}`)
+  if (r.overwritten.length) parts.push(`清除现有 ${r.overwritten.length}`)
   if (r.renamed.length) parts.push(`自动重命名 ${r.renamed.length}`)
   if (r.skipped.length) parts.push(`跳过 ${r.skipped.length}`)
   if (r.failed.length) parts.push(`失败 ${r.failed.length}`)

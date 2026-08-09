@@ -153,8 +153,11 @@ def test_import_conflict_strategies(client: TestClient, books_dir: Path) -> None
     assert report["renamed"] == [{"source": "册B", "target": "册B-2"}]
     assert (books_dir / "册B-2" / "book.yaml").is_file()
 
-    # overwrite：整体替换
+    # overwrite：全量替代，无关旧册也一并清除（此时已有 册A / 册B / 册B-2）
     result = _upload_books(client, data)
     report = _apply_books(client, result["staging_id"], "overwrite")
-    assert report["overwritten"] == ["册B"]
+    assert report["overwritten"] == ["册A", "册B", "册B-2"]
+    assert report["created"] == ["册B"]
     assert "新的册B" in (books_dir / "册B" / "book.yaml").read_text(encoding="utf-8")
+    assert not (books_dir / "册A").exists()
+    assert not (books_dir / "册B-2").exists()

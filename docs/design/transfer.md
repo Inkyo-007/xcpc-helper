@@ -25,10 +25,10 @@ xcpc-templates-20260809.zip        # 或 xcpc-books-*.zip
 
 - `manifest.json`：`{"app": "xcpc-helper", "kind": "templates"|"books", "format": 1, "exported_at": "...", "counts": {...}}`。导入端据此识别"本软件导出的标准归档"并校验 kind 与入口匹配（在模板库入口传了册包时给出明确报错）；
 - **导入两阶段**：`analyze`（上传 zip → 解压至暂存区 → 返回识别结果 + 警告清单 + 冲突清单）与 `apply`（携带暂存 id 与冲突策略 → 落盘 → 返回导入报告）。"格式错误是否继续导入"的裁决落在 analyze 结果的确认按钮上；
-- **冲突策略**（analyze 检出与现有模板/册重名时由用户选择，apply 统一执行）：
-  - `skip`：跳过冲突项，保留现有；
-  - `overwrite`：用归档内容整体替换现有项（模板=删整棵目录树重建；册=删目录重建）；
-  - `rename`：冲突项自动改名（`名称-2`、`名称-3`……递增），两边都保留；
+- **导入策略**（三种策略在 analyze 结果页始终可选，apply 统一执行）：
+  - `skip`：合并导入，跳过与现有库同名的项，保留现有；
+  - `overwrite`：整体替代——先清空整个 content/（或 books/）目录的全部内容（含目录本身，不留空目录触发告警），再把归档内容写入空库；选中时前端给出不可撤销警示；
+  - `rename`：合并导入，同名项自动改名（`名称-2`、`名称-3`……递增），两边都保留；
 - 所有落盘写操作经由既有 writer/store（模板走 `modules/template/writer.py`，册走 `modules/printbook/store.py`），保持"数据落盘必须走写层"的硬约定；导入完成后由服务端显式触发一次索引 rebuild 收尾（不等 watcher 去抖）。
 
 被否决方案：

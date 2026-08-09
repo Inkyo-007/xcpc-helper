@@ -32,7 +32,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
-  /** 导入成功，携带实际落盘的册名（created + renamed.target + overwritten） */
+  /** 导入成功，携带实际落盘的册名（created + renamed.target） */
   imported: [names: string[]]
 }>()
 
@@ -103,7 +103,6 @@ async function confirmImport(): Promise<void> {
     step.value = 'import-report'
     const names = [
       ...report.value.created,
-      ...report.value.overwritten,
       ...report.value.renamed.map((r) => r.target),
     ]
     emit('imported', names)
@@ -193,15 +192,19 @@ async function confirmExport(): Promise<void> {
           {{ w.path }}：{{ w.message }}
         </div>
       </n-alert>
-      <div v-if="analysis.conflicts.length" class="conflict-block">
-        <n-alert type="warning" :bordered="false">
-          与现有打印册重名：{{ analysis.conflicts.join('、') }}
-        </n-alert>
+      <n-alert v-if="analysis.conflicts.length" type="warning" :bordered="false">
+        与现有打印册重名：{{ analysis.conflicts.join('、') }}
+      </n-alert>
+      <div class="conflict-block">
         <n-radio-group v-model:value="strategy" class="strategy-group">
-          <n-radio value="skip">跳过冲突项（保留现有打印册）</n-radio>
-          <n-radio value="overwrite">用压缩包内容覆盖现有打印册</n-radio>
-          <n-radio value="rename">自动重命名导入（两者都保留）</n-radio>
+          <n-radio value="skip">合并导入（同名打印册保留现有，跳过导入）</n-radio>
+          <n-radio value="rename">合并导入（同名打印册自动重命名，两者都保留）</n-radio>
+          <n-radio value="overwrite">整体替代（清空现有打印册后导入）</n-radio>
         </n-radio-group>
+        <n-alert v-if="strategy === 'overwrite'" type="error" :bordered="false">
+          现有的全部打印册将被清除（无论是否同名），此操作不可撤销。
+          如需保留，请先导出备份。
+        </n-alert>
       </div>
       <div class="modal-actions">
         <n-button @click="step = 'import-upload'">重新选择</n-button>

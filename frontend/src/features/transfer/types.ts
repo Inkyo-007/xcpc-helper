@@ -1,6 +1,6 @@
 /** 导入/导出相关类型（与后端 modules/transfer/schemas.py 对齐）。 */
 
-/** 冲突处理策略：跳过 / 覆盖 / 自动重命名 */
+/** 导入策略：合并-跳过 / 整体替代（先清空现有库）/ 合并-自动重命名 */
 export type ConflictStrategy = 'skip' | 'overwrite' | 'rename'
 
 /** 归档识别类型：本软件导出的标准归档 / 外来平铺结构 */

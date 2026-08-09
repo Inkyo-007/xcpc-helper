@@ -135,10 +135,19 @@ def test_conflict_rename(client: TestClient, content_dir: Path) -> None:
 
 
 def test_conflict_overwrite(client: TestClient, content_dir: Path) -> None:
+    old_ids = _scan_ids(content_dir)
     result = _upload(client, _conflict_zip(), "/api/transfer/import/templates/analyze")
     report = _apply(client, result["staging_id"], "overwrite")
-    assert report["overwritten"] == ["math/sieve"]
-    # 旧内容被整体替换为归档内容（三层标准结构）
+    # 全量替代：旧库整体清除（无论是否冲突），只保留归档内容
+    assert report["overwritten"] == sorted(old_ids)
+    assert report["created"] == ["math/sieve"]
+    assert _scan_ids(content_dir) == {"math/sieve"}
+    # 无关旧分类目录也被移除，不留空目录
+    assert not (content_dir / "ds").exists()
+    assert not (content_dir / "graph").exists()
+    assert not (content_dir / "字符串").exists()
+    assert not (content_dir / "misc").exists()
+    # 冲突项旧内容被整体替换为归档内容（三层标准结构）
     assert not (content_dir / "math" / "sieve" / "euler_sieve.cpp").exists()
     assert (content_dir / "math" / "sieve" / "sieve" / "sieve.cpp").is_file()
 

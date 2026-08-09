@@ -38,6 +38,17 @@ logger = logging.getLogger("xcpc.service.transfer")
 _STAGING_ID_RE = re.compile(r"[0-9a-f]{32}")
 
 
+def _clear_directory(path: Path) -> None:
+    """清空目录下全部内容（保留目录本身）。目录不存在则无操作。"""
+    if not path.is_dir():
+        return
+    for child in path.iterdir():
+        if child.is_symlink() or child.is_file():
+            child.unlink()
+        else:
+            shutil.rmtree(child)
+
+
 class TransferService:
     """导入/导出服务。导出直接读磁盘事实来源；导入经暂存区两阶段完成。"""
 
@@ -96,6 +107,12 @@ class TransferService:
                 _kind, plans, _warnings = templates_io.analyze_templates_archive(root)
                 report = ImportReport()
                 taken = self._existing_template_ids()
+                if payload.strategy == "overwrite":
+                    # 全量替代：先清空整个 content/（含目录，避免残留空目录告警），
+                    # 再把归档内容写入空库
+                    report.overwritten = sorted(taken)
+                    _clear_directory(self._settings.content_dir)
+                    taken = set()
                 for plan in plans:
                     self._apply_template(plan, payload.strategy, taken, report)
                 self._templates.rebuild()
@@ -133,6 +150,11 @@ class TransferService:
                 plans, _warnings = books_io.analyze_books_archive(root)
                 report = ImportReport()
                 taken = self._existing_book_names()
+                if payload.strategy == "overwrite":
+                    # 全量替代：先清空整个 books/，再把归档册写入
+                    report.overwritten = sorted(taken)
+                    _clear_directory(self._settings.books_dir)
+                    taken = set()
                 for plan in plans:
                     self._apply_book(plan, payload.strategy, taken, report)
                 return report
@@ -149,6 +171,7 @@ class TransferService:
         books_dir = self._settings.books_dir
         name = plan.name
         try:
+            created = True
             if name in taken:
                 if strategy == "skip":
                     report.skipped.append(name)
@@ -163,8 +186,9 @@ class TransferService:
                 else:  # overwrite
                     book_store.delete_book(books_dir, name)
                     report.overwritten.append(name)
+                    created = False
             book_store.place_book_tree(books_dir, name, plan.source_dir)
-            if name not in report.overwritten:
+            if created:
                 report.created.append(name)
             taken.add(name)
         except (AppError, OSError) as exc:
@@ -183,6 +207,7 @@ class TransferService:
         category, name = plan.category, plan.name
         target_id = plan.id
         try:
+            created = True
             if target_id in taken:
                 if strategy == "skip":
                     report.skipped.append(target_id)
@@ -200,12 +225,13 @@ class TransferService:
                 else:  # overwrite
                     writer.delete_template_tree(content_dir, category, name)
                     report.overwritten.append(target_id)
+                    created = False
             writer.create_template_dir(content_dir, category, name)
             for version in plan.versions:
                 writer.create_version_dir(
                     content_dir, category, name, self._version_payload(plan, version, name)
                 )
-            if target_id not in report.overwritten:
+            if created:
                 report.created.append(target_id)
             taken.add(target_id)
         except (AppError, OSError, UnicodeDecodeError) as exc:
