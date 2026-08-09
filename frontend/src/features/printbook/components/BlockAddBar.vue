@@ -1,19 +1,25 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { FileText, Heading1, ImagePlus, SeparatorHorizontal } from 'lucide-vue-next'
 import { NButton, NInputNumber, NTooltip } from 'naive-ui'
 import type { BookBlockType } from '@/features/printbook/types'
 
 const props = defineProps<{
   blockCount: number
+  after: number
 }>()
 
 const emit = defineEmits<{
+  'update:after': [value: number]
   add: [{ type: BookBlockType; after: number }]
   'add-image': [{ file: File; after: number }]
 }>()
 
-const after = ref(0)
+const after = computed({
+  get: () => props.after,
+  // 清空输入时回退到默认（末尾）
+  set: (value: number | null) => emit('update:after', value ?? -1),
+})
 const fileInput = ref<HTMLInputElement | null>(null)
 
 watch(
@@ -99,11 +105,11 @@ function onFilePicked(event: Event): void {
               v-model:value="after"
               class="pb-insert-input"
               size="small"
-              :min="0"
+              :min="-1"
               :max="blockCount"
             />
           </template>
-          0 表示末尾，N 表示第 N 个条目之后
+          -1 表示末尾，0 表示头部，N 表示第 N 个条目之后
         </n-tooltip>
       </div>
     </div>

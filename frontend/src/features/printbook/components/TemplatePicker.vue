@@ -10,6 +10,8 @@ const props = defineProps<{
   allTemplates: TemplateSummary[]
   /** 已拉取的模板详情缓存；展开版本列表前由 request-detail 触发加载 */
   details: Record<string, TemplateDetail>
+  /** 插入位置：-1 末尾，0 头部，N 第 N 个条目之后 */
+  after: number
 }>()
 
 const emit = defineEmits<{
@@ -91,7 +93,7 @@ function toggleTemplate(template: TemplateSummary): void {
 function addVariant(template: TemplateSummary, variant: TemplateVariant): void {
   const version = variant.id === template.id ? '~' : variant.name
   activeId.value = template.id
-  emit('add-template', { templateId: template.id, version, after: 0 })
+  emit('add-template', { templateId: template.id, version, after: props.after })
 }
 </script>
 

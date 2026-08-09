@@ -250,15 +250,15 @@ async function commitBlocks(fallback: string): Promise<OpResult> {
   }
 }
 
-/** after=0 表示追加到末尾；N 表示插入到第 N 个条目之后。 */
+/** after=-1 表示追加到末尾；0 表示插入到头部；N 表示插入到第 N 个条目之后。 */
 function insertIndex(after: number): number {
   const detail = activeDetail.value
   const length = detail?.blocks.length ?? 0
-  if (after <= 0) return length
+  if (after < 0) return length
   return Math.min(after, length)
 }
 
-async function addBlock(type: BookBlockType, after = 0): Promise<OpResult> {
+async function addBlock(type: BookBlockType, after = -1): Promise<OpResult> {
   const detail = activeDetail.value
   if (!detail) return { ok: false, message: '请先选择打印册' }
   let block: BookBlock
@@ -281,7 +281,7 @@ async function addBlock(type: BookBlockType, after = 0): Promise<OpResult> {
   return commitBlocks('添加失败')
 }
 
-async function addImage(file: File, after = 0): Promise<OpResult> {
+async function addImage(file: File, after = -1): Promise<OpResult> {
   const detail = activeDetail.value
   if (!detail) return { ok: false, message: '请先选择打印册' }
   try {
@@ -304,7 +304,7 @@ async function addImage(file: File, after = 0): Promise<OpResult> {
 async function addTemplate(
   templateId: string,
   version: string | null,
-  after = 0,
+  after = -1,
 ): Promise<OpResult> {
   const detail = activeDetail.value
   if (!detail) return { ok: false, message: '请先选择打印册' }

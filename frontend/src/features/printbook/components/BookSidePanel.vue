@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { FolderSync, Pencil, Settings2, Trash2 } from 'lucide-vue-next'
 import { NButton, NSelect, NTooltip } from 'naive-ui'
 import BlockAddBar from '@/features/printbook/components/BlockAddBar.vue'
@@ -37,6 +37,9 @@ const selected = computed({
     else if (value) emit('select-book', value)
   },
 })
+
+/** 插入位置（块按钮组与模板选择器共用）：-1 末尾，0 头部，N 第 N 个条目之后 */
+const insertAfter = ref(-1)
 
 const bookOptions = computed(() => [
   { label: '＋ 新建打印册', value: '__new__' },
@@ -99,6 +102,7 @@ const bookOptions = computed(() => [
     </div>
 
     <BlockAddBar
+      v-model:after="insertAfter"
       :block-count="blockCount"
       @add="emit('add-block', $event.type, $event.after)"
       @add-image="emit('add-image', $event.file, $event.after)"
@@ -112,6 +116,7 @@ const bookOptions = computed(() => [
       :templates="templates"
       :all-templates="allTemplates"
       :details="details"
+      :after="insertAfter"
       @add-template="emit('add-template', $event.templateId, $event.version, $event.after)"
       @query-change="emit('picker-query', $event)"
       @request-detail="emit('request-detail', $event)"
