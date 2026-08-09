@@ -8,10 +8,17 @@ options:
   include_body: true
   h1_page_break: true
 blocks:
+- id: pb-1786301090709-10
+  type: heading
+  title: 代码模板
+  heading_level: 1
+- id: pb-1786301148238-11
+  type: markdown
+  content: 以下为代码模板。
 - id: heading-1
   type: heading
   title: 数学
-  heading_level: 1
+  heading_level: 2
 - id: template-2
   type: template
   template: 数学/快速幂
@@ -25,11 +32,26 @@ blocks:
 - id: heading-5
   type: heading
   title: 数据结构
-  heading_level: 1
+  heading_level: 2
 - id: template-6
   type: template
   template: 数据结构/并查集
   version: 带权
+  heading_level: 3
+- id: pb-1786300911445-2
+  type: template
+  template: 数据结构/线段树
+  version: 单点修改 class 封装版
+  heading_level: 3
+- id: pb-1786300948826-7
+  type: template
+  template: 数据结构/平衡树
+  version: Treap
+  heading_level: 3
+- id: pb-1786300962309-8
+  type: template
+  template: 数据结构/平衡树
+  version: Splay
   heading_level: 3
 - id: markdown-7
   type: markdown
@@ -38,8 +60,49 @@ blocks:
 - id: heading-8
   type: heading
   title: 字符串
-  heading_level: 1
-- id: template-9
+  heading_level: 2
+- id: pb-1786300877724-1
   type: template
-  template: 字符串/KMP
+  template: 字符串/字符串哈希
+  version: 单模哈希
   heading_level: 3
+- id: pb-1786301176602-12
+  type: heading
+  title: 文章摘录
+  heading_level: 1
+- id: pb-1786301188811-13
+  type: markdown
+  title: 排列组合之球放盒问题
+  content: "## P0：绪论\n\n**问题：把 $n$ 个球放在 $m$ 个盒子里，有多少种放法？**\n\n实际上，该问题可以分为 8 种情况。\n\
+    \n1. 球同，盒不同，不允许空盒。\n2. 球同，盒不同，允许空盒。\n3. 球同，盒同，允许空盒。\n4. 球同，盒同，不允许空盒。\n5. 球不同，盒同，不允许空盒。\n\
+    6. 球不同，盒同，允许空盒。\n7. 球不同，盒不同，不允许空盒。\n8. 球不同，盒不同，允许空盒。\n\n## P1：球同，盒不同，不允许空盒\n\n\
+    计算这种情况的一种经典方法是**插板法**。\n\n我们把球排成一列，在中间插入 $m-1$ 个板。这样就把球分隔成 $m$ 组，分到一组就是一个盒子里的球。\n\
+    \n显然 $n$ 个球有 $n-1$ 个空位可以插板。于是方案数就是 $n-1 \\choose m-1$。\n\n## P2：球同，盒不同，允许空盒\n\n\
+    情况类似 P1，不过现在允许空盒子了。\n\n对于这种情况，我们可以进行假设。如果每个盒子都已经有一个球了，那么问题就变成 P1 的形式了。\n\n所以我们可以假设有\
+    \ $n+m$ 个球，还是 $m$ 个盒子，把问题转化为 P1 的形式，方案数就是 $n+m-1 \\choose m-1$。\n\n## P3：球同，盒同，允许空盒\n\
+    \n这种情况可以用**动态规划**来解决。\n\n设 $dp[i][j]$ 为：把 $i$ 个相同球放进 $j$ 个相同盒子里，且盒子允许为空的方案数。\n\
+    \n$dp[i][j]$ 的转移方程可以分为下两种情况讨论：\n\n1. 至少有一个空盒子。实际上此时的方案数与把空盒子丢掉后的方案数是相等的，即与 $dp[i][j-1]$\
+    \ 是相等的。\n\n2. 没有空盒子。此时每个盒子都至少有一个球，把每个盒子都放一个球，就变为了计算把 $i-j$ 个球放入 $j$ 个盒子的方案数，即\
+    \ $dp[i-j][j]$。\n\n所以状态转移方程式为：$dp[i][j] = dp[i][j-1] + dp[i-j][j]$。\n\n其中，当 $i\
+    \ < j$ 时，也就是球数少于盒子数时，其方案数 $dp[i][j]$ 与 $dp[i][i]$ 相等。\n\n初始化 $dp[0][0...m] = 1$，答案即为\
+    \ $dp[n][m]$。\n\n## P4：球同，盒同，不允许空盒\n\n实际上，该情况可以直接用 P3 的方法求得方案数。设 $dp[i][j]$ 的意义与\
+    \ P3 相同，那么答案即是 $dp[n][m] - dp[n][m-1] = dp[n-m][m]$。\n\n这也很显然。相当于把总的方案数中空盒的情况给减去了，剩下的就是无空盒的情况。而根据转移式，$dp[n][m]\
+    \ = dp[n-m][m] + dp[n][m-1]$，所以答案就是 $dp[n-m][m]$。\n\n另外，还有一种直接推的理解方法。就是先把每个盒子放入\
+    \ 1 颗球，这样剩下 $n-m$ 颗球，转化为了 P3 的情况。这样就可以用 P3 的转移式直接做了，答案即为 $dp[n-m][m]$。\n\n## P5：球不同，盒同，不允许空盒\n\
+    \n同样，这种情况可以用**动态规划**来解决。\n\n设 $dp[i][j]$ 为：把 $i$ 个不同球放进 $j$ 个相同盒子里，且盒子不允许为空的方案数。\n\
+    \n$dp[i][j]$ 的转移方程可以分为下两种情况讨论：\n\n1. 第 $i$ 个球来时，前 $i-1$ 个球放在了 $j-1$ 个盒子里。由于盒子不允许为空，所以第\
+    \ $i$ 个球只能放在第 $j$ 个盒子里，此时其方案数等于 $dp[i-1][j-1]$\n\n2. 第 $i$ 个球来时，前 $i-1$ 个球放在了\
+    \ $j$ 个盒子里。此时该球可以放在 $m$ 个盒子中的任意一个里，所以方案数即为 $j \\times dp[i-1][j]$\n\n所以状态转移方程式为：$dp[i][j]\
+    \ = j \\times dp[i-1][j] + dp[i-1][j-1]$。\n\n初始化 $dp[0][0] = 1$，答案即是 $dp[n][m]$。\n\
+    \n### Note\n\n这种情况的方案数实际上就是第二类斯特林数（Stirling Number）。\n    \n第二类斯特林数（斯特林子集数）${n\
+    \ \\brace k}$，也可记作 $S(n,k)$，表示将 $n$ 个两两不同的元素，划分为 $k$ 个互不区分的非空子集的方案数。\n    \n其递推式即为：\n\
+    \    \n$${n \\brace k} = {n-1 \\brace k-1} + k {n-1 \\brace k}$$\n    \n第二类 Stirling\
+    \ 数有通项公式：\n    \n$${n \\brace m}=\\sum^{m}_{i=0} {{(-1)^{m-i}i^{n}} \\over {i!(m-i)!}}$$\n\
+    \n## P6：球不同，盒同，允许空盒\n\n设 $dp[i][j]$ 意义同 P5，答案显然是 $dp[n][1]+dp[n][2]+\\dots+dp[n][m]$。\n\
+    \n## P7：球不同，盒不同，不允许空盒。\n\n这种情况类似 P5，不过盒子不同。\n\n其实相当于可以把 P5 中的每种方案的盒子给全排列一下，$m$\
+    \ 个盒子的排列有 $m!$ 种。\n\n设 $dp[i][j]$ 的意义同 P5，答案即是 $dp[n][m] \\times m!$。\n\n### Note\n\
+    \n另外，这种情况也可以直接用动态规划递推解决。\n\n设 $dp[i][j]$ 为：把 $i$ 个不同球放进 $j$ 个不同盒子里，且盒子不允许为空的方案数。\n\
+    \n有状态转移式：$dp[i][j] = j \\times (dp[i - 1][j] + dp[i - 1][j - 1])$。\n\n推理过程类似于\
+    \ P5。主要区别在于 $dp[i][j] \\gets dp[i-1][j-1]$ 的部分。球仍然只能放进空盒里，但因为每种盒子不同，所以空的盒子也有 $j$\
+    \ 种选法，所以这种情况也要乘上 $j$。\n\n## P8：球不同，盒不同，允许空盒。\n\n最简单的一种。\n\n这种情况下，每个球都有 $m$ 种去处，所以答案是\
+    \ $n^m$。"

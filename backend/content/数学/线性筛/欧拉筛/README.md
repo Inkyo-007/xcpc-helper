@@ -1,9 +1,12 @@
 ---
-updated: 2026-07-29
-tags: ['素数', '积性函数']
-source: '洛谷 P3383'
-page: 'https://www.luogu.com.cn/problem/P3383'
-priority: 5
+updated: '2026-08-10'
+tags:
+- 素数
+- 质数
+- 筛法
+source: 洛谷 P3383
+page: https://www.luogu.com.cn/problem/P3383
+priority: 7
 ---
 
-每个合数只被最小质因子筛掉一次。可顺手筛 phi / mu。
+欧拉筛实现的线性筛素数，也可以辅助实现求 phi 与 mu。
