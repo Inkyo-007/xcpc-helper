@@ -15,6 +15,20 @@ interface ErrorBody {
   error?: { code?: string; message?: string }
 }
 
+/** 把非 2xx 响应规范化为 ApiError（错误体非 JSON 时保留兜底文案）。 */
+export async function toApiError(resp: Response, fallback: string): Promise<ApiError> {
+  let code = 'unknown'
+  let message = fallback
+  try {
+    const body = (await resp.json()) as ErrorBody
+    code = body.error?.code ?? code
+    message = body.error?.message ?? message
+  } catch {
+    // 非 JSON 错误体时保留默认信息
+  }
+  return new ApiError(resp.status, code, message)
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let resp: Response
   try {
@@ -23,16 +37,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(0, 'network_error', '无法连接后端服务，请确认后端已启动')
   }
   if (!resp.ok) {
-    let code = 'unknown'
-    let message = `请求失败（${resp.status}）`
-    try {
-      const body = (await resp.json()) as ErrorBody
-      code = body.error?.code ?? code
-      message = body.error?.message ?? message
-    } catch {
-      // 非 JSON 错误体时保留默认信息
-    }
-    throw new ApiError(resp.status, code, message)
+    throw await toApiError(resp, `请求失败（${resp.status}）`)
   }
   // 204 No Content（如 DELETE 成功）没有响应体，直接返回 undefined
   if (resp.status === 204) return undefined as T

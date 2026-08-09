@@ -104,7 +104,7 @@ backend/src/
 ├── services/transfer/
 │   └── service.py       # 编排：暂存区管理、调 writer/store 落盘、RLock 串行、导入后 rebuild
 └── routers/transfer/
-    └── router.py        # 薄层，asyncio.to_thread；下载走 FileResponse（RFC 5987 文件名）
+    └── router.py        # 薄层，asyncio.to_thread；下载为 zip 字节响应（RFC 5987 文件名）
 ```
 
 - 依赖方向严格单向 `transfer → template / printbook`；模板、打印册两侧不感知 transfer；
@@ -127,7 +127,7 @@ backend/src/
 
 ### 前端落地
 
-- `features/transfer/`：`types.ts`（AnalyzeResult / ImportReport / 策略枚举）、`api.ts`（复用 shared `request`，上传走 FormData；下载用隐藏 `<a>` 直连导出 URL）、`components/`（`TemplateTransferModal.vue`、`BookTransferModal.vue`、共用 `TransferUpload.vue` 拖拽区与 `TransferReport.vue` 结果展示）；
+- `features/transfer/`：`types.ts`（AnalyzeResult / ImportReport / 策略枚举）、`api.ts`（复用 shared `request`，上传走 FormData；下载先 fetch 校验响应、失败时抛出可读错误，成功再经 blob + 隐藏 `<a>` 落地）、`components/`（`TemplateTransferModal.vue`、`BookTransferModal.vue`、共用 `TransferUpload.vue` 拖拽区与 `TransferReport.vue` 结果展示）；
 - 宿主页面改动：`TemplateLibraryPage.vue` 工具栏加入口按钮；`BookSidePanel.vue` 移除 `BookOpen` 图标、加入口按钮；`nav.ts` / `router.ts` 移除 `/template/io` 占位（`PlaceholderMeta` 的 `import` 图标若不再使用一并清理）；
 - 导入完成后：模板库页走 store 既有刷新；打印册页刷新册列表并选中新册；
 - 不新增依赖；展示组装若有纯函数逻辑放 `features/transfer/model/` 并配 vitest。

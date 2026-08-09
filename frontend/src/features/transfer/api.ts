@@ -1,6 +1,7 @@
 /** 导入/导出相关 API。 */
 
-import { request } from '@/shared/api/client'
+import { ApiError, request, toApiError } from '@/shared/api/client'
+import { extractFilename } from '@/features/transfer/model/download'
 import type {
   BookAnalyzeResult,
   ConflictStrategy,
@@ -8,26 +9,41 @@ import type {
   TemplateAnalyzeResult,
 } from '@/features/transfer/types'
 
-/** 触发浏览器下载（导出端点为普通 GET，直连即可，无需经过 request 封装） */
-function download(path: string): void {
-  const a = document.createElement('a')
-  a.href = `/api/transfer${path}`
-  a.download = ''
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
+/** 先 fetch 校验响应再落地 blob：裸 <a href> 在后端报错时会把 JSON 错误体存成文件。 */
+async function download(path: string, fallbackName: string): Promise<void> {
+  let resp: Response
+  try {
+    resp = await fetch(`/api/transfer${path}`)
+  } catch {
+    throw new ApiError(0, 'network_error', '无法连接后端服务，请确认后端已启动')
+  }
+  if (!resp.ok) {
+    throw await toApiError(resp, `导出失败（${resp.status}）`)
+  }
+  const blob = await resp.blob()
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = extractFilename(resp.headers.get('Content-Disposition'), fallbackName)
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }
 
-export function downloadTemplatesArchive(): void {
-  download('/export/templates')
+export function downloadTemplatesArchive(): Promise<void> {
+  return download('/export/templates', 'xcpc-templates.zip')
 }
 
-export function downloadAllBooksArchive(): void {
-  download('/export/books')
+export function downloadAllBooksArchive(): Promise<void> {
+  return download('/export/books', 'xcpc-books.zip')
 }
 
-export function downloadBookArchive(name: string): void {
-  download(`/export/books/${encodeURIComponent(name)}`)
+export function downloadBookArchive(name: string): Promise<void> {
+  return download(`/export/books/${encodeURIComponent(name)}`, `xcpc-book-${name}.zip`)
 }
 
 function upload<T>(path: string, file: File): Promise<T> {

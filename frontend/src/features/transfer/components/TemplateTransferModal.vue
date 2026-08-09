@@ -40,6 +40,7 @@ type Step = 'menu' | 'import-upload' | 'import-result' | 'import-report' | 'expo
 const step = ref<Step>('menu')
 const analyzing = ref(false)
 const applying = ref(false)
+const exporting = ref(false)
 const analysis = ref<TemplateAnalyzeResult | null>(null)
 const strategy = ref<ConflictStrategy>('skip')
 const report = ref<ImportReport | null>(null)
@@ -71,6 +72,7 @@ watch(
       report.value = null
       strategy.value = 'skip'
       errorMessage.value = ''
+      exporting.value = false
     }
   },
 )
@@ -106,10 +108,17 @@ async function confirmImport(): Promise<void> {
   }
 }
 
-function confirmExport(): void {
-  downloadTemplatesArchive()
-  message.success('模板库归档已开始下载')
-  close()
+async function confirmExport(): Promise<void> {
+  exporting.value = true
+  try {
+    await downloadTemplatesArchive()
+    message.success('模板库归档已开始下载')
+    close()
+  } catch (err) {
+    message.error(err instanceof Error ? err.message : '导出失败，请重试')
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
 
@@ -224,7 +233,7 @@ function confirmExport(): void {
       </n-alert>
       <div class="modal-actions">
         <n-button @click="step = 'menu'">返回</n-button>
-        <n-button type="primary" @click="confirmExport">
+        <n-button type="primary" :loading="exporting" @click="confirmExport">
           <template #icon><Download :size="14" /></template>
           导出
         </n-button>
