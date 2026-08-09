@@ -1,8 +1,8 @@
 /** 共享 Markdown 渲染（marked + KaTeX），模板详情与打印册预览同源。 */
 
 import { Marked } from 'marked'
-import markedKatex from 'marked-katex-extension'
 import 'katex/dist/katex.min.css'
+import markedKatex from './marked-katex'
 
 // 支持 $...$ 行内公式与 $$...$$ 块级公式（KaTeX）
 const marked = new Marked()
