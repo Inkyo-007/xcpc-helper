@@ -6,6 +6,10 @@ cd /d "%~dp0"
 
 if exist "%~dp0uv.exe" (set "UV=%~dp0uv.exe") else (set "UV=uv")
 
+rem The install location may be on a different drive than uv's cache (C:),
+rem where hardlinks are unsupported. Use copy mode to avoid a noisy warning.
+set UV_LINK_MODE=copy
+
 echo ============================================================
 echo   XCPC Helper
 echo.
