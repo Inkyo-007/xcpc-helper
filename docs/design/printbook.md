@@ -212,7 +212,7 @@ backend/
 ### 前端落地
 
 - `features/printbook/`：`types.ts`（PrintBook 相关类型）、`api/`（复用 shared 请求封装）、`store/`（单例 store，模式与模板库一致）、`model/`（纯函数文档模型层 `buildDocument`）、`components/`（册下拉与操作菜单、块按钮组与插入位置控件、模板列表面板、条目列表、各类型编辑弹窗、预览、打印视图）。
-- 共享 `MarkdownView.vue`（marked + marked-katex-extension），预览说明框与模板库说明框同源渲染。
+- 共享 `MarkdownView.vue`（marked + 自实现 KaTeX 扩展 `shared/utils/marked-katex.ts`），预览说明框与模板库说明框同源渲染。
 - heading_level 按块类型的用户偏好记忆存 localStorage。
 - 左栏模板列表经服务端搜索/排序（200ms 防抖），展开版本时按需拉取模板详情缓存。
 - 依赖：Paged.js（分页与页码目录）、highlight.js（打印静态高亮）；拖拽排序用原生 HTML5 DnD 实现（含边缘自动滚动）。
