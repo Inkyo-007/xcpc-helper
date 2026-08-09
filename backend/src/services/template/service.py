@@ -59,21 +59,25 @@ class TemplateService:
         sort: SortMode = "priority",
     ) -> list[TemplateSummary]:
         db = self._settings.db_path
-        matched_ids: set[str] | None = None
+        scores: dict[str, float] | None = None
         if keyword and keyword.strip():
-            matched_ids = repository.search_ids(db, keyword.strip())
+            scores = repository.search_scores(db, keyword.strip())
 
         rows = repository.list_templates(db, category)
         summaries: list[TemplateSummary] = []
         for row in rows:
-            if matched_ids is not None and row["id"] not in matched_ids:
+            if scores is not None and row["id"] not in scores:
                 continue
             row_tags: list[str] = json.loads(row["tags"])
             if tags and not all(tag in row_tags for tag in tags):
                 continue
             summaries.append(_row_to_summary(row))
 
-        return _sort_summaries(summaries, sort)
+        ordered = _sort_summaries(summaries, sort)
+        if scores is not None:
+            # 搜索时相关度恒为第一排序键；稳定排序保留用户所选排序作为同分决胜
+            ordered.sort(key=lambda t: scores.get(t.id, 0.0), reverse=True)
+        return ordered
 
     def get_detail(self, template_id: str) -> TemplateDetail:
         db = self._settings.db_path

@@ -171,13 +171,17 @@ def _fts_available(db_path: Path) -> bool:
         return bool(row[0])
 
 
-def search_ids(db_path: Path, keyword: str) -> set[str]:
-    """按关键词过滤模板 id。多词取交集；每词优先 FTS trigram，短词退化 LIKE。"""
+def search_scores(db_path: Path, keyword: str) -> dict[str, float]:
+    """按关键词检索模板，返回 id → 相关度分数。多词取交集且分数求和。
+
+    每词优先 FTS trigram 匹配，短词退化 LIKE；打分不依赖分词路径，
+    统一按命中位置加权：名称精确 > 名称包含 > 标签包含 > 正文/代码出现次数。
+    """
     terms = keyword.split()
     if not terms:
-        return set()
+        return {}
 
-    result: set[str] | None = None
+    result: dict[str, float] | None = None
     with get_connection(db_path) as conn:
         fts_ok = _fts_available(db_path)
         for term in terms:
@@ -194,8 +198,46 @@ def search_ids(db_path: Path, keyword: str) -> set[str]:
                     ("%" + _escape_like(term) + "%",),
                 ).fetchall()
                 matched = {row[0] for row in rows}
-            result = matched if result is None else (result & matched)
-    return result if result is not None else set()
+            if not matched:
+                return {}
+            scores = _score_term(conn, term, matched)
+            if result is None:
+                result = scores
+            else:
+                result = {
+                    tid: result[tid] + score
+                    for tid, score in scores.items()
+                    if tid in result
+                }
+    return result if result is not None else {}
+
+
+def _score_term(
+    conn: sqlite3.Connection, term: str, matched: set[str]
+) -> dict[str, float]:
+    """对单词命中的模板打分，分数不依赖 FTS 是否可用，保证两条检索路径一致。"""
+    placeholders = ",".join("?" * len(matched))
+    rows = conn.execute(
+        "SELECT id, slug, tags, search_text FROM templates "
+        f"WHERE id IN ({placeholders})",
+        tuple(sorted(matched)),
+    ).fetchall()
+    term_lower = term.casefold()
+    scores: dict[str, float] = {}
+    for row in rows:
+        slug: str = row[1]
+        tags: list[str] = json.loads(row[2])
+        search_text: str = row[3]
+        score = 0.0
+        if slug.casefold() == term_lower:
+            score += 100.0
+        elif term_lower in slug.casefold():
+            score += 50.0
+        if any(term_lower in tag.casefold() for tag in tags):
+            score += 20.0
+        score += search_text.casefold().count(term_lower)
+        scores[row[0]] = score
+    return scores
 
 
 def _escape_like(term: str) -> str:

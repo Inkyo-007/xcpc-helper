@@ -39,6 +39,33 @@ def test_list_filter_by_category_and_keyword(service: TemplateService) -> None:
     assert {t.id for t in hits} == {"ds/dsu"}
 
 
+def test_list_search_sorted_by_relevance(tmp_path: Path) -> None:
+    """搜索时相关度恒为第一排序键：同名模板压过高优先级的间接命中。"""
+    root = tmp_path / "content"
+
+    def _write(path: Path, text: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    _write(root / "ds" / "线段树" / "seg.cpp", "int seg[4];\n")
+    _write(root / "ds" / "线段树" / "README.md", "---\npriority: 1\n---\n")
+    _write(root / "ds" / "lct" / "lct.cpp", "struct LCT {};\n")
+    _write(
+        root / "ds" / "lct" / "README.md",
+        "---\npriority: 9\n---\n\n内部用线段树维护信息。\n",
+    )
+
+    settings = Settings(content_dir=root, data_dir=tmp_path / "data")
+    svc = TemplateService(settings)
+    svc.rebuild()
+
+    # 不搜索时仍按优先级：lct 在前
+    assert [t.id for t in svc.list_templates()] == ["ds/lct", "ds/线段树"]
+    # 搜索时按相关度：名称精确命中的“线段树”在前
+    hits = svc.list_templates(keyword="线段树")
+    assert [t.id for t in hits] == ["ds/线段树", "ds/lct"]
+
+
 def test_list_filter_by_tags(service: TemplateService) -> None:
     hits = service.list_templates(tags=["连通性"])
     assert {t.id for t in hits} == {"ds/dsu"}

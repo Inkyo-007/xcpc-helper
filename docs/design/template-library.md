@@ -94,7 +94,7 @@ priority: 5
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/templates` | 模板列表（摘要），支持 `category` / `tags` / `keyword`（FTS5 搜标题/标签/说明/代码）/ `sort`（updated/name/priority） |
+| GET | `/api/templates` | 模板列表（摘要），支持 `category` / `tags` / `keyword`（FTS5 搜标题/标签/说明/代码，结果按相关度排序，用户所选 `sort` 作同分决胜）/ `sort`（updated/name/priority） |
 | GET | `/api/templates/{id}` | 模板详情，含全部副标签版本（代码 + README 正文） |
 | GET | `/api/categories` | 分类列表（从 content/ 一级目录自动派生） |
 | GET | `/api/diagnostics` | 扫描诊断（格式错误、缺代码文件、page 无 source 等），供前端显示报错提示 |
