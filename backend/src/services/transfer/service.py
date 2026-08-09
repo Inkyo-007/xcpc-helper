@@ -15,14 +15,16 @@ from uuid import uuid4
 
 from core.config import Settings, get_settings
 from core.exceptions import AppError, BadRequestError
+from modules.printbook import store as book_store
 from modules.template import writer
 from modules.template.models import Diagnostic
 from modules.template.parser import parse_readme_file
 from modules.template.scanner import scan_content
 from modules.template.schemas import VersionMetaInput, VersionUpsert
-from modules.transfer import templates_io
+from modules.transfer import books_io, templates_io
 from modules.transfer.archive import extract_archive
 from modules.transfer.schemas import (
+    BookAnalyzeResult,
     FailedEntry,
     ImportApplyInput,
     ImportReport,
@@ -50,6 +52,16 @@ class TransferService:
         """以当前扫描结果为事实来源，导出标准化三层结构的模板库 zip。"""
         scan = scan_content(self._settings.content_dir)
         return templates_io.build_templates_archive(scan.templates)
+
+    def export_books(self, name: str | None = None) -> bytes:
+        """导出打印册 zip：name 为 None 时导出所有册，否则导出单册（不存在 404）。"""
+        books_dir = self._settings.books_dir
+        if name is not None:
+            book_store.load_book(books_dir, name)  # 存在性与可读性校验（404/400）
+            names = [name]
+        else:
+            names = [info.name for info in book_store.list_books(books_dir)]
+        return books_io.build_books_archive(books_dir, names)
 
     # ===== 模板导入 =====
 
@@ -90,6 +102,75 @@ class TransferService:
                 return report
             finally:
                 shutil.rmtree(root, ignore_errors=True)
+
+    # ===== 打印册导入 =====
+
+    def analyze_books(self, data: bytes) -> BookAnalyzeResult:
+        """上传 zip → 解压至暂存区 → 返回册清单 + 警告 + 冲突清单。"""
+        staging_id, root = self._new_staging(data)
+        try:
+            plans, warnings = books_io.analyze_books_archive(root)
+        except BaseException:
+            shutil.rmtree(root, ignore_errors=True)
+            raise
+        if not plans:
+            shutil.rmtree(root, ignore_errors=True)
+            raise BadRequestError("压缩包中没有可导入的打印册")
+        existing = self._existing_book_names()
+        conflicts = sorted(p.name for p in plans if p.name in existing)
+        return BookAnalyzeResult(
+            staging_id=staging_id,
+            books=books_io.to_book_items(plans),
+            warnings=warnings,
+            conflicts=conflicts,
+        )
+
+    def apply_books(self, payload: ImportApplyInput) -> ImportReport:
+        """按冲突策略执行册导入（整册目录原子就位），返回逐项报告。"""
+        with self._lock:
+            root = self._staging_root(payload.staging_id)
+            try:
+                plans, _warnings = books_io.analyze_books_archive(root)
+                report = ImportReport()
+                taken = self._existing_book_names()
+                for plan in plans:
+                    self._apply_book(plan, payload.strategy, taken, report)
+                return report
+            finally:
+                shutil.rmtree(root, ignore_errors=True)
+
+    def _apply_book(
+        self,
+        plan: books_io.ImportBookPlan,
+        strategy: str,
+        taken: set[str],
+        report: ImportReport,
+    ) -> None:
+        books_dir = self._settings.books_dir
+        name = plan.name
+        try:
+            if name in taken:
+                if strategy == "skip":
+                    report.skipped.append(name)
+                    return
+                if strategy == "rename":
+                    n = 2
+                    while f"{name}-{n}" in taken:
+                        n += 1
+                    new_name = f"{name}-{n}"
+                    report.renamed.append(RenamedEntry(source=name, target=new_name))
+                    name = new_name
+                else:  # overwrite
+                    book_store.delete_book(books_dir, name)
+                    report.overwritten.append(name)
+            book_store.place_book_tree(books_dir, name, plan.source_dir)
+            if name not in report.overwritten:
+                report.created.append(name)
+            taken.add(name)
+        except (AppError, OSError) as exc:
+            message = exc.message if isinstance(exc, AppError) else str(exc)
+            logger.warning("导入打印册失败 [%s] %s", plan.name, message)
+            report.failed.append(FailedEntry(id=plan.name, message=message))
 
     def _apply_template(
         self,
@@ -225,6 +306,10 @@ class TransferService:
     def _existing_template_ids(self) -> set[str]:
         """当前库中全部模板 id（直接扫磁盘事实来源，不依赖索引新鲜度）。"""
         return {t.id for t in scan_content(self._settings.content_dir).templates}
+
+    def _existing_book_names(self) -> set[str]:
+        """当前 books/ 下全部册名（含配置损坏的册，目录名即身份）。"""
+        return {info.name for info in book_store.list_books(self._settings.books_dir)}
 
 
 # 依赖注入

@@ -152,6 +152,31 @@ def delete_book(books_dir: Path, name: str) -> None:
     shutil.rmtree(book_dir)
 
 
+def place_book_tree(books_dir: Path, name: str, source_dir: Path) -> str:
+    """把外部册目录整体就位到 books/（供册导入使用），返回规范化册名。
+
+    原子性：先整体复制到 books/ 下的 .tmp-<uuid> 暂存目录，再一次 rename 到位；
+    目标已存在抛 409（覆盖/改名策略由调用方先决策）。
+    source_dir 必须含 book.yaml；缺 assets/ 时就位后补空目录。
+    """
+    name = validate_name(name, "打印册")
+    if not (source_dir / BOOK_FILE).is_file():
+        raise BadRequestError(f"册目录缺少 {BOOK_FILE}: {source_dir.name}")
+    books_dir.mkdir(parents=True, exist_ok=True)
+    target = books_dir / name
+    if target.exists():
+        raise ConflictError(f"打印册已存在: {name}")
+    staging = Path(tempfile.mkdtemp(prefix=".tmp-", dir=books_dir))
+    try:
+        staged_book = staging / name
+        shutil.copytree(source_dir, staged_book)
+        (staged_book / ASSETS_DIR).mkdir(exist_ok=True)
+        os.rename(staged_book, target)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    return name
+
+
 # ===== 图片资源 =====
 
 

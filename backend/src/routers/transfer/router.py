@@ -12,6 +12,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, Response, UploadFile
 
 from modules.transfer.schemas import (
+    BookAnalyzeResult,
     ImportApplyInput,
     ImportReport,
     TemplateAnalyzeResult,
@@ -40,6 +41,20 @@ async def export_templates(service: ServiceDep) -> Response:
     return _zip_response(data, "xcpc-templates")
 
 
+@router.get("/export/books")
+async def export_books(service: ServiceDep) -> Response:
+    """GET /api/transfer/export/books：导出所有打印册 zip。"""
+    data = await asyncio.to_thread(service.export_books)
+    return _zip_response(data, "xcpc-books")
+
+
+@router.get("/export/books/{name}")
+async def export_book(name: str, service: ServiceDep) -> Response:
+    """GET /api/transfer/export/books/{name}：导出单册 zip。"""
+    data = await asyncio.to_thread(service.export_books, name)
+    return _zip_response(data, f"xcpc-book-{name}")
+
+
 @router.post("/import/templates/analyze", response_model=TemplateAnalyzeResult)
 async def analyze_templates(
     service: ServiceDep, file: Annotated[UploadFile, File()]
@@ -55,3 +70,18 @@ async def apply_templates(
 ) -> ImportReport:
     """POST .../import/templates/apply：按冲突策略执行导入，返回报告。"""
     return await asyncio.to_thread(service.apply_templates, payload)
+
+
+@router.post("/import/books/analyze", response_model=BookAnalyzeResult)
+async def analyze_books(
+    service: ServiceDep, file: Annotated[UploadFile, File()]
+) -> BookAnalyzeResult:
+    """POST .../import/books/analyze：上传册包，返回册清单与暂存 id。"""
+    data = await file.read()
+    return await asyncio.to_thread(service.analyze_books, data)
+
+
+@router.post("/import/books/apply", response_model=ImportReport)
+async def apply_books(payload: ImportApplyInput, service: ServiceDep) -> ImportReport:
+    """POST .../import/books/apply：按冲突策略执行册导入，返回报告。"""
+    return await asyncio.to_thread(service.apply_books, payload)

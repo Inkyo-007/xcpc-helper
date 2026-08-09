@@ -88,6 +88,28 @@ def settings(content_dir: Path, tmp_path: Path) -> Settings:
     )
 
 
+BOOK_YAML = (
+    "cover:\n"
+    "  title: 示例打印册\n"
+    "options:\n"
+    "  include_toc: true\n"
+    "blocks:\n"
+    "  - type: template\n"
+    "    template: math/sieve\n"
+)
+
+
+@pytest.fixture
+def books_dir(tmp_path: Path) -> Path:
+    """两册样本：册A 含 assets 图片，册B 仅 book.yaml。"""
+    root = tmp_path / "books"
+    _write(root / "册A" / "book.yaml", BOOK_YAML)
+    (root / "册A" / "assets").mkdir(parents=True)
+    (root / "册A" / "assets" / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    _write(root / "册B" / "book.yaml", "cover:\n  title: 校内赛版\n")
+    return root
+
+
 @pytest.fixture
 def template_service(settings: Settings) -> TemplateService:
     service = TemplateService(settings)

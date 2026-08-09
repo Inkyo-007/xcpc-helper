@@ -37,6 +37,20 @@ class TemplateAnalyzeResult(BaseModel):
     conflicts: list[str]  # 与现有库重名的模板 id（<分类>/<模板名>）
 
 
+class BookAnalyzeItem(BaseModel):
+    """识别出的一册（analyze 只读预览项）。"""
+
+    name: str
+    title: str
+
+
+class BookAnalyzeResult(BaseModel):
+    staging_id: str
+    books: list[BookAnalyzeItem]
+    warnings: list[TransferWarning]
+    conflicts: list[str]  # 与现有册重名的册名
+
+
 class ImportApplyInput(BaseModel):
     staging_id: str
     strategy: ConflictStrategy = "skip"
