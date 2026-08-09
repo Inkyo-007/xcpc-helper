@@ -13,6 +13,7 @@ from modules.transfer.archive import (
     decode_entry_name,
     extract_archive,
     read_manifest,
+    strip_wrapper_dir,
     write_archive,
 )
 from tests.transfer.conftest import make_zip
@@ -78,6 +79,39 @@ def test_read_manifest_missing_or_foreign(tmp_path: Path) -> None:
     assert read_manifest(tmp_path) is None
     (tmp_path / "manifest.json").write_text(json.dumps({"app": "other"}), encoding="utf-8")
     assert read_manifest(tmp_path) is None
+
+
+def test_strip_wrapper_own_archive(tmp_path: Path) -> None:
+    """本软件归档被连文件夹整体打包：含 manifest 的单一子目录下钻。"""
+    wrapper = tmp_path / "xcpc-templates"
+    (wrapper / "content" / "math").mkdir(parents=True)
+    (wrapper / "manifest.json").write_text("{}", encoding="utf-8")
+    assert strip_wrapper_dir(tmp_path) == wrapper
+
+
+def test_strip_wrapper_foreign_library(tmp_path: Path) -> None:
+    """外来库被整体打包：单一子目录内目录多于文件时下钻。"""
+    wrapper = tmp_path / "ownlib"
+    (wrapper / "图论").mkdir(parents=True)
+    (wrapper / "dp").mkdir(parents=True)
+    (wrapper / "说明.txt").write_text("x", encoding="utf-8")
+    assert strip_wrapper_dir(tmp_path) == wrapper
+
+
+def test_strip_wrapper_keeps_single_category(tmp_path: Path) -> None:
+    """单分类外来库（子项以代码文件为主）不下钻，仍按分类识别。"""
+    category = tmp_path / "图论"
+    category.mkdir()
+    (category / "dijkstra.cpp").write_text("x", encoding="utf-8")
+    (category / "spfa.cpp").write_text("x", encoding="utf-8")
+    assert strip_wrapper_dir(tmp_path) == tmp_path
+
+
+def test_strip_wrapper_keeps_multi_entry_root(tmp_path: Path) -> None:
+    """根部有多个条目时不存在包裹层，原样返回。"""
+    (tmp_path / "图论").mkdir()
+    (tmp_path / "dp").mkdir()
+    assert strip_wrapper_dir(tmp_path) == tmp_path
 
 
 def test_write_archive_with_dir_entries_and_unicode() -> None:

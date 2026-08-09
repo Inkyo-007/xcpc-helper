@@ -100,6 +100,21 @@ def test_import_rejects_archive_without_manifest(client: TestClient) -> None:
     assert "manifest" in resp.json()["error"]["message"]
 
 
+def test_import_wrapped_archive(client: TestClient) -> None:
+    """册归档被连文件夹整体打包（多一层包裹目录）也能识别。"""
+    manifest = json.dumps({"app": "xcpc-helper", "kind": "books"})
+    data = make_zip(
+        {
+            "xcpc-books/manifest.json": manifest,
+            "xcpc-books/books/册C/book.yaml": "cover:\n  title: 包裹册\n",
+        }
+    )
+    result = _upload_books(client, data)
+    assert [b["name"] for b in result["books"]] == ["册C"]
+    report = _apply_books(client, result["staging_id"])
+    assert report["created"] == ["册C"]
+
+
 def test_import_skips_corrupt_book(client: TestClient) -> None:
     """损坏 book.yaml 与缺 book.yaml 的册进警告，其余正常导入。"""
     manifest = json.dumps({"app": "xcpc-helper", "kind": "books"})

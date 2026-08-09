@@ -7,6 +7,8 @@
 - 标准归档（含本软件 manifest 且 kind=templates）：content/ 子树按三层结构映射；
 - 外来平铺结构：一级目录=分类，分类目录下每份代码文件=一份单版本模板；
   分类下的子目录、根部散落文件、白名单外扩展名一律列入警告并跳过。
+
+两种归档都可能被用户连文件夹一起打包而多一层包裹目录，识别前先静默剥离。
 """
 
 from dataclasses import dataclass, field
@@ -18,7 +20,12 @@ from modules.template.models import TemplateNode
 from modules.template.scanner import CODE_EXTENSIONS
 from modules.template.schemas import VersionMetaInput
 from modules.template.writer import render_readme
-from modules.transfer.archive import build_manifest, read_manifest, write_archive
+from modules.transfer.archive import (
+    build_manifest,
+    read_manifest,
+    strip_wrapper_dir,
+    write_archive,
+)
 from modules.transfer.schemas import ArchiveKind, TemplateAnalyzeItem, TransferWarning
 
 # ===== 导出 =====
@@ -147,6 +154,7 @@ def analyze_templates_archive(
     root: Path,
 ) -> tuple[ArchiveKind, list[ImportTemplatePlan], list[TransferWarning]]:
     """识别暂存区根目录，返回 (归档类型, 导入计划, 警告清单)。kind 不匹配时抛 400。"""
+    root = strip_wrapper_dir(root)
     manifest = read_manifest(root)
     if manifest is not None:
         kind = manifest.get("kind")

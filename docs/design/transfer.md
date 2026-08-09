@@ -46,9 +46,11 @@ xcpc-templates-20260809.zip        # 或 xcpc-books-*.zip
 
 - `content/` 子树按三层结构直接映射导入（含多版本与空主标签目录）；
 - `books/` 子树每册一个目录（book.yaml + assets/），book.yaml 损坏的册列入警告并跳过，不阻断其余册。
+- 本软件归档被连文件夹整体打包（压缩包根仅含一个目录且其内含 manifest/content/books）时，同样先静默下钻一层再识别。
 
 ### 3.2 外来模板库（无 manifest 或结构不符）
 
+- 先剥离**单层包裹目录**：用户常把整个模板文件夹直接打成 zip，导致归档多一层外壳。压缩包根仅含一个目录且其内目录数多于文件数时，静默下钻一层再识别（单分类外来库形态相同但子项以代码文件为主，不受影响）；
 - 顶层每个一级目录视为**分类**；分类目录下每个代码文件（扩展名命中 `CODE_EXTENSIONS`）视为一份**单版本模板**，模板名取文件名主名；
 - 以下条目一律列入警告并跳过（analyze 返回警告清单，用户确认后继续导入可识别部分）：
   - 分类目录下的**子目录**（不递归识别）；
@@ -132,7 +134,7 @@ backend/src/
 
 ## 6. 验证方式
 
-- 后端：`tests/transfer/` 覆盖——archive（GBK 名、zip slip、限量）、导出规范化（三种形态 → 三层结构、UTF-8、空主标签目录条目、manifest）、analyze（外来平铺映射、子目录/根文件/.txt 警告、名称清洗、同主名拆分）、apply 三种冲突策略、导出→导入 round-trip 扫描结果等价、册导入导出（单册/全册、冲突策略、损坏 book.yaml 跳过）、TestClient 端到端；
+- 后端：`tests/transfer/` 覆盖——archive（GBK 名、zip slip、限量、包裹目录剥离）、导出规范化（三种形态 → 三层结构、UTF-8、空主标签目录条目、manifest）、analyze（外来平铺映射、包裹层下钻、子目录/根文件/.txt 警告、名称清洗、同主名拆分）、apply 三种冲突策略、导出→导入 round-trip 扫描结果等价、册导入导出（单册/全册、冲突策略、损坏 book.yaml 跳过、包裹层下钻）、TestClient 端到端；
 - 验证命令：`backend/` 下 `uv run pytest`、`uv run ruff check src tests`；起服务后 `curl http://127.0.0.1:8000/api/diagnostics` 正常返回；
 - 前端：`npm run typecheck`、`npm run test`、`npm run build`；
 - 手动走查：模板库导出 → 解压核对三层结构 → 重新导入（冲突策略各试一次）；构造外来平铺 zip（含中文名、子目录、.txt、同主名多扩展名）走完整导入；册导出当前/所有 → 删册 → 导入恢复。
@@ -144,4 +146,5 @@ backend/src/
 3. `feat(后端): 实现打印册导出与导入`
 4. `feat(前端): 添加导入/导出弹窗组件`
 5. `feat(前端): 接入模板库与打印册入口并移除 io 占位页`
-6. `docs: 更新导入/导出设计文档状态与进度`
+6. `fix(后端): 导入识别时剥离单层包裹目录`
+7. `docs: 更新导入/导出设计文档状态与进度`

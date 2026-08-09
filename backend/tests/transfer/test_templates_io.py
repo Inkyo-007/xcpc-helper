@@ -138,6 +138,27 @@ def test_foreign_reserved_names_fallback(tmp_path: Path) -> None:
     assert any("清洗" in w.message for w in warnings)
 
 
+def test_wrapped_foreign_archive(tmp_path: Path) -> None:
+    """用户把整个文件夹打成 zip：剥离 ownlib 包裹层后按外来平铺结构识别。"""
+    data = make_zip(
+        {
+            "ownlib/图论/dijkstra.cpp": "// dij",
+            "ownlib/图论/最短路/floyd.cpp": "// floyd",
+            "ownlib/图论/note.txt": "note",
+            "ownlib/dp/dsu.cpp": "// cpp",
+            "ownlib/dp/dsu.py": "# py",
+            "ownlib/root_loose.cpp": "// root",
+        }
+    )
+    kind, plans, warnings = templates_io.analyze_templates_archive(_extract(data, tmp_path))
+    assert kind == "foreign"
+    assert {p.id for p in plans} == {"图论/dijkstra", "dp/dsu", "dp/dsu-2"}
+    warned_paths = {w.path for w in warnings}
+    assert "图论/最短路" in warned_paths  # 分类下的子目录
+    assert "图论/note.txt" in warned_paths  # 白名单外扩展名
+    assert "root_loose.cpp" in warned_paths  # 根部散落文件
+
+
 def test_sanitize_name() -> None:
     """名称清洗对齐 common.validation 规则：保留名/空名兜底、非法字符替换、长度截断。"""
     assert templates_io.sanitize_name("CON") == ("未命名", True)

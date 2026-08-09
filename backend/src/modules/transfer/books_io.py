@@ -18,7 +18,12 @@ from pydantic import ValidationError
 from core.exceptions import BadRequestError
 from modules.printbook.models import BookConfig
 from modules.printbook.store import BOOK_FILE
-from modules.transfer.archive import build_manifest, read_manifest, write_archive
+from modules.transfer.archive import (
+    build_manifest,
+    read_manifest,
+    strip_wrapper_dir,
+    write_archive,
+)
 from modules.transfer.schemas import BookAnalyzeItem, TransferWarning
 
 # ===== 导出 =====
@@ -51,6 +56,7 @@ class ImportBookPlan:
 
 def analyze_books_archive(root: Path) -> tuple[list[ImportBookPlan], list[TransferWarning]]:
     """识别暂存区根目录下的 books/ 子树。非册归档（含模板库归档）抛 400。"""
+    root = strip_wrapper_dir(root)
     manifest = read_manifest(root)
     if manifest is None:
         raise BadRequestError("不是本软件导出的打印册归档（缺少 manifest.json）")

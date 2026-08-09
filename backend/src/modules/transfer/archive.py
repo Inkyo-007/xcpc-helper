@@ -118,6 +118,30 @@ def read_manifest(root: Path) -> dict | None:
     return data
 
 
+def strip_wrapper_dir(root: Path) -> Path:
+    """剥离单层包裹目录：把整个文件夹打成 zip 会让归档多一层外壳，这里静默下钻。
+
+    根目录仅含一个条目且为目录（忽略点开头条目）时考虑下钻，条件为其中任一：
+    - 该目录含 manifest.json / content/ / books/（本软件导出的归档被整体打包）；
+    - 该目录子项中目录数多于文件数（外来模板库按「文件夹/分类/代码」整体打包；
+      单分类外来库的子项以代码文件为主，不会误下钻）。
+    """
+    entries = [p for p in root.iterdir() if not p.name.startswith(".")]
+    if len(entries) != 1 or not entries[0].is_dir():
+        return root
+    wrapper = entries[0]
+    own_markers = (wrapper / MANIFEST_NAME).is_file() or any(
+        (wrapper / d).is_dir() for d in ("content", "books")
+    )
+    if own_markers:
+        return wrapper
+    children = [p for p in wrapper.iterdir() if not p.name.startswith(".")]
+    dirs = sum(1 for p in children if p.is_dir())
+    if dirs > len(children) - dirs:
+        return wrapper
+    return root
+
+
 def write_archive(files: list[tuple[str, bytes]], dir_entries: list[str] | None = None) -> bytes:
     """把内存中的文件集合打成 zip 字节流。arcname 一律 posix 风格（utf-8 标志自动置位）。"""
     buf = io.BytesIO()
