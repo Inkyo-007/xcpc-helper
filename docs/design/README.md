@@ -7,6 +7,7 @@
 | [conventions.md](conventions.md) | 跨功能公共约定 | 长期有效 |
 | [template-library.md](template-library.md) | 模板库（template） | 已实现 |
 | [printbook.md](printbook.md) | 打印册（printbook） | 已实现 |
+| [transfer.md](transfer.md) | 导入 / 导出（transfer） | 设计中 |
 
 ## 状态约定
 
