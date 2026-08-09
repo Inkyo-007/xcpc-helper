@@ -22,6 +22,9 @@ backend/data/*.db-journal
 backend/data/*.db-wal
 backend/data/*.db-shm
 
+# 导入/导出的上传暂存区（随用随清，不入库）
+backend/data/.staging/
+
 # 可视化写操作的原子暂存目录（正常会自动清理，防御崩溃残留）
 backend/content/.tmp-*/
 

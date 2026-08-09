@@ -39,12 +39,23 @@ class Settings(BaseSettings):
     # 文件变更后的去抖时间（秒），避免频繁重建
     watch_debounce_seconds: float = 0.5
 
+    # 导入/导出：zip 限量与上传暂存区
+    transfer_max_entries: int = 5000
+    transfer_max_total_mb: int = 200
+    transfer_max_file_mb: int = 20
+    # analyze 与 apply 之间暂存目录的保留时长（秒）
+    transfer_staging_ttl_seconds: int = 3600
+
     # 前端构建产物目录（存在时由 FastAPI 托管）
     frontend_dist: Path = PROJECT_ROOT / "frontend" / "dist"
 
     @property
     def db_path(self) -> Path:
         return self.data_dir / self.db_name
+
+    @property
+    def staging_dir(self) -> Path:
+        return self.data_dir / ".staging"
 
 
 @lru_cache

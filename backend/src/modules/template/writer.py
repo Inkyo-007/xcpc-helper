@@ -195,6 +195,19 @@ def delete_template_dir(content_dir: Path, category: str, name: str) -> None:
     _cleanup_empty_category(content_dir, category)
 
 
+def delete_template_tree(content_dir: Path, category: str, name: str) -> None:
+    """物理删除整棵模板目录树（含所有版本）。
+
+    仅供导入的 overwrite 策略使用；交互删除仍走"先删版本再删空模板"
+    的防误删路径（delete_template_dir 拒绝非空目录）。
+    """
+    target = content_dir / category / name
+    if not target.is_dir():
+        raise NotFoundError(f"模板不存在: {category}/{name}")
+    shutil.rmtree(target)
+    _cleanup_empty_category(content_dir, category)
+
+
 # ===== 版本操作 =====
 
 
