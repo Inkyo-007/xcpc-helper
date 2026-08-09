@@ -658,6 +658,17 @@ div.n-base-selection-input {
   white-space: nowrap;
 }
 
+/* n-spin 包装层必须接力高度约束链（flex + min-height:0），
+   否则内部 .tpl-list 的 overflow-y 拿不到受限高度，
+   列表会随内容撑高而无法滚动。 */
+.tpl-list-spin,
+.tpl-list-spin > .n-spin-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---------------- 列表 + 详情 ---------------- */
 
 .lib-content {
