@@ -17,7 +17,7 @@ export interface NavGroup {
 }
 
 export interface PlaceholderMeta {
-  icon: 'book' | 'import' | 'timer' | 'settings'
+  icon: 'book' | 'timer' | 'settings'
   title: string
   hint: string
 }
@@ -30,7 +30,6 @@ export const NAV_GROUPS: NavGroup[] = [
     children: [
       { id: 'tpl-lib', label: '模板库', to: '/template/library' },
       { id: 'tpl-books', label: '打印册', to: '/template/printbook' },
-      { id: 'tpl-io', label: '导入 / 导出', to: '/template/io' },
     ],
   },
   {

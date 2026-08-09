@@ -146,6 +146,22 @@ async function selectBook(name: string): Promise<OpResult> {
   }
 }
 
+/** 册导入等外部变更后刷新列表并选中指定册（缺省选中第一本可用册） */
+async function refreshBooks(selectName?: string): Promise<OpResult> {
+  try {
+    await refreshList()
+    const target =
+      selectName && books.value.some((b) => b.name === selectName)
+        ? selectName
+        : (books.value.find((b) => !b.error)?.name ?? null)
+    if (target) await loadDetail(target)
+    activeName.value = target
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, message: errorMessage(err, '打印册加载失败') }
+  }
+}
+
 // ===== 册级操作 =====
 
 async function createBook(name: string, title: string): Promise<OpResult> {
@@ -415,6 +431,7 @@ export function usePrintBooks() {
     rememberTemplateLevel,
     init,
     selectBook,
+    refreshBooks,
     createBook,
     renameBook,
     deleteBook,

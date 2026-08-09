@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Check, ChevronRight, Flag, Inbox, Plus, RefreshCw, Search } from 'lucide-vue-next'
+import {
+  Check,
+  ChevronRight,
+  Flag,
+  FolderSync,
+  Inbox,
+  Plus,
+  RefreshCw,
+  Search,
+} from 'lucide-vue-next'
 import { NAlert, NButton, NEmpty, NInput, NSelect, NSpin, NTooltip, useMessage } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
 import TemplateCreateModal from '@/features/template/components/TemplateCreateModal.vue'
 import TemplateDetail from '@/features/template/components/TemplateDetail.vue'
 import VersionFormModal from '@/features/template/components/VersionFormModal.vue'
 import { useTemplates } from '@/features/template/store'
+import TemplateTransferModal from '@/features/transfer/components/TemplateTransferModal.vue'
 import { ROOT_VERSION_TOKEN } from '@/features/template/types'
 import type {
   SortMode,
@@ -26,6 +36,7 @@ const {
   loadList,
   loadDetail,
   reload,
+  refresh,
   deleteTemplate,
   removeVersion,
   categoryHue,
@@ -42,6 +53,7 @@ const openVariants = ref<Record<string, boolean>>({})
 const activeVariantId = ref<string | null>(null)
 const reloading = ref(false)
 const showCreate = ref(false)
+const showTransfer = ref(false)
 const deletingTemplate = ref<TemplateDetailData | null>(null)
 const deleteLoading = ref(false)
 const versionForm = ref<{
@@ -171,6 +183,11 @@ function onTemplateCreated(id: string): void {
   activeId.value = id
   activeVariantId.value = null
   void ensureDetail(id)
+}
+
+/** 模板导入完成：刷新列表/分类/诊断（后端已重建索引，无需再触发 reload） */
+async function onImported(): Promise<void> {
+  await refresh()
 }
 
 /** 空主标签的"删除模板"入口：打开确认弹窗 */
@@ -335,6 +352,14 @@ async function confirmDeleteVersion(): Promise<void> {
               </template>
               手动刷新
             </n-tooltip>
+            <n-tooltip>
+              <template #trigger>
+                <n-button size="small" quaternary @click="showTransfer = true">
+                  <template #icon><FolderSync :size="14" /></template>
+                </n-button>
+              </template>
+              导入 / 导出
+            </n-tooltip>
             <n-select
               v-model:value="sortMode"
               class="sort-select"
@@ -466,6 +491,7 @@ async function confirmDeleteVersion(): Promise<void> {
     </div>
 
     <TemplateCreateModal v-model:show="showCreate" @created="onTemplateCreated" />
+    <TemplateTransferModal v-model:show="showTransfer" @imported="onImported" />
     <DeleteConfirmModal
       :show="deletingTemplate !== null"
       title="删除模板"

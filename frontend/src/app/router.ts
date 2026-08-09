@@ -29,19 +29,6 @@ export const router = createRouter({
       meta: { group: '模板整理', sub: '打印册' },
     },
     {
-      path: '/template/io',
-      component: () => import('@/app/PlaceholderPage.vue'),
-      meta: {
-        group: '模板整理',
-        sub: '导入 / 导出',
-        placeholder: {
-          icon: 'import',
-          title: '导入 / 导出',
-          hint: '批量导入本地目录（目录自动映射为分类），或整库备份 / 迁移。此功能在 M2 里程碑实现。',
-        },
-      },
-    },
-    {
       path: '/contest/stress',
       component: () => import('@/app/PlaceholderPage.vue'),
       meta: {

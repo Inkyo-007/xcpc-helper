@@ -9,6 +9,7 @@ import EntryEditorModal from '@/features/printbook/components/EntryEditorModal.v
 import EntryList from '@/features/printbook/components/EntryList.vue'
 import BookPreview from '@/features/printbook/components/preview/BookPreview.vue'
 import { usePrintBooks } from '@/features/printbook/store'
+import BookTransferModal from '@/features/transfer/components/BookTransferModal.vue'
 import type {
   BookBlock,
   BookBlockType,
@@ -31,6 +32,7 @@ const {
   rememberTemplateLevel,
   init,
   selectBook,
+  refreshBooks,
   createBook,
   renameBook,
   deleteBook,
@@ -53,6 +55,7 @@ onMounted(async () => {
 const showBookName = ref(false)
 const bookNameMode = ref<'create' | 'rename'>('create')
 const showSettings = ref(false)
+const showTransfer = ref(false)
 const editingBlock = ref<BookBlock | null>(null)
 const deletingBook = ref<PrintBookSummary | null>(null)
 
@@ -93,6 +96,10 @@ async function onMoveBlock(from: number, to: number): Promise<void> {
 
 async function onSelectBook(name: string): Promise<void> {
   report(await selectBook(name))
+}
+
+async function onBooksImported(names: string[]): Promise<void> {
+  report(await refreshBooks(names[0]))
 }
 
 async function onBookCreated(name: string, title: string): Promise<void> {
@@ -159,6 +166,7 @@ async function confirmDeleteBook(): Promise<void> {
         :block-count="blockCount"
         @select-book="onSelectBook"
         @new-book="bookNameMode = 'create'; showBookName = true"
+        @transfer="showTransfer = true"
         @settings="showSettings = true"
         @rename="bookNameMode = 'rename'; showBookName = true"
         @delete-book="deletingBook = activeBook"
@@ -210,6 +218,11 @@ async function confirmDeleteBook(): Promise<void> {
       :loading="false"
       @update:show="deletingBook = null"
       @confirm="confirmDeleteBook"
+    />
+    <BookTransferModal
+      v-model:show="showTransfer"
+      :active-name="activeBook?.name ?? null"
+      @imported="onBooksImported"
     />
   </div>
 </template>

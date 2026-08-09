@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { BookOpen, Pencil, Settings2, Trash2 } from 'lucide-vue-next'
+import { FolderSync, Pencil, Settings2, Trash2 } from 'lucide-vue-next'
 import { NButton, NSelect, NTooltip } from 'naive-ui'
 import BlockAddBar from '@/features/printbook/components/BlockAddBar.vue'
 import TemplatePicker from '@/features/printbook/components/TemplatePicker.vue'
@@ -19,6 +19,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'select-book': [name: string]
   'new-book': []
+  transfer: []
   settings: []
   rename: []
   'delete-book': []
@@ -49,7 +50,6 @@ const bookOptions = computed(() => [
   <div class="pb-side">
     <div class="pb-side-top">
       <div class="pb-book-switch">
-        <BookOpen :size="15" class="pb-book-icon" />
         <n-select
           v-model:value="selected"
           class="pb-book-select"
@@ -58,6 +58,14 @@ const bookOptions = computed(() => [
         />
       </div>
       <div class="pb-book-actions">
+        <n-tooltip>
+          <template #trigger>
+            <n-button quaternary size="small" @click="emit('transfer')">
+              <template #icon><FolderSync :size="14" /></template>
+            </n-button>
+          </template>
+          导入 / 导出
+        </n-tooltip>
         <n-tooltip>
           <template #trigger>
             <n-button quaternary size="small" @click="emit('rename')">
@@ -135,11 +143,6 @@ const bookOptions = computed(() => [
   gap: 8px;
   min-width: 0;
   flex: 1;
-}
-
-.pb-book-icon {
-  flex: none;
-  color: var(--accent);
 }
 
 .pb-book-select {
