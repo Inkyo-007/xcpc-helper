@@ -1,5 +1,6 @@
 # CI：push 到 main 与每个 PR 自动运行验证命令（与 AGENTS.md「验证命令」一致），
 # 任一环节失败则标红，用于保证主干与社区贡献的质量。
+# 后端在 Windows / Linux / macOS 三平台矩阵验证，防止平台相关的回归。
 name: CI
 
 on:
@@ -9,7 +10,11 @@ on:
 
 jobs:
   backend:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: backend
@@ -21,7 +26,8 @@ jobs:
       - run: uv run ruff check src tests
 
   frontend:
-    runs-on: windows-latest
+    # 前端为纯 Web 栈，无平台差异，单平台验证即可
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: frontend
