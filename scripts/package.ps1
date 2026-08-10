@@ -55,8 +55,8 @@ if (Test-Path $uvBin) {
     if ($target.artifact.EndsWith('.zip')) {
         Expand-Archive -Path $uvPkg -DestinationPath $uvDir -Force
     } else {
-        # tar.gz：Windows 10+ 与 Linux/macOS 均自带 tar
-        tar -xzf $uvPkg -C $uvDir
+        # tar.gz 内为 <平台目录>/uv 的嵌套结构，解包时剥掉顶层目录（GNU tar 与 bsdtar 均支持）
+        tar -xzf $uvPkg -C $uvDir --strip-components 1
     }
     Remove-Item $uvPkg
 }
