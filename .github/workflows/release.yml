@@ -1,4 +1,4 @@
-# Release 流水线：推送 v* 标签时自动构建免安装压缩包并发布 Release。
+# Release 流水线：推送 v* 标签时按平台矩阵构建免安装压缩包并发布 Release。
 #
 # 发版方式（日常维护只需这一条）：
 #   git tag v0.1.0
@@ -24,7 +24,17 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x64
+          - os: ubuntu-latest
+            platform: linux-x64
+          - os: macos-latest
+            platform: macos-arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,18 +55,29 @@ jobs:
 
       - name: 构建免安装压缩包
         shell: pwsh
-        run: scripts/package.ps1 -Version $env:PACKAGE_VERSION
+        run: scripts/package.ps1 -Version $env:PACKAGE_VERSION -Platform ${{ matrix.platform }}
 
       - name: 上传构建产物（artifact）
         uses: actions/upload-artifact@v4
         with:
-          name: xcpc-helper-${{ env.PACKAGE_VERSION }}-windows-x64
-          path: release/xcpc-helper-*.zip
+          name: xcpc-helper-${{ env.PACKAGE_VERSION }}-${{ matrix.platform }}
+          path: release/xcpc-helper-*
           retention-days: 90
 
+  # 各平台构建完成后汇总为一个 Release（仅推送标签时执行）
+  release:
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载全部平台产物
+        uses: actions/download-artifact@v4
+        with:
+          pattern: xcpc-helper-*
+          merge-multiple: true
+
       - name: 创建 Release 并附加压缩包
-        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          files: release/xcpc-helper-*.zip
+          files: xcpc-helper-*
           generate_release_notes: true
