@@ -40,24 +40,24 @@
 
 ### 方式一：免安装包（推荐）
 
-Windows 用户无需安装任何环境：
+无需安装任何环境，Windows / Linux / macOS 均可：
 
-1. 在本仓库的 Releases 页面下载最新的 `xcpc-helper-*-windows-x64.zip`；
+1. 在本仓库的 Releases 页面下载对应平台的最新压缩包：Windows 选 `xcpc-helper-*-windows-x64.zip`，Linux 选 `xcpc-helper-*-linux-x64.tar.gz`，macOS（Apple 芯片）选 `xcpc-helper-*-macos-arm64.tar.gz`；
 2. 解压到任意目录；
-3. 双击解压目录中的 `start.bat`。首次运行会自动下载 Python 与依赖（需要联网，约几分钟），之后启动即时完成、离线可用；
+3. 启动：Windows 双击解压目录中的 `start.bat`，Linux/macOS 在解压目录执行 `./start.sh`。首次运行会自动下载 Python 与依赖（需要联网，约几分钟），之后启动即时完成、离线可用；
 4. 按窗口提示，在浏览器访问 <http://127.0.0.1:8000>。
 
 ### 方式二：源码部署
 
 适合想跟随最新代码或二次开发的用户。需要 Node.js ≥ 20 与 Python 3.12+ / [uv](https://docs.astral.sh/uv/)：
 
-```powershell
+```bash
 # 1. 获取源码
 git clone https://github.com/Inkyo-007/xcpc-helper.git
 cd xcpc-helper
 
-# 2. 一键安装依赖并构建（PowerShell）
-scripts/dev.ps1
+# 2. 一键安装依赖并构建（Windows 用 scripts/dev.ps1）
+scripts/dev.sh
 
 # 3. 启动
 cd backend
@@ -66,16 +66,19 @@ uv run uvicorn --app-dir src main:app --host 127.0.0.1 --port 8000
 
 浏览器访问 <http://127.0.0.1:8000> 即可使用。
 
-之后日常使用也可以直接双击仓库根目录的 `start.bat` 启动（前提是已运行过 `scripts/dev.ps1` 完成构建）。
+之后日常使用也可以直接运行仓库根目录的 `start.bat`（Windows）或 `./start.sh`（Linux/macOS）启动（前提是已运行过环境搭建脚本完成构建）。
 
 ### 桌面模式（可选）
 
 想要独立的桌面窗口而不是浏览器页面：
 
-```powershell
-scripts/dev.ps1 -Desktop
+```bash
+# Windows 用 scripts/dev.ps1 -Desktop
+scripts/dev.sh --desktop
 uv run --directory backend --group desktop python desktop.py
 ```
+
+Linux 下桌面模式额外依赖系统级 WebKitGTK（无法通过 pip/uv 安装），如 Ubuntu/Debian 执行 `sudo apt install python3-gi gir1.2-webkit2-4.1`；Windows 与 macOS 开箱即用。
 
 ## 添加自己的模板
 
@@ -109,7 +112,7 @@ priority: 5
 **模板改动后界面没更新？**
 正常情况下文件监听会自动重建索引。如遇异常，可在诊断面板查看问题，或手动重建：
 
-```powershell
+```bash
 curl -X POST http://127.0.0.1:8000/api/templates/reload
 ```
 

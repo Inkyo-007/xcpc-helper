@@ -48,7 +48,7 @@ xcpc-helper/
 - Node.js ≥ 20（`frontend/.nvmrc` 锁定 24）与 npm
 - Python 3.12+ 与 [uv](https://docs.astral.sh/uv/)
 
-也可以直接运行 `scripts/dev.ps1` 一键完成依赖安装与前端构建。
+也可以直接运行环境搭建脚本一键完成依赖安装与前端构建：Windows 用 `scripts/dev.ps1`，Linux/macOS 用 `scripts/dev.sh`。
 
 ### 方式一：本地服务（推荐）
 
@@ -71,14 +71,17 @@ uv run uvicorn --app-dir src main:app --host 127.0.0.1 --port 8000
 ### 方式二：桌面应用
 
 ```bash
-# 1. 搭建环境（-Desktop 额外安装 pywebview 依赖组）
-scripts/dev.ps1 -Desktop
+# 1. 搭建环境（额外安装 pywebview 依赖组）
+scripts/dev.ps1 -Desktop   # Windows
+scripts/dev.sh --desktop   # Linux/macOS
 
 # 2. 启动桌面窗口
 uv run --directory backend --group desktop python ../desktop.py
 ```
 
 `desktop.py` 会自动拉起后端服务（127.0.0.1:8000），就绪后打开桌面窗口；关闭窗口时后端随之退出。
+
+Linux 下 pywebview 依赖系统级 WebKitGTK（无法通过 pip/uv 安装），如 Ubuntu/Debian 需先执行 `sudo apt install python3-gi gir1.2-webkit2-4.1`；Windows 与 macOS 开箱即用。
 
 ### 方式三：前后端分离开发
 
@@ -105,7 +108,7 @@ npm run dev
 | 前端测试 | `npm run test` | `frontend/` |
 | 前端生产构建 | `npm run build` | `frontend/` |
 | 手动重建索引 | `curl -X POST http://127.0.0.1:8000/api/templates/reload` | 任意 |
-| 打包免安装压缩包 | `scripts/package.ps1 -Version <版本>` | 仓库根目录 |
+| 打包免安装压缩包 | `scripts/package.ps1 -Version <版本> [-Platform windows-x64\|linux-x64\|macos-arm64]` | 仓库根目录 |
 
 ## API 概览
 

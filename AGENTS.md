@@ -16,7 +16,7 @@
 
 ## 验证命令（完成定义）
 
-当前开发环境为 Windows PowerShell：**逐行执行命令，不要使用 `&&` 连接**。
+以下命令在 Windows / Linux / macOS 下一致；在 Windows PowerShell 中请**逐行执行命令，不要使用 `&&` 连接**。
 
 | 改动范围 | 必跑命令 |
 | --- | --- |
