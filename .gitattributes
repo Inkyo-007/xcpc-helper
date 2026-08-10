@@ -1,0 +1,8 @@
+# 默认按内容自动判断文本文件并规范化换行
+* text=auto
+
+# shell 脚本必须 LF（CRLF 会导致 bash 解析失败）
+*.sh text eol=lf
+
+# cmd 批处理在 CRLF 下行为最稳妥
+*.bat text eol=crlf
