@@ -25,4 +25,16 @@ describe('buildPalette', () => {
     expect(light.accent).toContain('48%')
     expect(dark.accent).toContain('55%')
   })
+
+  it('颜色使用 zrender 可解析的逗号分隔 hsl/hsla 语法', () => {
+    // zrender 颜色解析器只认旧式逗号语法；空格/斜杠的 CSS Color 4 写法
+    // 会被解析为 undefined，导致 visualMap 等依赖颜色换算的场景拿不到颜色
+    const p = buildPalette({ ...base, dark: false })
+    const commaHsl = /^hsl\(\d+, \d+%, \d+%\)$/
+    const commaHsla = /^hsla\(\d+, \d+%, \d+%, [\d.]+\)$/
+    expect(p.accent).toMatch(commaHsl)
+    for (const color of p.heatColors.slice(1)) {
+      expect(color).toMatch(commaHsla)
+    }
+  })
 })
