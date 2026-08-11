@@ -16,6 +16,9 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 
+# ---------- 文档 ----------
+docs/cache/
+
 # SQLite 检索索引缓存（可随时重建，不入库）
 backend/data/*.db
 backend/data/*.db-journal
