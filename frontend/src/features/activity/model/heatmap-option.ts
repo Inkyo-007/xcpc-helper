@@ -2,7 +2,12 @@
 /** 日历热力图的 option 构建（纯函数）：着色档位编码进 data 第二维，
  * 由隐藏的 piecewise visualMap 映射为颜色——heatmap 系列必须搭配
  * visualMap 使用，缺失时开发模式会直接抛 "Heatmap must use with visualMap"。
- * 格子必须保持方形：cellSize 宽高同源，由组件按容器宽度 / 列数算出后传入。
+ * 格子保持方形的关键：calendar 若同时设置 left+right（或 top+bottom），
+ * ECharts 会把该方向的 cellSize 强制改成 auto 并拉伸填满容器；因此这里只设
+ * left/top，格子边长由组件按容器宽度 / 列数算出后双向精确指定，
+ * 右侧与下侧留白由组件在推算容器尺寸时预留（HEATMAP_EDGE_PAD）。
+ * 网格固定周日起始：ECharts 内部按 getDay() 定位行，firstDay 只旋转标签、
+ * 会造成标签与格子错位，故不设置。
  */
 
 import type { EChartsCoreOption } from '@/features/activity/model/echarts-setup'
@@ -12,20 +17,23 @@ import { heatLevel } from '@/features/activity/model/heatmap'
 import type { DayActivity } from '@/features/activity/types'
 
 const MONTH_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
-const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+/** 周日起始网格的行标签：只标 一/三/五 三行，小格子下 7 行标签会互相挤压 */
+const DAY_LABELS = ['', '一', '', '三', '', '五', '']
 
-/** 日历网格在容器中的留白（组件按它推算格子边长与总高） */
-export const HEATMAP_LAYOUT = { top: 26, left: 34, right: 12, bottom: 6 } as const
+/** 日历网格在容器中的定位：只能设 left/top，否则 cellSize 被强制 auto（见文件头注释） */
+export const HEATMAP_LAYOUT = { top: 26, left: 34 } as const
+/** 网格右侧/下侧的预留空白：仅供组件推算容器尺寸，不能传给 calendar */
+export const HEATMAP_EDGE_PAD = { right: 12, bottom: 6 } as const
 
 const DAY_MS = 86400000
 
-/** 日序列占用的列（周）数，周一起始：首列要算上首日之前的前置空格 */
+/** 日序列占用的列（周）数，与 ECharts calendar 的周日起始网格保持一致 */
 export function weekCount(daily: DayActivity[]): number {
   if (daily.length === 0) return 1
   const first = parseDate(daily[0].date)
   const last = parseDate(daily[daily.length - 1].date)
   const days = Math.round((last.getTime() - first.getTime()) / DAY_MS) + 1
-  const leadBlanks = (first.getDay() + 6) % 7
+  const leadBlanks = first.getDay()
   return Math.max(1, Math.ceil((days + leadBlanks) / 7))
 }
 
@@ -69,7 +77,7 @@ export function buildHeatmapOption(
       cellSize: [cellSize, cellSize],
       splitLine: { show: false },
       itemStyle: { color: 'transparent', borderWidth: 0 },
-      dayLabel: { firstDay: 1, nameMap: DAY_LABELS, color: p.faint, fontSize: 11 },
+      dayLabel: { nameMap: DAY_LABELS, color: p.faint, fontSize: 11 },
       monthLabel: { nameMap: MONTH_LABELS, color: p.faint, fontSize: 11 },
       yearLabel: { show: false },
     },

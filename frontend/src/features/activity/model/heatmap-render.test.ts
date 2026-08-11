@@ -57,10 +57,20 @@ describe('weekCount', () => {
     expect(weeks).toBeLessThanOrEqual(55)
   })
 
-  it('首日为周日时前置空格计入列数', () => {
-    // 2026-08-09 是周日，周一起始下首列有 6 个前置空格
+  it('首日为周日时恰好占一列', () => {
+    // 2026-08-09 是周日，周日起始网格下连续 7 天正好一列
     const daily: DayActivity[] = Array.from({ length: 7 }, (_, i) => ({
       date: addDays('2026-08-09', i),
+      submissions: 0,
+      solved: 0,
+    }))
+    expect(weekCount(daily)).toBe(1)
+  })
+
+  it('首日为周一时前置空格计入列数', () => {
+    // 2026-08-10 是周一，周日起始网格下首列有 1 个前置空格
+    const daily: DayActivity[] = Array.from({ length: 7 }, (_, i) => ({
+      date: addDays('2026-08-10', i),
       submissions: 0,
       solved: 0,
     }))
