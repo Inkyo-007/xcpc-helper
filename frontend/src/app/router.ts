@@ -29,6 +29,11 @@ export const router = createRouter({
       meta: { group: '模板整理', sub: '打印册' },
     },
     {
+      path: '/activity/overview',
+      component: () => import('@/features/activity/ActivityPage.vue'),
+      meta: { group: '训练统计', sub: '数据总览' },
+    },
+    {
       path: '/contest/stress',
       component: () => import('@/app/PlaceholderPage.vue'),
       meta: {
