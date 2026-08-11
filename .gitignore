@@ -28,6 +28,12 @@ backend/data/*.db-shm
 # 导入/导出的上传暂存区（随用随清，不入库）
 backend/data/.staging/
 
+# 训练统计：平台凭据（cookie 等敏感数据，仅存本机）
+backend/data/user/*/secrets.json
+
+# 训练统计：写操作的原子暂存文件（正常会自动清理，防御崩溃残留）
+backend/data/user/**/.tmp-*
+
 # 可视化写操作的原子暂存目录（正常会自动清理，防御崩溃残留）
 backend/content/.tmp-*/
 

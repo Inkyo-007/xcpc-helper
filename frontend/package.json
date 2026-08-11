@@ -20,6 +20,7 @@
     "@codemirror/state": "^6.5.0",
     "@codemirror/view": "^6.36.1",
     "@lezer/highlight": "^1.2.1",
+    "echarts": "^6.1.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.17.0",
     "lucide-vue-next": "^0.469.0",
