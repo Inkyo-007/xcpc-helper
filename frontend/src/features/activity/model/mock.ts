@@ -139,6 +139,11 @@ export function generateEntries(
   const failed = day.submissions - day.solved
   const used = new Set<number>()
   const pick = (): ProblemSeed => {
+    // 爆发日的提交数可超过题库量：题库抽完后允许重复取题，
+    // 否则 while 永远找不到未用过的下标，死循环把整页卡死
+    if (used.size >= pool.length) {
+      return pool[Math.floor(rand() * pool.length)]
+    }
     let idx = Math.floor(rand() * pool.length)
     while (used.has(idx)) idx = (idx + 1) % pool.length
     used.add(idx)
