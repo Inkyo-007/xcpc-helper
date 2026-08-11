@@ -2,15 +2,32 @@
 /** 日历热力图的 option 构建（纯函数）：着色档位编码进 data 第二维，
  * 由隐藏的 piecewise visualMap 映射为颜色——heatmap 系列必须搭配
  * visualMap 使用，缺失时开发模式会直接抛 "Heatmap must use with visualMap"。
+ * 格子必须保持方形：cellSize 宽高同源，由组件按容器宽度 / 列数算出后传入。
  */
 
 import type { EChartsCoreOption } from '@/features/activity/model/echarts-setup'
 import type { ChartPalette } from '@/features/activity/model/echarts-theme'
+import { parseDate } from '@/features/activity/model/dates'
 import { heatLevel } from '@/features/activity/model/heatmap'
 import type { DayActivity } from '@/features/activity/types'
 
 const MONTH_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
 const DAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+
+/** 日历网格在容器中的留白（组件按它推算格子边长与总高） */
+export const HEATMAP_LAYOUT = { top: 26, left: 34, right: 12, bottom: 6 } as const
+
+const DAY_MS = 86400000
+
+/** 日序列占用的列（周）数，周一起始：首列要算上首日之前的前置空格 */
+export function weekCount(daily: DayActivity[]): number {
+  if (daily.length === 0) return 1
+  const first = parseDate(daily[0].date)
+  const last = parseDate(daily[daily.length - 1].date)
+  const days = Math.round((last.getTime() - first.getTime()) / DAY_MS) + 1
+  const leadBlanks = (first.getDay() + 6) % 7
+  return Math.max(1, Math.ceil((days + leadBlanks) / 7))
+}
 
 /** data 一行的形状：[日期, 档位, AC 数, 提交数] */
 export interface HeatValue extends Array<unknown> {
@@ -24,6 +41,7 @@ export function buildHeatmapOption(
   daily: DayActivity[],
   selected: string | null,
   p: ChartPalette,
+  cellSize = 14,
 ): EChartsCoreOption {
   const range = [daily[0]?.date ?? '', daily.at(-1)?.date ?? '']
   return {
@@ -46,12 +64,9 @@ export function buildHeatmapOption(
       pieces: p.heatColors.map((color, i) => ({ value: i, color })),
     },
     calendar: {
-      top: 26,
-      left: 34,
-      right: 12,
-      bottom: 6,
+      ...HEATMAP_LAYOUT,
       range,
-      cellSize: ['auto', 14],
+      cellSize: [cellSize, cellSize],
       splitLine: { show: false },
       itemStyle: { color: 'transparent', borderWidth: 0 },
       dayLabel: { firstDay: 1, nameMap: DAY_LABELS, color: p.faint, fontSize: 11 },
