@@ -15,6 +15,7 @@ import SubmissionList from '@/features/activity/components/SubmissionList.vue'
 import SyncBar from '@/features/activity/components/SyncBar.vue'
 import UserProfileCard from '@/features/activity/components/UserProfileCard.vue'
 import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
+import { parseDate, toDateStr } from '@/features/activity/model/dates'
 import { pageCount } from '@/features/activity/model/pagination'
 import { useActivity, type PlatformScope } from '@/features/activity/store'
 import type { PlatformId } from '@/features/activity/types'
@@ -23,7 +24,7 @@ const {
   accounts,
   activePlatform,
   selectedDate,
-  recentPage,
+  listPage,
   syncing,
   mergedDaily,
   totals,
@@ -33,7 +34,8 @@ const {
   init,
   setPlatform,
   selectDate,
-  setRecentPage,
+  setSelectedDate,
+  setListPage,
   syncNow,
   bindAccount,
   unbindAccount,
@@ -48,9 +50,10 @@ const bindPreset = ref<PlatformId | null>(null)
 const weeklyBars = computed(() => weeklySolved(mergedDaily.value))
 const monthlyBars = computed(() => monthlySolved(mergedDaily.value))
 
-/* ---------- 网址状态同步：?platform=<平台>&page=<页码> ----------
- * all 与第 1 页为缺省值，不出现在网址中；切换平台重置页码（见 store），
- * 翻页保留筛选；刷新、浏览器前进/后退与复制链接均能恢复同一视图。 */
+/* ---------- 网址状态同步：?platform=<平台>&date=<日期>&page=<页码> ----------
+ * all、无选中日期与第 1 页为缺省值，不出现在网址中；切换平台重置日期
+ * 与页码，选中日期切换当日明细时页码回到第 1 页（见 store）；
+ * 刷新、浏览器前进/后退与复制链接均能恢复同一视图。 */
 
 const route = useRoute()
 const router = useRouter()
@@ -77,21 +80,38 @@ function queryPage(raw: unknown): number {
   return Number.isInteger(n) && n > 0 ? n : 1
 }
 
+/** 网址中的选中日期：非法格式或不存在的日期回退为未选中 */
+function queryDate(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
+  // parseDate 会把 2 月 31 日之类的日期顺延，回写比对即可识别
+  return toDateStr(parseDate(raw)) === raw ? raw : null
+}
+
 onMounted(() => {
   init()
-  // 从网址恢复筛选与页码（先平台后页码：切换平台会把页码重置回 1）
+  // 从网址恢复视图（顺序固定：平台 → 日期 → 页码：
+  // 切平台会重置日期与页码，切日期会把当日明细页码重置回 1）
   const platform = queryPlatform(route.query.platform)
   if (platform !== 'all') setPlatform(platform)
+  const date = queryDate(route.query.date)
+  if (date) setSelectedDate(date)
   const page = queryPage(route.query.page)
-  if (page > 1) setRecentPage(page)
+  if (page > 1) setListPage(page)
 })
 
 // 状态 → 网址：缺省值不写入，避免无谓的跳转
-watch([activePlatform, recentPage], ([platform, page]) => {
+watch([activePlatform, selectedDate, listPage], ([platform, date, page]) => {
   const query: Record<string, string> = {}
   if (platform !== 'all') query.platform = platform
+  if (date) query.date = date
   if (page > 1) query.page = String(page)
-  if (query.platform === route.query.platform && query.page === route.query.page) return
+  if (
+    query.platform === route.query.platform &&
+    query.date === route.query.date &&
+    query.page === route.query.page
+  ) {
+    return
+  }
   void router.push({ query })
 })
 
@@ -101,17 +121,19 @@ watch(
   (query) => {
     const platform = queryPlatform(query.platform)
     if (platform !== activePlatform.value) setPlatform(platform)
+    const date = queryDate(query.date)
+    if (date !== selectedDate.value) setSelectedDate(date)
     const page = queryPage(query.page)
-    if (page !== recentPage.value) setRecentPage(page)
+    if (page !== listPage.value) setListPage(page)
   },
 )
 
-// 列表变短（切平台/解绑）导致页码超出范围时夹紧
+// 当前列表（近期提交或当日明细）变短导致页码超出范围时夹紧
 watch(
-  () => recentEntries.value.length,
+  () => (selectedDate.value ? entries.value.length : recentEntries.value.length),
   (total) => {
     const max = pageCount(total)
-    if (recentPage.value > max) setRecentPage(max)
+    if (listPage.value > max) setListPage(max)
   },
 )
 
@@ -154,8 +176,8 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
             :selected-date="selectedDate"
             :recent="recentEntries"
             :day-entries="entries"
-            :page="recentPage"
-            @update:page="setRecentPage"
+            :page="listPage"
+            @update:page="setListPage"
           />
         </section>
       </aside>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 左栏提交列表：默认近期提交（跨天合并，较新在上）；
- * 近期提交每页 10 条，底部分页导航；点击热力图格子后切换为
- * 当日明细（再次点击该格子取消选中），当日明细不分页。 */
+ * 点击热力图格子后切换为当日明细（再次点击该格子取消选中）。
+ * 两种模式均每页 10 条，底部分页导航；页码状态各自独立（见 store）。 */
 
 import { computed } from 'vue'
 import { ExternalLink, Inbox } from 'lucide-vue-next'
@@ -16,7 +16,7 @@ const props = defineProps<{
   selectedDate: string | null
   recent: RecentSubmission[]
   dayEntries: SubmissionEntry[]
-  /** 近期提交模式的分页页码（从 1 起） */
+  /** 当前模式的分页页码（从 1 起） */
   page: number
 }>()
 
@@ -26,7 +26,9 @@ const emit = defineEmits<{
 
 const dayMode = computed(() => props.selectedDate !== null)
 
-const totalPages = computed(() => pageCount(props.recent.length))
+const totalPages = computed(() =>
+  pageCount(dayMode.value ? props.dayEntries.length : props.recent.length),
+)
 
 const dateLabel = computed(() => {
   if (!props.selectedDate) return ''
@@ -52,7 +54,7 @@ interface Row {
 
 const rows = computed<Row[]>(() => {
   if (dayMode.value) {
-    return props.dayEntries.map((e) => ({ ...e, timeLabel: e.time }))
+    return paged(props.dayEntries, props.page).map((e) => ({ ...e, timeLabel: e.time }))
   }
   const today = todayStr()
   return paged(props.recent, props.page).map((e) => ({
@@ -116,7 +118,7 @@ function openProblem(row: Row): void {
       <span>{{ dayMode ? '这一天还没有提交记录' : '近期还没有提交记录' }}</span>
     </div>
 
-    <footer v-if="!dayMode && totalPages > 1" class="list-foot">
+    <footer v-if="totalPages > 1" class="list-foot">
       <NPagination
         :page="page"
         :page-count="totalPages"

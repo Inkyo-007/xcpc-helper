@@ -25,8 +25,10 @@ const { currentKey } = useUserGroups()
 const accountsByGroup = reactive<Record<string, BoundAccount[]>>({})
 const activePlatform = ref<PlatformScope>('all')
 const selectedDate = ref<string | null>(null)
-/** 近期提交列表的分页页码（从 1 起；当日明细模式不分页） */
+/** 近期提交列表的分页页码（从 1 起） */
 const recentPage = ref(1)
+/** 当日明细列表的分页页码（从 1 起；与近期提交各自独立，切换日期时重置） */
+const dayPage = ref(1)
 const syncing = ref(false)
 const initialized = ref(false)
 
@@ -177,15 +179,31 @@ function setPlatform(scope: PlatformScope): void {
   activePlatform.value = scope
   selectedDate.value = null
   recentPage.value = 1
+  dayPage.value = 1
+}
+
+/** 直接设置选中日期（网址恢复用）；切换日期时当日明细页码回到第 1 页 */
+function setSelectedDate(date: string | null): void {
+  selectedDate.value = date
+  dayPage.value = 1
 }
 
 /** 选中某天查看当日明细；再次点击同一格子取消选中，回到近期提交 */
 function selectDate(date: string): void {
-  selectedDate.value = selectedDate.value === date ? null : date
+  setSelectedDate(selectedDate.value === date ? null : date)
 }
 
-function setRecentPage(page: number): void {
-  recentPage.value = page
+/** 当前列表（近期提交或当日明细）的页码：随模式路由到对应状态 */
+const listPage = computed({
+  get: () => (selectedDate.value ? dayPage.value : recentPage.value),
+  set: (page: number) => {
+    if (selectedDate.value) dayPage.value = page
+    else recentPage.value = page
+  },
+})
+
+function setListPage(page: number): void {
+  listPage.value = page
 }
 
 /** mock 同步：模拟耗时后刷新同步时间 */
@@ -245,7 +263,7 @@ export function useActivity() {
     accounts,
     activePlatform,
     selectedDate,
-    recentPage,
+    listPage,
     syncing,
     initialized,
     mergedDaily,
@@ -256,7 +274,8 @@ export function useActivity() {
     init,
     setPlatform,
     selectDate,
-    setRecentPage,
+    setSelectedDate,
+    setListPage,
     syncNow,
     bindAccount,
     unbindAccount,
