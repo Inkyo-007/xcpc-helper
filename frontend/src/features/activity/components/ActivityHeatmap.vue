@@ -181,9 +181,11 @@ function onCellClick(cell: HeatCell): void {
         该时间范围内暂无训练数据
       </div>
     </div>
-    <div v-if="tooltip" class="heat-tooltip" :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }">
-      {{ tooltip.text }}
-    </div>
+    <Transition name="tooltip-fade">
+      <div v-if="tooltip" class="heat-tooltip" :style="{ left: `${tooltip.x}px`, top: `${tooltip.y}px` }">
+        {{ tooltip.text }}
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -285,6 +287,24 @@ function onCellClick(cell: HeatCell): void {
   font-size: 12px;
   white-space: nowrap;
   pointer-events: none;
+  /* 相邻格子间移动时位置平滑跟随（淡入淡出由 tooltip-fade 过渡承担） */
+  transition: left 0.12s ease, top 0.12s ease;
+}
+
+/* 悬浮提示淡入淡出：位移用独立的 translate 属性，避开基类的 transform 定位 */
+.tooltip-fade-enter-active,
+.tooltip-fade-leave-active {
+  transition:
+    opacity 0.16s ease,
+    translate 0.16s ease,
+    left 0.12s ease,
+    top 0.12s ease;
+}
+
+.tooltip-fade-enter-from,
+.tooltip-fade-leave-to {
+  opacity: 0;
+  translate: 0 3px;
 }
 
 .heatmap-empty {
