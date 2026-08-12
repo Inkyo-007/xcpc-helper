@@ -1,26 +1,20 @@
 <script setup lang="ts">
-/** 汇总 / 单平台分段切换器：汇总 + 已绑定平台（按绑定顺序去重）。 */
+/** 汇总 / 单平台分段切换器：汇总 + 全部支持平台（与是否绑定无关，
+ * 未绑定平台的视图用于引导绑定 / 换绑）。 */
 
-import { computed } from 'vue'
 import { LayoutGrid } from 'lucide-vue-next'
-import { platformName } from '@/features/activity/model/mock'
+import { PLATFORMS } from '@/features/activity/model/mock'
 import type { PlatformScope } from '@/features/activity/store'
-import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
-const props = defineProps<{
+defineProps<{
   modelValue: PlatformScope
-  accounts: BoundAccount[]
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: PlatformScope]
 }>()
 
-const platforms = computed<PlatformId[]>(() => {
-  const seen = new Set<PlatformId>()
-  for (const acc of props.accounts) seen.add(acc.platform)
-  return [...seen]
-})
+const platforms = PLATFORMS
 </script>
 
 <template>
@@ -38,15 +32,15 @@ const platforms = computed<PlatformId[]>(() => {
     </button>
     <button
       v-for="p in platforms"
-      :key="p"
+      :key="p.id"
       type="button"
       class="tab-chip"
-      :class="{ active: modelValue === p }"
+      :class="{ active: modelValue === p.id }"
       role="tab"
-      :aria-selected="modelValue === p"
-      @click="emit('update:modelValue', p)"
+      :aria-selected="modelValue === p.id"
+      @click="emit('update:modelValue', p.id)"
     >
-      {{ platformName(p) }}
+      {{ p.name }}
     </button>
   </div>
 </template>

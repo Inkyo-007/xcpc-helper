@@ -1,26 +1,37 @@
 <script setup lang="ts">
-/** 同步区：新鲜度 + 立即同步 + 账号管理弹层（解绑）+ 绑定入口。 */
+/** 同步区：新鲜度 + 立即同步 + 账号管理弹层（解绑）+ 右侧账号入口。
+ * 汇总视图为用户组下拉菜单；平台视图为该平台绑定账号的 ID（未绑定则
+ * 显示「未绑定账号」），点击进入绑定 / 换绑。 */
 
-import { ref } from 'vue'
-import { Plus, RefreshCw, Unlink, Users } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { Link2, Plus, RefreshCw, Unlink, Users } from 'lucide-vue-next'
 import { NButton, NPopover, NTooltip } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
+import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
 import { platformName } from '@/features/activity/model/mock'
+import type { PlatformScope } from '@/features/activity/store'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
-defineProps<{
+const props = defineProps<{
   lastSyncLabel: string
   syncing: boolean
   accounts: BoundAccount[]
+  activePlatform: PlatformScope
 }>()
 
 const emit = defineEmits<{
   sync: []
-  bind: []
+  bind: [platform: PlatformId]
   unbind: [platform: PlatformId, handle: string]
 }>()
 
 const removing = ref<BoundAccount | null>(null)
+
+/** 平台视图下当前平台绑定的账号（每平台至多一个） */
+const platformAccount = computed<BoundAccount | null>(() => {
+  if (props.activePlatform === 'all') return null
+  return props.accounts.find((a) => a.platform === props.activePlatform) ?? null
+})
 
 function stateLabel(acc: BoundAccount): string {
   if (acc.syncState === 'running') return '同步中'
@@ -82,10 +93,26 @@ function confirmUnbind(): void {
         </div>
       </div>
     </NPopover>
-    <NButton type="primary" size="small" @click="emit('bind')">
-      <template #icon><Plus :size="15" /></template>
-      绑定账号
-    </NButton>
+    <UserGroupMenu v-if="activePlatform === 'all'" />
+    <NTooltip v-else :show-arrow="false">
+      <template #trigger>
+        <NButton
+          v-if="platformAccount"
+          size="small"
+          type="primary"
+          secondary
+          @click="emit('bind', platformAccount.platform)"
+        >
+          <template #icon><Link2 :size="14" /></template>
+          <span class="bound-handle mono">{{ platformAccount.handle }}</span>
+        </NButton>
+        <NButton v-else size="small" dashed @click="emit('bind', activePlatform as PlatformId)">
+          <template #icon><Plus :size="14" /></template>
+          未绑定账号
+        </NButton>
+      </template>
+      {{ platformAccount ? '点击换绑账号' : '点击绑定账号' }}
+    </NTooltip>
     <DeleteConfirmModal
       :show="removing !== null"
       title="解绑账号"
@@ -108,6 +135,13 @@ function confirmUnbind(): void {
   font-size: 11.5px;
   color: var(--faint);
   margin-right: 2px;
+  white-space: nowrap;
+}
+
+.bound-handle {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

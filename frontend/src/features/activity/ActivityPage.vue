@@ -37,10 +37,13 @@ const {
   syncNow,
   bindAccount,
   unbindAccount,
+  boundOn,
 } = useActivity()
 
 const message = useMessage()
 const showBind = ref(false)
+/** 绑定弹窗锁定的平台：从平台视图的账号按钮打开时为该平台，空状态入口为 null */
+const bindPreset = ref<PlatformId | null>(null)
 
 const weeklyBars = computed(() => weeklySolved(mergedDaily.value))
 const monthlyBars = computed(() => monthlySolved(mergedDaily.value))
@@ -61,11 +64,11 @@ const PLATFORM_SCOPES: PlatformScope[] = [
   'nowcoder',
 ]
 
-/** 网址中的平台筛选：非法值、未绑定的平台都回退为汇总 */
+/** 网址中的平台筛选：非法值回退为汇总（平台页签与绑定状态无关） */
 function queryPlatform(raw: unknown): PlatformScope {
   if (typeof raw !== 'string' || raw === 'all') return 'all'
   if (!(PLATFORM_SCOPES as string[]).includes(raw)) return 'all'
-  return accounts.value.some((a) => a.platform === raw) ? (raw as PlatformScope) : 'all'
+  return raw as PlatformScope
 }
 
 /** 网址中的页码：非正整数回退为第 1 页 */
@@ -112,9 +115,16 @@ watch(
   },
 )
 
+/** 打开绑定弹窗：platform 为 null 时自由选择平台（空状态入口） */
+function openBind(platform: PlatformId | null): void {
+  bindPreset.value = platform
+  showBind.value = true
+}
+
 async function onBind(platform: PlatformId, handle: string): Promise<void> {
+  const rebinding = boundOn(platform) !== null
   await bindAccount(platform, handle)
-  message.success('绑定成功，已完成首次同步')
+  message.success(rebinding ? '换绑成功，已重新同步' : '绑定成功，已完成首次同步')
 }
 </script>
 
@@ -123,15 +133,15 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
     <div class="act-toolbar">
       <PlatformTabs
         :model-value="activePlatform"
-        :accounts="accounts"
         @update:model-value="setPlatform"
       />
       <SyncBar
         :last-sync-label="lastSyncLabel"
         :syncing="syncing"
         :accounts="accounts"
+        :active-platform="activePlatform"
         @sync="syncNow"
-        @bind="showBind = true"
+        @bind="openBind"
         @unbind="unbindAccount"
       />
     </div>
@@ -197,13 +207,13 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
       </div>
       <h2 class="empty-title">还没有训练数据</h2>
       <p class="empty-hint">绑定一个竞赛平台账号，同步后这里会展示你的训练统计。</p>
-      <NButton type="primary" @click="showBind = true">
+      <NButton type="primary" @click="openBind(null)">
         <template #icon><Plus :size="15" /></template>
         绑定第一个账号
       </NButton>
     </div>
 
-    <AccountBindModal v-model:show="showBind" @bind="onBind" />
+    <AccountBindModal v-model:show="showBind" :platform="bindPreset" @bind="onBind" />
   </div>
 </template>
 

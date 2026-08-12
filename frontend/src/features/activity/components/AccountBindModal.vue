@@ -1,5 +1,7 @@
 <script setup lang="ts">
 /** 绑定平台账号弹窗：平台选择 → handle 输入 → 验证回执 → 确认绑定。
+ * 从平台视图的账号按钮打开时锁定该平台；该平台已有账号时为换绑
+ * （新账号替换旧账号及其本地数据，见 store.bindAccount）。
  * mock 阶段：验证为模拟延迟 + 示例回执；后端就绪后替换为真实 verify 请求。
  */
 
@@ -12,6 +14,8 @@ import type { PlatformId } from '@/features/activity/types'
 
 const props = defineProps<{
   show: boolean
+  /** 从平台视图打开时锁定该平台；null 表示自由选择平台 */
+  platform?: PlatformId | null
 }>()
 
 const emit = defineEmits<{
@@ -19,22 +23,28 @@ const emit = defineEmits<{
   bind: [platform: PlatformId, handle: string]
 }>()
 
-const { isBound } = useActivity()
+const { isBound, boundOn } = useActivity()
 
 const platformOptions = PLATFORMS.map((p) => ({ label: p.name, value: p.id }))
 
-const platform = ref<PlatformId>('codeforces')
+const platform = ref<PlatformId>(props.platform ?? 'codeforces')
 const handle = ref('')
 const verifying = ref(false)
 const errorText = ref('')
 /** 验证成功的回执（mock 示例数据） */
 const receipt = ref<{ handle: string; rating: number } | null>(null)
 
+/** 锁定平台：从平台视图的账号按钮打开时不可切换平台 */
+const platformLocked = computed(() => props.platform != null)
+
+/** 当前所选平台是否已有绑定账号：有则本次为换绑 */
+const rebinding = computed(() => boundOn(platform.value) !== null)
+
 watch(
   () => props.show,
   (show) => {
     if (show) {
-      platform.value = 'codeforces'
+      platform.value = props.platform ?? 'codeforces'
       handle.value = ''
       verifying.value = false
       errorText.value = ''
@@ -75,7 +85,7 @@ function confirm(): void {
   <n-modal
     :show="show"
     preset="card"
-    title="绑定平台账号"
+    :title="rebinding ? '换绑平台账号' : '绑定平台账号'"
     class="create-modal"
     :style="{ width: 'min(460px, calc(100vw - 40px))' }"
     @update:show="emit('update:show', $event)"
@@ -87,6 +97,7 @@ function confirm(): void {
           :options="platformOptions"
           size="small"
           class="bind-platform"
+          :disabled="platformLocked"
         />
         <n-input
           v-model:value="handle"
@@ -114,7 +125,7 @@ function confirm(): void {
       <n-button size="small" quaternary @click="emit('update:show', false)">取消</n-button>
       <n-button size="small" type="primary" :disabled="!receipt" @click="confirm">
         <template #icon><Link2 :size="14" /></template>
-        确认绑定
+        {{ rebinding ? '确认换绑' : '确认绑定' }}
       </n-button>
     </div>
   </n-modal>

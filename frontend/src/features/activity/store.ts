@@ -7,6 +7,7 @@
 
 import { computed, reactive, ref } from 'vue'
 import { generateDaily, generateEntries, historyOffset } from '@/features/activity/model/mock'
+import { useUserGroups } from '@/features/activity/profile'
 import type {
   BoundAccount,
   DayActivity,
@@ -18,7 +19,10 @@ import type {
 
 export type PlatformScope = 'all' | PlatformId
 
-const accounts = ref<BoundAccount[]>([])
+const { currentKey } = useUserGroups()
+
+/** 账号绑定按用户组隔离：key 为用户组内部 key */
+const accountsByGroup = reactive<Record<string, BoundAccount[]>>({})
 const activePlatform = ref<PlatformScope>('all')
 const selectedDate = ref<string | null>(null)
 /** 近期提交列表的分页页码（从 1 起；当日明细模式不分页） */
@@ -26,11 +30,19 @@ const recentPage = ref(1)
 const syncing = ref(false)
 const initialized = ref(false)
 
-/** 每账号的日序列（key 为 `platform/handle`） */
+/** 当前用户组的账号列表（按绑定顺序） */
+const accounts = computed<BoundAccount[]>(() => accountsByGroup[currentKey.value] ?? [])
+
+/** 每账号的日序列（key 为 `用户组/platform/handle`，随组隔离） */
 const dailyByAccount = reactive<Record<string, DayActivity[]>>({})
 
+/** 日序列与历史偏移的 seed key：带上用户组，避免不同组的同名账号共享 mock 数据 */
+function groupScope(): string {
+  return currentKey.value
+}
+
 function accountKey(platform: PlatformId, handle: string): string {
-  return `${platform}/${handle}`
+  return `${groupScope()}/${platform}/${handle}`
 }
 
 function scopedAccounts(): BoundAccount[] {
@@ -142,6 +154,7 @@ function seedDaily(acc: BoundAccount): void {
 function init(): void {
   if (initialized.value) return
   initialized.value = true
+  // demo 账号挂在初始化时的当前用户组下；新建的用户组从空白开始
   const demo: BoundAccount[] = [
     {
       platform: 'codeforces',
@@ -156,7 +169,7 @@ function init(): void {
       syncState: 'idle',
     },
   ]
-  accounts.value = demo
+  accountsByGroup[groupScope()] = demo
   demo.forEach(seedDaily)
 }
 
@@ -179,20 +192,30 @@ function setRecentPage(page: number): void {
 async function syncNow(): Promise<void> {
   if (syncing.value) return
   syncing.value = true
-  for (const acc of accounts.value) acc.syncState = 'running'
+  const scoped = accounts.value
+  for (const acc of scoped) acc.syncState = 'running'
   await new Promise((r) => setTimeout(r, 1400))
   const now = new Date().toISOString()
-  for (const acc of accounts.value) {
+  for (const acc of scoped) {
     acc.syncState = 'idle'
     acc.lastSyncAt = now
   }
   syncing.value = false
 }
 
-/** mock 绑定：生成该账号数据并立即"同步" */
+/** mock 绑定：生成该账号数据并立即"同步"。
+ * 每个平台在当前用户组下只保留一个账号：绑定同平台新账号即换绑，
+ * 旧账号及其本地数据被替换。 */
 async function bindAccount(platform: PlatformId, handle: string): Promise<void> {
+  const old = accounts.value.find((a) => a.platform === platform)
+  if (old && old.handle !== handle) {
+    delete dailyByAccount[accountKey(old.platform, old.handle)]
+  }
+  accountsByGroup[groupScope()] = [
+    ...accounts.value.filter((a) => a.platform !== platform),
+  ]
   const acc: BoundAccount = { platform, handle, lastSyncAt: null, syncState: 'running' }
-  accounts.value.push(acc)
+  accountsByGroup[groupScope()].push(acc)
   seedDaily(acc)
   await new Promise((r) => setTimeout(r, 900))
   acc.syncState = 'idle'
@@ -200,12 +223,16 @@ async function bindAccount(platform: PlatformId, handle: string): Promise<void> 
 }
 
 function unbindAccount(platform: PlatformId, handle: string): void {
-  accounts.value = accounts.value.filter(
+  accountsByGroup[groupScope()] = accounts.value.filter(
     (a) => !(a.platform === platform && a.handle === handle),
   )
   delete dailyByAccount[accountKey(platform, handle)]
-  if (activePlatform.value !== 'all' && !scopedAccounts().length) activePlatform.value = 'all'
   selectedDate.value = null
+}
+
+/** 当前用户组在指定平台上绑定的账号（每平台至多一个） */
+function boundOn(platform: PlatformId): BoundAccount | null {
+  return accounts.value.find((a) => a.platform === platform) ?? null
 }
 
 /** 判断 handle 是否已被绑定（mock 验证用） */
@@ -233,6 +260,7 @@ export function useActivity() {
     syncNow,
     bindAccount,
     unbindAccount,
+    boundOn,
     isBound,
   }
 }
