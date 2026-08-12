@@ -105,6 +105,7 @@ function cancelEdit(): void {
           </button>
         </template>
       </div>
+      <span class="tag-divider" aria-hidden="true"></span>
       <div class="tag-row">
         <NInput
           v-if="editing === 'signature'"
@@ -142,9 +143,10 @@ function cancelEdit(): void {
 <style scoped>
 .profile-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 16px 16px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
@@ -153,12 +155,12 @@ function cancelEdit(): void {
 
 .avatar-btn {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: 100%;
+  aspect-ratio: 1;
   flex: none;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 50%;
+  border-radius: var(--radius);
   background: var(--accent-soft);
   color: var(--accent-strong);
   cursor: pointer;
@@ -184,7 +186,7 @@ function cancelEdit(): void {
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 24px;
+  font-size: 56px;
   font-weight: 700;
 }
 
@@ -192,6 +194,8 @@ function cancelEdit(): void {
   position: absolute;
   inset: 0;
   margin: auto;
+  width: 56px;
+  height: 56px;
   color: var(--faint);
 }
 
@@ -216,17 +220,20 @@ function cancelEdit(): void {
 }
 
 .profile-tags {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 2px;
 }
 
 .tag-row {
+  position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
   min-height: 24px;
 }
 
@@ -236,7 +243,7 @@ function cancelEdit(): void {
   border: 0;
   background: transparent;
   color: var(--text);
-  text-align: left;
+  text-align: center;
   cursor: text;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -244,7 +251,7 @@ function cancelEdit(): void {
 }
 
 .tag-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -257,7 +264,21 @@ function cancelEdit(): void {
   color: var(--faint);
 }
 
+/* 主副标签间的主题色短粗分割线 */
+.tag-divider {
+  width: 36px;
+  height: 4px;
+  margin: 4px 0;
+  border-radius: 99px;
+  background: var(--accent);
+  flex: none;
+}
+
 .tag-edit {
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
