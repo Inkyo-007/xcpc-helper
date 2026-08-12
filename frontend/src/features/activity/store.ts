@@ -12,6 +12,7 @@ import type {
   DayActivity,
   OverviewTotals,
   PlatformId,
+  RecentSubmission,
   SubmissionEntry,
 } from '@/features/activity/types'
 
@@ -81,14 +82,6 @@ const totals = computed<OverviewTotals>(() => {
   }
 })
 
-/** 最近有提交的一天（明细列表的默认选中日） */
-function latestActiveDate(daily: DayActivity[]): string | null {
-  for (let i = daily.length - 1; i >= 0; i--) {
-    if (daily[i].submissions > 0) return daily[i].date
-  }
-  return null
-}
-
 const entries = computed<SubmissionEntry[]>(() => {
   const date = selectedDate.value
   if (!date) return []
@@ -99,7 +92,29 @@ const entries = computed<SubmissionEntry[]>(() => {
     )
     if (day && day.submissions > 0) out.push(...generateEntries(acc.platform, acc.handle, day))
   }
-  return out.sort((a, b) => a.time.localeCompare(b.time))
+  return out.sort((a, b) => b.time.localeCompare(a.time))
+})
+
+/** 近期提交的扫描窗口与条数上限（mock 阶段足够覆盖一个滚动列表） */
+const RECENT_DAYS = 21
+const RECENT_LIMIT = 60
+
+/** 近期提交：近 RECENT_DAYS 天内有提交的日子，跨账号合并，按时间倒序 */
+const recentEntries = computed<RecentSubmission[]>(() => {
+  const out: RecentSubmission[] = []
+  for (const acc of scopedAccounts()) {
+    const days = dailyByAccount[accountKey(acc.platform, acc.handle)] ?? []
+    for (let i = days.length - 1; i >= 0 && i >= days.length - RECENT_DAYS; i--) {
+      const day = days[i]
+      if (day.submissions === 0) continue
+      for (const e of generateEntries(acc.platform, acc.handle, day)) {
+        out.push({ ...e, date: day.date })
+      }
+    }
+  }
+  return out
+    .sort((a, b) => `${b.date} ${b.time}`.localeCompare(`${a.date} ${a.time}`))
+    .slice(0, RECENT_LIMIT)
 })
 
 const lastSyncLabel = computed(() => {
@@ -141,16 +156,20 @@ function init(): void {
   ]
   accounts.value = demo
   demo.forEach(seedDaily)
-  selectedDate.value = latestActiveDate(mergedDaily.value)
 }
 
 function setPlatform(scope: PlatformScope): void {
   activePlatform.value = scope
-  selectedDate.value = latestActiveDate(mergedDaily.value)
+  selectedDate.value = null
 }
 
 function selectDate(date: string): void {
   selectedDate.value = date
+}
+
+/** 退出单日明细，回到近期提交列表 */
+function clearDate(): void {
+  selectedDate.value = null
 }
 
 /** mock 同步：模拟耗时后刷新同步时间 */
@@ -175,7 +194,6 @@ async function bindAccount(platform: PlatformId, handle: string): Promise<void> 
   await new Promise((r) => setTimeout(r, 900))
   acc.syncState = 'idle'
   acc.lastSyncAt = new Date().toISOString()
-  selectedDate.value = latestActiveDate(mergedDaily.value)
 }
 
 function unbindAccount(platform: PlatformId, handle: string): void {
@@ -184,7 +202,7 @@ function unbindAccount(platform: PlatformId, handle: string): void {
   )
   delete dailyByAccount[accountKey(platform, handle)]
   if (activePlatform.value !== 'all' && !scopedAccounts().length) activePlatform.value = 'all'
-  selectedDate.value = latestActiveDate(mergedDaily.value)
+  selectedDate.value = null
 }
 
 /** 判断 handle 是否已被绑定（mock 验证用） */
@@ -202,10 +220,12 @@ export function useActivity() {
     mergedDaily,
     totals,
     entries,
+    recentEntries,
     lastSyncLabel,
     init,
     setPlatform,
     selectDate,
+    clearDate,
     syncNow,
     bindAccount,
     unbindAccount,

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-/** 统计卡片行：总解题 / 总提交 / 今日 / 本周 / 连续天数，数字 count-up + 错峰入场。 */
+/** 统计卡片行：总解题 / 总提交 / 今日 / 连续天数，数字 count-up + 错峰入场。 */
 
 import { onBeforeUnmount, ref, watch, type Component } from 'vue'
-import { CalendarCheck2, CalendarRange, CheckCircle2, Flame, Send } from 'lucide-vue-next'
+import { CalendarCheck2, CheckCircle2, Flame, Send } from 'lucide-vue-next'
 import type { OverviewTotals } from '@/features/activity/types'
 
 const props = defineProps<{
@@ -44,7 +44,6 @@ const cards: CardDef[] = [
   { key: 'solved', label: '总解题数', icon: CheckCircle2, value: useCountUp(() => props.totals.totalSolved) },
   { key: 'subs', label: '总提交数', icon: Send, value: useCountUp(() => props.totals.totalSubmissions) },
   { key: 'today', label: '今日解题', icon: CalendarCheck2, value: useCountUp(() => props.totals.todaySolved) },
-  { key: 'week', label: '本周解题', icon: CalendarRange, value: useCountUp(() => props.totals.weekSolved) },
   { key: 'streak', label: '连续天数', icon: Flame, value: useCountUp(() => props.totals.streakDays) },
 ]
 </script>
@@ -72,7 +71,7 @@ const cards: CardDef[] = [
 <style scoped>
 .stat-cards {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
@@ -138,12 +137,6 @@ const cards: CardDef[] = [
   margin-top: 1px;
   font-size: 11.5px;
   color: var(--faint);
-}
-
-@media (max-width: 1100px) {
-  .stat-cards {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 @media (max-width: 720px) {

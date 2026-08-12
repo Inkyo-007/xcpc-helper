@@ -1,118 +1,211 @@
 <script setup lang="ts">
-/** 当日提交明细：verdict 徽章 + 题目外链 + 平台/语言/时间元信息。 */
+/** 左栏提交列表：默认近期提交（跨天合并，较新在上）；
+ * 点击热力图格子后切换为当日明细，可一键返回近期提交。 */
 
 import { computed } from 'vue'
-import { ExternalLink, Inbox } from 'lucide-vue-next'
-import { parseDate, weekdayCn } from '@/features/activity/model/dates'
+import { ExternalLink, Inbox, Undo2 } from 'lucide-vue-next'
+import { parseDate, todayStr, weekdayCn } from '@/features/activity/model/dates'
 import { platformName } from '@/features/activity/model/mock'
-import type { SubmissionEntry, Verdict } from '@/features/activity/types'
+import type { RecentSubmission, SubmissionEntry, Verdict } from '@/features/activity/types'
 
 const props = defineProps<{
-  date: string | null
-  entries: SubmissionEntry[]
+  /** 热力图选中的日期；null 表示近期提交模式 */
+  selectedDate: string | null
+  recent: RecentSubmission[]
+  dayEntries: SubmissionEntry[]
 }>()
 
+const emit = defineEmits<{
+  'clear-date': []
+}>()
+
+const dayMode = computed(() => props.selectedDate !== null)
+
 const dateLabel = computed(() => {
-  if (!props.date) return ''
-  const d = parseDate(props.date)
-  return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日 · 周${weekdayCn(props.date)}`
+  if (!props.selectedDate) return ''
+  const d = parseDate(props.selectedDate)
+  return `${d.getMonth() + 1} 月 ${d.getDate()} 日 · 周${weekdayCn(props.selectedDate)}`
 })
 
 /** 当日通过的不同题目数 */
 const solvedCount = computed(
-  () => new Set(props.entries.filter((e) => e.verdict === 'AC').map((e) => e.problemKey)).size,
+  () => new Set(props.dayEntries.filter((e) => e.verdict === 'AC').map((e) => e.problemKey)).size,
 )
 
+interface Row {
+  id: string
+  platform: SubmissionEntry['platform']
+  problemKey: string
+  problemName: string
+  problemUrl: string
+  verdict: Verdict
+  language: string
+  timeLabel: string
+}
+
+const rows = computed<Row[]>(() => {
+  if (dayMode.value) {
+    return props.dayEntries.map((e) => ({ ...e, timeLabel: e.time }))
+  }
+  const today = todayStr()
+  return props.recent.map((e) => ({
+    ...e,
+    // 今天的提交只显示时刻，更早的带上日期
+    timeLabel: e.date === today ? e.time : `${e.date.slice(5)} ${e.time}`,
+  }))
+})
+
+/** verdict 徽章固定配色：AC 绿 / WA 红 / CE 黄 / RE 紫 / 资源超限与未知深蓝 */
 const VERDICT_CLASS: Record<Verdict, string> = {
   AC: 'v-ac',
   WA: 'v-wa',
-  TLE: 'v-tle',
-  MLE: 'v-tle',
+  CE: 'v-ce',
   RE: 'v-re',
+  TLE: 'v-limit',
+  MLE: 'v-limit',
+  OLE: 'v-limit',
+  UKE: 'v-limit',
 }
 
-function openProblem(entry: SubmissionEntry): void {
-  window.open(entry.problemUrl, '_blank', 'noopener')
+function openProblem(row: Row): void {
+  window.open(row.problemUrl, '_blank', 'noopener')
 }
 </script>
 
 <template>
-  <div class="submission-list">
-    <div class="list-head">
-      <span class="list-date">{{ dateLabel }}</span>
-      <span class="list-total mono">{{ entries.length }} 次提交 · 通过 {{ solvedCount }} 题</span>
-    </div>
-    <div v-if="entries.length" class="list-rows">
+  <div class="sub-list">
+    <header class="list-head">
+      <span class="list-title">{{ dayMode ? dateLabel : '近期提交' }}</span>
+      <span v-if="dayMode" class="list-total mono">
+        {{ dayEntries.length }} 次提交 · 通过 {{ solvedCount }} 题
+      </span>
       <button
-        v-for="entry in entries"
-        :key="entry.id"
+        v-if="dayMode"
+        type="button"
+        class="back-btn"
+        @click="emit('clear-date')"
+      >
+        <Undo2 :size="12" />
+        近期提交
+      </button>
+      <span v-else class="list-total mono">{{ rows.length }} 条</span>
+    </header>
+
+    <div v-if="rows.length" class="list-rows">
+      <button
+        v-for="row in rows"
+        :key="row.id"
         type="button"
         class="sub-row"
-        @click="openProblem(entry)"
+        @click="openProblem(row)"
       >
-        <span class="verdict mono" :class="VERDICT_CLASS[entry.verdict]">{{ entry.verdict }}</span>
-        <span class="sub-problem">
-          <span class="sub-name">{{ entry.problemName }}</span>
-          <ExternalLink class="sub-link" :size="12" />
+        <span class="row-top">
+          <span class="verdict mono" :class="VERDICT_CLASS[row.verdict]">{{ row.verdict }}</span>
+          <span class="sub-problem">
+            <span class="sub-platform">{{ platformName(row.platform) }}</span>
+            <span class="sub-name">{{ row.problemKey }}. {{ row.problemName }}</span>
+            <ExternalLink class="sub-link" :size="11" />
+          </span>
         </span>
-        <span class="sub-platform">{{ platformName(entry.platform) }}</span>
-        <span class="sub-lang mono">{{ entry.language }}</span>
-        <span class="sub-time mono">{{ entry.time }}</span>
+        <span class="row-bottom">
+          <span class="sub-lang mono">{{ row.language }}</span>
+          <span class="sub-time mono">{{ row.timeLabel }}</span>
+        </span>
       </button>
     </div>
     <div v-else class="list-empty">
-      <Inbox :size="22" />
-      <span>这一天还没有提交记录</span>
+      <Inbox :size="20" />
+      <span>{{ dayMode ? '这一天还没有提交记录' : '近期还没有提交记录' }}</span>
     </div>
   </div>
 </template>
 
 <style scoped>
-.submission-list {
+.sub-list {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .list-head {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
+  flex: none;
 }
 
-.list-date {
-  font-size: 13.5px;
+.list-title {
+  font-size: 12px;
   font-weight: 700;
-  color: var(--text);
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .list-total {
-  font-size: 11.5px;
+  margin-left: auto;
+  font-size: 11px;
   color: var(--faint);
+  white-space: nowrap;
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.back-btn:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
 }
 
 .list-rows {
-  display: flex;
-  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -16px;
+  padding: 0 16px;
+}
+
+.list-rows::-webkit-scrollbar {
+  width: 8px;
+}
+
+.list-rows::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 .sub-row {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto auto 44px;
-  align-items: center;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   width: 100%;
-  padding: 8px 10px;
+  padding: 8px 6px;
   border: 0;
   border-bottom: 1px solid var(--border);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .sub-row:last-child {
@@ -121,12 +214,28 @@ function openProblem(entry: SubmissionEntry): void {
 
 .sub-row:hover {
   background: var(--surface-2);
-  transform: translateX(3px);
+}
+
+.row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.row-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 46px;
 }
 
 .verdict {
   display: inline-flex;
   justify-content: center;
+  width: 38px;
+  flex: none;
   padding: 1px 0;
   border-radius: 4px;
   font-size: 10.5px;
@@ -134,43 +243,57 @@ function openProblem(entry: SubmissionEntry): void {
   letter-spacing: 0.03em;
 }
 
+/* verdict 徽章配色固定，不随主题色相与明暗变化 */
 .v-ac {
-  color: var(--accent-strong);
-  background: var(--accent-soft);
+  color: #1e9e52;
+  background: hsl(142 60% 42% / 0.14);
 }
 
 .v-wa {
-  color: #c63b57;
-  background: hsl(350 60% 50% / 0.12);
+  color: #d64541;
+  background: hsl(4 64% 52% / 0.12);
 }
 
-.v-tle {
-  color: #b97a1f;
-  background: hsl(38 70% 45% / 0.14);
+.v-ce {
+  color: #c28a0a;
+  background: hsl(42 88% 45% / 0.15);
 }
 
 .v-re {
-  color: var(--muted);
-  background: var(--surface-2);
+  color: #8a5cf0;
+  background: hsl(262 70% 60% / 0.14);
+}
+
+.v-limit {
+  color: #2f5fc7;
+  background: hsl(222 62% 50% / 0.13);
 }
 
 .sub-problem {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: 6px;
   min-width: 0;
-  font-size: 13px;
-  font-weight: 550;
+  font-size: 12.5px;
+}
+
+.sub-platform {
+  flex: none;
+  font-size: 11px;
+  color: var(--faint);
 }
 
 .sub-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 550;
 }
 
 .sub-link {
   flex: none;
+  align-self: center;
   color: var(--faint);
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -180,29 +303,20 @@ function openProblem(entry: SubmissionEntry): void {
   opacity: 1;
 }
 
-.sub-platform {
-  font-size: 11px;
-  color: var(--muted);
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  white-space: nowrap;
-}
-
 .sub-lang {
   font-size: 11px;
   color: var(--faint);
-  white-space: nowrap;
 }
 
 .sub-time {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--muted);
-  text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .list-empty {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;

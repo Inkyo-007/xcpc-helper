@@ -41,7 +41,7 @@ export interface OverviewData {
   daily: DayActivity[]
 }
 
-export type Verdict = 'AC' | 'WA' | 'TLE' | 'MLE' | 'RE'
+export type Verdict = 'AC' | 'WA' | 'CE' | 'RE' | 'TLE' | 'MLE' | 'OLE' | 'UKE'
 
 export interface SubmissionEntry {
   id: string
@@ -53,4 +53,10 @@ export interface SubmissionEntry {
   language: string
   /** HH:mm（本地时区） */
   time: string
+}
+
+/** 近期提交列表条目：带所属日期，跨天合并后按时间倒序展示 */
+export interface RecentSubmission extends SubmissionEntry {
+  /** YYYY-MM-DD（本地时区） */
+  date: string
 }

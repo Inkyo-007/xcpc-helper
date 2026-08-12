@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/** 数据总览页：平台切换 + 统计卡片 + 通过数柱状图 + 训练热力图 + 当日明细。 */
+/** 数据总览页：左右双栏布局（无分界线）。
+ * 左栏：用户信息卡 + 近期提交；右栏：统计卡片 + 训练热力图 + 通过数柱状图。 */
 
 import { computed, onMounted, ref } from 'vue'
 import { ChartColumn, MousePointerClick, Plus } from 'lucide-vue-next'
@@ -11,6 +12,7 @@ import PlatformTabs from '@/features/activity/components/PlatformTabs.vue'
 import StatCards from '@/features/activity/components/StatCards.vue'
 import SubmissionList from '@/features/activity/components/SubmissionList.vue'
 import SyncBar from '@/features/activity/components/SyncBar.vue'
+import UserProfileCard from '@/features/activity/components/UserProfileCard.vue'
 import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
 import { useActivity } from '@/features/activity/store'
 import type { PlatformId } from '@/features/activity/types'
@@ -23,10 +25,12 @@ const {
   mergedDaily,
   totals,
   entries,
+  recentEntries,
   lastSyncLabel,
   init,
   setPlatform,
   selectDate,
+  clearDate,
   syncNow,
   bindAccount,
   unbindAccount,
@@ -64,49 +68,59 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
       />
     </div>
 
-    <template v-if="accounts.length">
-      <StatCards :totals="totals" />
+    <div v-if="accounts.length" class="act-body">
+      <aside class="act-side">
+        <UserProfileCard />
+        <section class="act-panel act-submissions">
+          <SubmissionList
+            :selected-date="selectedDate"
+            :recent="recentEntries"
+            :day-entries="entries"
+            @clear-date="clearDate"
+          />
+        </section>
+      </aside>
 
-      <div class="act-charts">
+      <div class="act-main">
+        <StatCards :totals="totals" />
+
         <section class="act-panel">
           <header class="panel-head">
-            <span class="panel-title">近 7 天通过</span>
+            <span class="panel-title">训练热力</span>
+            <span class="panel-hint">
+              <MousePointerClick :size="12" />
+              点击格子查看当日明细
+            </span>
+            <span class="heat-legend">
+              少
+              <i class="legend-cell lv0"></i>
+              <i class="legend-cell lv1"></i>
+              <i class="legend-cell lv2"></i>
+              <i class="legend-cell lv3"></i>
+              <i class="legend-cell lv4"></i>
+              <i class="legend-cell lv5"></i>
+              多
+            </span>
           </header>
-          <PassBarChart :data="weeklyBars" />
+          <ActivityHeatmap :daily="mergedDaily" :selected="selectedDate" @select="selectDate" />
         </section>
-        <section class="act-panel">
-          <header class="panel-head">
-            <span class="panel-title">近 12 个月通过</span>
-          </header>
-          <PassBarChart :data="monthlyBars" />
-        </section>
+
+        <div class="act-charts">
+          <section class="act-panel">
+            <header class="panel-head">
+              <span class="panel-title">近 7 天通过</span>
+            </header>
+            <PassBarChart :data="weeklyBars" />
+          </section>
+          <section class="act-panel">
+            <header class="panel-head">
+              <span class="panel-title">近 12 个月通过</span>
+            </header>
+            <PassBarChart :data="monthlyBars" />
+          </section>
+        </div>
       </div>
-
-      <section class="act-panel">
-        <header class="panel-head">
-          <span class="panel-title">训练热力</span>
-          <span class="panel-hint">
-            <MousePointerClick :size="12" />
-            点击格子查看当日明细
-          </span>
-          <span class="heat-legend">
-            少
-            <i class="legend-cell lv0"></i>
-            <i class="legend-cell lv1"></i>
-            <i class="legend-cell lv2"></i>
-            <i class="legend-cell lv3"></i>
-            <i class="legend-cell lv4"></i>
-            <i class="legend-cell lv5"></i>
-            多
-          </span>
-        </header>
-        <ActivityHeatmap :daily="mergedDaily" :selected="selectedDate" @select="selectDate" />
-      </section>
-
-      <section class="act-panel">
-        <SubmissionList :date="selectedDate" :entries="entries" />
-      </section>
-    </template>
+    </div>
 
     <div v-else class="act-empty">
       <div class="empty-icon">
@@ -128,22 +142,11 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
 .act-page {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 14px 20px 20px;
-}
-
-.act-page::-webkit-scrollbar {
-  width: 10px;
-}
-
-.act-page::-webkit-scrollbar-thumb {
-  background: var(--accent);
-  border-radius: 99px;
-  border: 3px solid transparent;
-  background-clip: content-box;
+  padding: 14px 20px 16px;
 }
 
 .act-toolbar {
@@ -153,16 +156,55 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
   flex: none;
 }
 
+/* 左右双栏：仅以间距区分，不画分界线 */
+.act-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.act-side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.act-submissions {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.act-main {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.act-main::-webkit-scrollbar {
+  width: 10px;
+}
+
+.act-main::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
 .act-charts {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-}
-
-@media (max-width: 900px) {
-  .act-charts {
-    grid-template-columns: 1fr;
-  }
 }
 
 .act-panel {
@@ -271,5 +313,47 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
   margin: 0 0 6px;
   max-width: 340px;
   font-size: 12.5px;
+}
+
+@media (max-width: 1080px) {
+  .act-page {
+    overflow-y: auto;
+  }
+
+  .act-body {
+    flex: none;
+    grid-template-columns: 1fr;
+  }
+
+  .act-side {
+    min-height: auto;
+  }
+
+  .act-submissions {
+    flex: none;
+    max-height: 360px;
+  }
+
+  .act-main {
+    overflow: visible;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .act-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
+.act-page::-webkit-scrollbar {
+  width: 10px;
+}
+
+.act-page::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
 </style>
