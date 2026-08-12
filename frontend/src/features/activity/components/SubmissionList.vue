@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /** 左栏提交列表：默认近期提交（跨天合并，较新在上）；
- * 点击热力图格子后切换为当日明细，可一键返回近期提交。 */
+ * 点击热力图格子后切换为当日明细（再次点击该格子取消选中）。 */
 
 import { computed } from 'vue'
-import { ExternalLink, Inbox, Undo2 } from 'lucide-vue-next'
+import { ExternalLink, Inbox } from 'lucide-vue-next'
 import { parseDate, todayStr, weekdayCn } from '@/features/activity/model/dates'
 import { platformName } from '@/features/activity/model/mock'
 import type { RecentSubmission, SubmissionEntry, Verdict } from '@/features/activity/types'
@@ -13,10 +13,6 @@ const props = defineProps<{
   selectedDate: string | null
   recent: RecentSubmission[]
   dayEntries: SubmissionEntry[]
-}>()
-
-const emit = defineEmits<{
-  'clear-date': []
 }>()
 
 const dayMode = computed(() => props.selectedDate !== null)
@@ -79,15 +75,6 @@ function openProblem(row: Row): void {
       <span v-if="dayMode" class="list-total mono">
         {{ dayEntries.length }} 次提交 · 通过 {{ solvedCount }} 题
       </span>
-      <button
-        v-if="dayMode"
-        type="button"
-        class="back-btn"
-        @click="emit('clear-date')"
-      >
-        <Undo2 :size="12" />
-        近期提交
-      </button>
       <span v-else class="list-total mono">{{ rows.length }} 条</span>
     </header>
 
@@ -150,27 +137,6 @@ function openProblem(row: Row): void {
   font-size: 11px;
   color: var(--faint);
   white-space: nowrap;
-}
-
-.back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 2px;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.back-btn:hover {
-  color: var(--accent-strong);
-  border-color: var(--accent);
 }
 
 .list-rows {

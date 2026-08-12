@@ -163,13 +163,9 @@ function setPlatform(scope: PlatformScope): void {
   selectedDate.value = null
 }
 
+/** 选中某天查看当日明细；再次点击同一格子取消选中，回到近期提交 */
 function selectDate(date: string): void {
-  selectedDate.value = date
-}
-
-/** 退出单日明细，回到近期提交列表 */
-function clearDate(): void {
-  selectedDate.value = null
+  selectedDate.value = selectedDate.value === date ? null : date
 }
 
 /** mock 同步：模拟耗时后刷新同步时间 */
@@ -225,7 +221,6 @@ export function useActivity() {
     init,
     setPlatform,
     selectDate,
-    clearDate,
     syncNow,
     bindAccount,
     unbindAccount,

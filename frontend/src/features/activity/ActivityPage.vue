@@ -30,7 +30,6 @@ const {
   init,
   setPlatform,
   selectDate,
-  clearDate,
   syncNow,
   bindAccount,
   unbindAccount,
@@ -76,7 +75,6 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
             :selected-date="selectedDate"
             :recent="recentEntries"
             :day-entries="entries"
-            @clear-date="clearDate"
           />
         </section>
       </aside>
@@ -89,7 +87,7 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
             <span class="panel-title">训练热力</span>
             <span class="panel-hint">
               <MousePointerClick :size="12" />
-              点击格子查看当日明细
+              点击格子查看当日明细，再次点击取消
             </span>
             <span class="heat-legend">
               少
