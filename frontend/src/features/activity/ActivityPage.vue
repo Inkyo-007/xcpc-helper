@@ -2,7 +2,8 @@
 /** 数据总览页：左右双栏布局（无分界线）。
  * 左栏：用户信息卡 + 近期提交；右栏：统计卡片 + 训练热力图 + 通过数柱状图。 */
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ChartColumn, MousePointerClick, Plus } from 'lucide-vue-next'
 import { NButton, useMessage } from 'naive-ui'
 import AccountBindModal from '@/features/activity/components/AccountBindModal.vue'
@@ -14,7 +15,8 @@ import SubmissionList from '@/features/activity/components/SubmissionList.vue'
 import SyncBar from '@/features/activity/components/SyncBar.vue'
 import UserProfileCard from '@/features/activity/components/UserProfileCard.vue'
 import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
-import { useActivity } from '@/features/activity/store'
+import { pageCount } from '@/features/activity/model/pagination'
+import { useActivity, type PlatformScope } from '@/features/activity/store'
 import type { PlatformId } from '@/features/activity/types'
 
 const {
@@ -43,7 +45,72 @@ const showBind = ref(false)
 const weeklyBars = computed(() => weeklySolved(mergedDaily.value))
 const monthlyBars = computed(() => monthlySolved(mergedDaily.value))
 
-onMounted(init)
+/* ---------- 网址状态同步：?platform=<平台>&page=<页码> ----------
+ * all 与第 1 页为缺省值，不出现在网址中；切换平台重置页码（见 store），
+ * 翻页保留筛选；刷新、浏览器前进/后退与复制链接均能恢复同一视图。 */
+
+const route = useRoute()
+const router = useRouter()
+
+const PLATFORM_SCOPES: PlatformScope[] = [
+  'all',
+  'codeforces',
+  'atcoder',
+  'luogu',
+  'leetcode-cn',
+  'nowcoder',
+]
+
+/** 网址中的平台筛选：非法值、未绑定的平台都回退为汇总 */
+function queryPlatform(raw: unknown): PlatformScope {
+  if (typeof raw !== 'string' || raw === 'all') return 'all'
+  if (!(PLATFORM_SCOPES as string[]).includes(raw)) return 'all'
+  return accounts.value.some((a) => a.platform === raw) ? (raw as PlatformScope) : 'all'
+}
+
+/** 网址中的页码：非正整数回退为第 1 页 */
+function queryPage(raw: unknown): number {
+  const n = Number(typeof raw === 'string' ? raw : '')
+  return Number.isInteger(n) && n > 0 ? n : 1
+}
+
+onMounted(() => {
+  init()
+  // 从网址恢复筛选与页码（先平台后页码：切换平台会把页码重置回 1）
+  const platform = queryPlatform(route.query.platform)
+  if (platform !== 'all') setPlatform(platform)
+  const page = queryPage(route.query.page)
+  if (page > 1) setRecentPage(page)
+})
+
+// 状态 → 网址：缺省值不写入，避免无谓的跳转
+watch([activePlatform, recentPage], ([platform, page]) => {
+  const query: Record<string, string> = {}
+  if (platform !== 'all') query.platform = platform
+  if (page > 1) query.page = String(page)
+  if (query.platform === route.query.platform && query.page === route.query.page) return
+  void router.push({ query })
+})
+
+// 网址 → 状态：浏览器前进/后退（或手动改网址）时恢复视图
+watch(
+  () => route.query,
+  (query) => {
+    const platform = queryPlatform(query.platform)
+    if (platform !== activePlatform.value) setPlatform(platform)
+    const page = queryPage(query.page)
+    if (page !== recentPage.value) setRecentPage(page)
+  },
+)
+
+// 列表变短（切平台/解绑）导致页码超出范围时夹紧
+watch(
+  () => recentEntries.value.length,
+  (total) => {
+    const max = pageCount(total)
+    if (recentPage.value > max) setRecentPage(max)
+  },
+)
 
 async function onBind(platform: PlatformId, handle: string): Promise<void> {
   await bindAccount(platform, handle)
