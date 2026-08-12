@@ -1,11 +1,14 @@
 <script setup lang="ts">
 /** 左栏提交列表：默认近期提交（跨天合并，较新在上）；
- * 点击热力图格子后切换为当日明细（再次点击该格子取消选中）。 */
+ * 近期提交每页 10 条，底部分页导航；点击热力图格子后切换为
+ * 当日明细（再次点击该格子取消选中），当日明细不分页。 */
 
 import { computed } from 'vue'
 import { ExternalLink, Inbox } from 'lucide-vue-next'
+import { NPagination } from 'naive-ui'
 import { parseDate, todayStr, weekdayCn } from '@/features/activity/model/dates'
 import { platformName } from '@/features/activity/model/mock'
+import { pageCount, paged } from '@/features/activity/model/pagination'
 import type { RecentSubmission, SubmissionEntry, Verdict } from '@/features/activity/types'
 
 const props = defineProps<{
@@ -13,9 +16,17 @@ const props = defineProps<{
   selectedDate: string | null
   recent: RecentSubmission[]
   dayEntries: SubmissionEntry[]
+  /** 近期提交模式的分页页码（从 1 起） */
+  page: number
+}>()
+
+const emit = defineEmits<{
+  'update:page': [page: number]
 }>()
 
 const dayMode = computed(() => props.selectedDate !== null)
+
+const totalPages = computed(() => pageCount(props.recent.length))
 
 const dateLabel = computed(() => {
   if (!props.selectedDate) return ''
@@ -44,7 +55,7 @@ const rows = computed<Row[]>(() => {
     return props.dayEntries.map((e) => ({ ...e, timeLabel: e.time }))
   }
   const today = todayStr()
-  return props.recent.map((e) => ({
+  return paged(props.recent, props.page).map((e) => ({
     ...e,
     // 今天的提交只显示时刻，更早的带上日期
     timeLabel: e.date === today ? e.time : `${e.date.slice(5)} ${e.time}`,
@@ -75,7 +86,7 @@ function openProblem(row: Row): void {
       <span v-if="dayMode" class="list-total mono">
         {{ dayEntries.length }} 次提交 · 通过 {{ solvedCount }} 题
       </span>
-      <span v-else class="list-total mono">{{ rows.length }} 条</span>
+      <span v-else class="list-total mono">{{ recent.length }} 条</span>
     </header>
 
     <div v-if="rows.length" class="list-rows">
@@ -104,6 +115,15 @@ function openProblem(row: Row): void {
       <Inbox :size="20" />
       <span>{{ dayMode ? '这一天还没有提交记录' : '近期还没有提交记录' }}</span>
     </div>
+
+    <footer v-if="!dayMode && totalPages > 1" class="list-foot">
+      <NPagination
+        :page="page"
+        :page-count="totalPages"
+        size="small"
+        @update:page="(p: number) => emit('update:page', p)"
+      />
+    </footer>
   </div>
 </template>
 
@@ -141,21 +161,17 @@ function openProblem(row: Row): void {
 
 .list-rows {
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   margin: 0 -16px;
   padding: 0 16px;
 }
 
-.list-rows::-webkit-scrollbar {
-  width: 8px;
-}
-
-.list-rows::-webkit-scrollbar-thumb {
-  background: var(--accent);
-  border-radius: 99px;
-  border: 2px solid transparent;
-  background-clip: content-box;
+.list-foot {
+  display: flex;
+  justify-content: center;
+  padding-top: 10px;
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  flex: none;
 }
 
 .sub-row {

@@ -21,6 +21,8 @@ export type PlatformScope = 'all' | PlatformId
 const accounts = ref<BoundAccount[]>([])
 const activePlatform = ref<PlatformScope>('all')
 const selectedDate = ref<string | null>(null)
+/** 近期提交列表的分页页码（从 1 起；当日明细模式不分页） */
+const recentPage = ref(1)
 const syncing = ref(false)
 const initialized = ref(false)
 
@@ -161,11 +163,16 @@ function init(): void {
 function setPlatform(scope: PlatformScope): void {
   activePlatform.value = scope
   selectedDate.value = null
+  recentPage.value = 1
 }
 
 /** 选中某天查看当日明细；再次点击同一格子取消选中，回到近期提交 */
 function selectDate(date: string): void {
   selectedDate.value = selectedDate.value === date ? null : date
+}
+
+function setRecentPage(page: number): void {
+  recentPage.value = page
 }
 
 /** mock 同步：模拟耗时后刷新同步时间 */
@@ -211,6 +218,7 @@ export function useActivity() {
     accounts,
     activePlatform,
     selectedDate,
+    recentPage,
     syncing,
     initialized,
     mergedDaily,
@@ -221,6 +229,7 @@ export function useActivity() {
     init,
     setPlatform,
     selectDate,
+    setRecentPage,
     syncNow,
     bindAccount,
     unbindAccount,

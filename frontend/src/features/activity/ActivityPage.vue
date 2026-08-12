@@ -21,6 +21,7 @@ const {
   accounts,
   activePlatform,
   selectedDate,
+  recentPage,
   syncing,
   mergedDaily,
   totals,
@@ -30,6 +31,7 @@ const {
   init,
   setPlatform,
   selectDate,
+  setRecentPage,
   syncNow,
   bindAccount,
   unbindAccount,
@@ -75,6 +77,8 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
             :selected-date="selectedDate"
             :recent="recentEntries"
             :day-entries="entries"
+            :page="recentPage"
+            @update:page="setRecentPage"
           />
         </section>
       </aside>
@@ -140,7 +144,8 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
 .act-page {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* 整页滚动：近期提交等内容较多时由页面承担滚动，不再用内部滚动区 */
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -157,7 +162,6 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
 /* 左右双栏：仅以间距区分，不画分界线 */
 .act-body {
   flex: 1;
-  min-height: 0;
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 16px;
@@ -172,31 +176,15 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
 
 .act-submissions {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .act-main {
   min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-right: 4px;
-}
-
-.act-main::-webkit-scrollbar {
-  width: 10px;
-}
-
-.act-main::-webkit-scrollbar-thumb {
-  background: var(--accent);
-  border-radius: 99px;
-  border: 3px solid transparent;
-  background-clip: content-box;
 }
 
 .act-charts {
@@ -314,10 +302,6 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
 }
 
 @media (max-width: 1080px) {
-  .act-page {
-    overflow-y: auto;
-  }
-
   .act-body {
     flex: none;
     grid-template-columns: 1fr;
@@ -325,16 +309,6 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
 
   .act-side {
     min-height: auto;
-  }
-
-  .act-submissions {
-    flex: none;
-    max-height: 360px;
-  }
-
-  .act-main {
-    overflow: visible;
-    padding-right: 0;
   }
 }
 
