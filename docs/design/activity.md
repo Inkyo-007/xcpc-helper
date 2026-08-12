@@ -76,7 +76,7 @@ Submission {
   problem_name
   problem_url
   difficulty      # 原始难度值，不做跨平台归一
-  verdict         # AC / WA / TLE ...
+  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE
   submitted_at    # UTC 秒级时间戳
   language
 }
@@ -92,13 +92,18 @@ Submission {
 
 侧边栏新增「训练统计」组（`NavGroup.icon` 联合类型扩 `'chart'`），子页「数据总览」，路由 `/activity/overview`。第一期**只做一个页面**：页内顶部用分段切换器切视图（汇总 / 各已绑定平台），后续 rating 折线与平台专属卡片直接长在单平台视图内，不再动信息架构。
 
-### 4.2 页面区块（自上而下）
+### 4.2 页面区块
 
-1. **工具条**：左侧平台分段切换器（汇总 + 已绑定平台动态生成）；右侧同步区——上次同步时间（等宽字体 muted）、「立即同步」按钮（lucide `RefreshCw`，同步中旋转禁用）、「绑定账号」主按钮。同步失败出 warning 徽章，点开看诊断，已有数据照常展示。
-2. **统计卡片行**（五张一排）：总解题数、总提交数、今日解题、本周解题、连续活跃天数。数字 count-up 滚动，卡片入场 stagger。
-3. **柱状图行**（洛谷主页风格，两张并排，窄屏堆叠）：左「近 7 天通过」日粒度、右「近 12 个月通过」月粒度，均为 AC 数；accent 色圆角柱，hover tooltip。
-4. **activity 热力图**：GitHub 式一年图（53 周 × 7 天，周一起始）。hover 出 NTooltip（日期 + 提交/通过数）；**点击选中某天**，格子加 accent 描边，联动下方明细。
-5. **明细列表**：默认显示最近有提交的一天，点热力图格子后切换为所选日期。每行：verdict 徽章（AC 用 accent，WA/TLE 等用 muted 区分）、题目名（跳平台原站外链）、平台标签、语言、提交时间；列表头部等宽小字写当日合计。
+页面主体为左右双栏（不出现分界线，仅以间距区分）：左栏较窄，右栏较宽；顶部工具条通栏。
+
+1. **工具条**（通栏）：左侧平台分段切换器（汇总 + 已绑定平台动态生成）；右侧同步区——上次同步时间（等宽字体 muted）、「立即同步」按钮（lucide `RefreshCw`，同步中旋转禁用）、「绑定账号」主按钮。同步失败出 warning 徽章，点开看诊断，已有数据照常展示。
+2. **左栏 · 用户信息卡**：头像（用户本地上传，前端裁剪缩放为方形后持久化；mock 阶段存 localStorage，后端 `profile.json` 就绪后迁移）、主标签（ID）、副标签（签名）；ID 与签名点击就地编辑。
+3. **左栏 · 近期提交**：跨平台合并的最近提交，较新在上。每行：verdict 徽章、题目基本信息（平台 + 题号 + 题名，点击跳平台原站外链）、语言与提交时间。点击热力图格子后切换为当日明细，可一键返回近期提交。
+4. **右栏 · 统计卡片行**（四张一排）：总解题数、总提交数、今日解题、连续活跃天数。数字 count-up 滚动，卡片入场 stagger。
+5. **右栏 · activity 热力图**：GitHub 式一年图（53 周 × 7 天，周一起始）。hover 出 NTooltip（日期 + 提交/通过数）；**点击选中某天**，格子加 accent 描边，联动左栏提交列表。
+6. **右栏 · 柱状图行**（洛谷主页风格，两张并排，窄屏堆叠）：左「近 7 天通过」日粒度、右「近 12 个月通过」月粒度，均为 AC 数；accent 色圆角柱，hover tooltip。
+
+verdict 徽章配色固定、不随主题色相变化：AC 绿、WA 红、CE 黄、RE 紫，TLE / MLE / OLE / UKE 深蓝。
 
 ### 4.3 热力图着色规则
 
@@ -192,6 +197,7 @@ frontend/src/features/activity/
 │  ├─ rating-tiers.ts           # 各平台 rating 分档/配色表（后续增量）
 │  └─ ...
 └─ components/
+   ├─ UserProfileCard.vue       # 用户信息卡（头像上传 / ID / 签名就地编辑）
    ├─ AccountBindModal.vue      # 绑定/解绑/凭据录入
    ├─ SyncStatusBar.vue         # 新鲜度 + 手动同步 + 错误诊断
    ├─ OverviewCards.vue         # 跨平台总数据
