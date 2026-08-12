@@ -98,9 +98,9 @@ Submission {
 
 1. **工具条**（通栏）：左侧平台分段切换器（汇总 + 已绑定平台动态生成）；右侧同步区——上次同步时间（等宽字体 muted）、「立即同步」按钮（lucide `RefreshCw`，同步中旋转禁用）、「绑定账号」主按钮。同步失败出 warning 徽章，点开看诊断，已有数据照常展示。
 2. **左栏 · 用户信息卡**：头像（用户本地上传，前端裁剪缩放为方形后持久化；mock 阶段存 localStorage，后端 `profile.json` 就绪后迁移）、主标签（ID）、副标签（签名）；ID 与签名点击就地编辑。
-3. **左栏 · 近期提交**：跨平台合并的最近提交，较新在上。每行：verdict 徽章、题目基本信息（平台 + 题号 + 题名，点击跳平台原站外链）、语言与提交时间。点击热力图格子后切换为当日明细，可一键返回近期提交。
+3. **左栏 · 近期提交**：跨平台合并的最近提交，较新在上。每行：verdict 徽章、题目基本信息（平台 + 题号 + 题名，点击跳平台原站外链）、语言与提交时间。**每页固定 10 条**，底部放分页导航（页码同步到网址，见 §4.7）。点击热力图格子后切换为当日明细（标题变为该日期），不提供返回按钮——**再次点击同一格子取消选中**，即回到近期提交。
 4. **右栏 · 统计卡片行**（四张一排）：总解题数、总提交数、今日解题、连续活跃天数。数字 count-up 滚动，卡片入场 stagger。
-5. **右栏 · activity 热力图**：GitHub 式一年图（53 周 × 7 天，周一起始）。hover 出 NTooltip（日期 + 提交/通过数）；**点击选中某天**，格子加 accent 描边，联动左栏提交列表。
+5. **右栏 · activity 热力图**：GitHub 式一年图（53 周 × 7 天，周日起始）。hover 时格子上浮（放大 + 投影 + 置顶，不被相邻格遮挡）并出 tooltip（日期 + 提交/通过数）；**点击选中某天**：选中格维持上浮态并加 accent 描边，其余格子淡化且不再响应悬停动效，联动左栏提交列表；再次点击该格取消选中。
 6. **右栏 · 柱状图行**（洛谷主页风格，两张并排，窄屏堆叠）：左「近 7 天通过」日粒度、右「近 12 个月通过」月粒度，均为 AC 数；accent 色圆角柱，hover tooltip。
 
 verdict 徽章配色固定、不随主题色相变化：AC 绿、WA 红、CE 黄、RE 紫，TLE / MLE / OLE / UKE 深蓝。
@@ -131,7 +131,11 @@ verdict 徽章配色固定、不随主题色相变化：AC 绿、WA 红、CE 黄
 
 ### 4.6 图表主题桥接
 
-ECharts 配色在 JS 侧生成：`model/echarts-theme.ts` 经 `getComputedStyle` 读取 `--hue`/`--text`/`--surface-2` 等 CSS 变量产出配色对象；组件用 MutationObserver 监听 `documentElement` 的 `data-theme` 与 `style`（`--hue`）变化，触发 `setOption` 刷新。不反向依赖 App 的 `useTheme` 实例。
+配色在 JS 侧统一生成：`model/echarts-theme.ts` 经 `getComputedStyle` 读取 `--hue`/`--text`/`--surface-2` 等 CSS 变量产出配色对象；组件用 MutationObserver 监听 `documentElement` 的 `data-theme` 与 `style`（`--hue`）变化，ECharts 图触发 `setOption` 刷新，热力图格子直接以内联背景色刷新。不反向依赖 App 的 `useTheme` 实例。
+
+### 4.7 网址状态同步
+
+平台筛选与近期提交页码写入网址 query（`?platform=codeforces&page=2`）：`all` 与第 1 页为缺省值，不出现在网址中。切换平台重置页码为 1；翻页保留筛选；刷新、浏览器前进/后退与复制链接均能恢复同一视图。
 
 ## 5. 工程落地
 
@@ -202,7 +206,7 @@ frontend/src/features/activity/
    ├─ SyncStatusBar.vue         # 新鲜度 + 手动同步 + 错误诊断
    ├─ OverviewCards.vue         # 跨平台总数据
    ├─ PassBarChart.vue          # 通过数柱状图（日/月两种粒度复用）
-   ├─ ActivityHeatmap.vue       # GitHub 式热力图（ECharts calendar）
+   ├─ ActivityHeatmap.vue       # GitHub 式热力图（DOM 网格，上浮/选中动效）
    ├─ RatingChart.vue           # rating 折线 + 分档底色（后续增量）
    └─ platforms/                # 平台专属组件注册表（如 LuoguExtrasCard.vue）
 ```
@@ -211,7 +215,8 @@ frontend/src/features/activity/
 
 - extras 在 `types.ts` 用判别联合类型（`LuoguExtras | CodeforcesExtras | ...`）保类型安全；
 - `PlatformPage.vue` 按 capabilities 条件渲染公共区块 + 查表挂载专属区块；
-- 图表自第一期起引入 **ECharts**：按需引入（`echarts/core` + Calendar/Bar/Grid/Tooltip/VisualMap，SVGRenderer）；主题桥接见 §4.6；rating 折线期追加 LineChart 与分档底色；
+- 柱状图自第一期起引入 **ECharts**：按需引入（`echarts/core` + Bar/Grid/Tooltip，SVGRenderer）；主题桥接见 §4.6；rating 折线期追加 LineChart 与分档底色；
+- 热力图用 DOM 网格实现（悬停上浮、选中淡化等逐格动效在 ECharts calendar 上难以做到），格子配色复用 §4.6 的配色对象；
 - `app/nav.ts`、`app/router.ts` 各加一条，替换占位页。
 
 ## 6. 验证方式
