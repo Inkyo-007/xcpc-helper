@@ -1,10 +1,17 @@
-"""UserStore 读写层测试：profile 往返、原子写、去重合并、损坏容错、名称校验。"""
+"""UserStore 读写层测试：profile 往返、原子写、去重合并、损坏容错、名称校验、用户组目录管理。"""
 
 import pytest
 
-from core.exceptions import BadRequestError
+from core.exceptions import BadRequestError, ConflictError, NotFoundError
 from modules.activity.models import Account, Submission, Verdict
-from modules.activity.store import UserStore
+from modules.activity.store import (
+    EXAMPLE_GROUP,
+    UserStore,
+    create_group,
+    delete_group,
+    list_groups,
+    rename_group,
+)
 
 
 def make_store(tmp_path) -> UserStore:
@@ -107,3 +114,92 @@ def test_invalid_handle_rejected(tmp_path):
         store.merge_submissions("codeforces", "a/b", [submission("1", 1000)])
     with pytest.raises(BadRequestError):
         store.load_submissions("codeforces", "../evil")
+
+
+# ===== 用户组目录管理 =====
+
+
+def test_profile_roundtrip_with_profile_fields(tmp_path):
+    store = make_store(tmp_path)
+    profile = store.load_profile()
+    profile.id = "我的昵称"
+    profile.signature = "菜就多练"
+    profile.avatar = "data:image/jpeg;base64,abc"
+    store.save_profile(profile)
+
+    loaded = store.load_profile()
+    assert loaded.id == "我的昵称"
+    assert loaded.signature == "菜就多练"
+    assert loaded.avatar == "data:image/jpeg;base64,abc"
+
+
+def test_create_group_initializes_profile(tmp_path):
+    root = tmp_path / "user"
+    create_group(root, "第一组")
+    groups = list_groups(root)
+    assert groups == ["第一组"]
+    profile = UserStore(root, "第一组").load_profile()
+    # 信息卡 ID 初始为目录名（之后独立编辑）
+    assert profile.id == "第一组"
+    assert profile.accounts == []
+
+
+def test_create_group_conflict(tmp_path):
+    root = tmp_path / "user"
+    create_group(root, "groupA")
+    with pytest.raises(ConflictError):
+        create_group(root, "groupA")
+
+
+def test_list_groups_excludes_example_and_hidden(tmp_path):
+    root = tmp_path / "user"
+    create_group(root, "B组")
+    create_group(root, "A组")
+    # 模拟 example 样例目录与隐藏目录
+    (root / EXAMPLE_GROUP).mkdir(exist_ok=True)
+    (root / ".hidden").mkdir()
+    assert list_groups(root) == ["A组", "B组"]
+
+
+def test_rename_group_moves_data(tmp_path):
+    root = tmp_path / "user"
+    create_group(root, "旧名")
+    store = UserStore(root, "旧名")
+    store.merge_submissions("codeforces", "demo", [submission("1", 1000)])
+    store.save_account(Account(platform="codeforces", handle="demo", last_synced_at=1000))
+
+    rename_group(root, "旧名", "新名")
+    assert list_groups(root) == ["新名"]
+    # 数据随目录迁移
+    moved = UserStore(root, "新名").load_profile()
+    assert moved.accounts[0].handle == "demo"
+    assert UserStore(root, "新名").load_submissions("codeforces", "demo")[1] == 0
+    assert not UserStore(root, "旧名").load_profile().accounts
+
+
+def test_rename_group_conflict_and_missing(tmp_path):
+    root = tmp_path / "user"
+    create_group(root, "A")
+    create_group(root, "B")
+    with pytest.raises(ConflictError):
+        rename_group(root, "A", "B")
+    with pytest.raises(NotFoundError):
+        rename_group(root, "不存在", "C")
+
+
+def test_delete_group_removes_tree(tmp_path):
+    root = tmp_path / "user"
+    create_group(root, "A")
+    create_group(root, "B")
+    delete_group(root, "A")
+    assert list_groups(root) == ["B"]
+    with pytest.raises(NotFoundError):
+        delete_group(root, "A")
+
+
+def test_chinese_group_name_allowed(tmp_path):
+    """中文组名正常放行，路径安全。"""
+    root = tmp_path / "user"
+    name = create_group(root, "算法训练·秋")
+    assert name == "算法训练·秋"
+    assert (root / name).is_dir()

@@ -1,15 +1,18 @@
-"""data/user/<userid>/ 读写层：原子写、锁、JSONL 去重合并。
+"""data/user/<userid>/ 读写层：原子写、锁、JSONL 去重合并、用户组目录管理。
 
 设计原则（对齐 conventions.md 与 printbook store）：
 - 写操作一律临时文件 + os.replace 原子替换；
 - 同资源并发写用 RLock 串行化；
 - 账号名经 common.validation.validate_name 校验，杜绝路径穿越；
 - JSONL 读入合并去重后整体原子替换（见 activity.md §3.3）；
-- 单行损坏只跳过不阻断（"诊断不阻断"哲学）。
+- 单行损坏只跳过不阻断（"诊断不阻断"哲学）；
+- 用户组 = data/user/<user_id>/ 目录（目录名即组名，中文放行），
+  创建/重命名同步目录名，删除为物理删除（前端明确提示不可找回）。
 """
 
 import json
 import os
+import shutil
 import tempfile
 import threading
 from pathlib import Path
@@ -17,10 +20,14 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from common.validation import validate_name
+from core.exceptions import ConflictError, NotFoundError
 from modules.activity.models import DEFAULT_USER_ID, Account, Profile, Submission
 
 PROFILE_FILE = "profile.json"
 SUBMISSIONS_DIR = Path("activity") / "submissions"
+
+# 格式样例目录（入 git 的 example 样例，不作为用户组参与管理）
+EXAMPLE_GROUP = "example"
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -36,8 +43,64 @@ def _atomic_write(path: Path, text: str) -> None:
         raise
 
 
+# ===== 用户组目录管理（root 层） =====
+
+
+def list_groups(root: Path) -> list[str]:
+    """data/user/ 下全部用户组目录名（升序；跳过隐藏目录与 example 样例）。"""
+    if not root.is_dir():
+        return []
+    return sorted(
+        (
+            p.name
+            for p in root.iterdir()
+            if p.is_dir()
+            and not p.name.startswith(".")
+            and p.name != EXAMPLE_GROUP
+        ),
+        key=str.lower,
+    )
+
+
+def create_group(root: Path, name: str) -> str:
+    """新建用户组目录 + 初始档案（信息卡 ID 初始为目录名），返回规范化组名。"""
+    name = validate_name(name, "用户组")
+    group_dir = root / name
+    if group_dir.exists():
+        raise ConflictError(f"用户组已存在: {name}")
+    root.mkdir(parents=True, exist_ok=True)
+    group_dir.mkdir()
+    UserStore(root, name).save_profile(Profile(id=name))
+    return name
+
+
+def rename_group(root: Path, name: str, new_name: str) -> str:
+    """用户组目录改名（数据随目录迁移，归属不变），返回新组名。"""
+    name = validate_name(name, "用户组")
+    new_name = validate_name(new_name, "用户组")
+    src = root / name
+    if not src.is_dir():
+        raise NotFoundError(f"用户组不存在: {name}")
+    if new_name == name:
+        return name
+    dst = root / new_name
+    if dst.exists():
+        raise ConflictError(f"用户组已存在: {new_name}")
+    os.rename(src, dst)
+    return new_name
+
+
+def delete_group(root: Path, name: str) -> None:
+    """物理删除用户组目录（含账号绑定、训练数据与信息卡，不可找回）。"""
+    name = validate_name(name, "用户组")
+    group_dir = root / name
+    if not group_dir.is_dir():
+        raise NotFoundError(f"用户组不存在: {name}")
+    shutil.rmtree(group_dir)
+
+
 class UserStore:
-    """单用户组数据目录读写。第一期固定 DEFAULT_USER_ID。"""
+    """单用户组数据目录读写。"""
 
     def __init__(self, root: Path, user_id: str = DEFAULT_USER_ID) -> None:
         self._dir = root / user_id

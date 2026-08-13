@@ -40,9 +40,15 @@ class Account(BaseModel):
 
 
 class Profile(BaseModel):
-    """用户组档案 + 账号绑定（profile.json）。"""
+    """用户组档案（profile.json）：信息卡 ID/签名/头像 + 账号绑定。
 
-    id: str
+    信息栏 ID（id 字段）与用户组名称（目录名）分离：新建组时初始化为
+    目录名，之后独立编辑，重命名组不改变信息卡 ID。
+    """
+
+    id: str = ""  # 信息栏显示 ID（独立于目录名）
+    signature: str = ""
+    avatar: str | None = None
     accounts: list[Account] = Field(default_factory=list)
 
 

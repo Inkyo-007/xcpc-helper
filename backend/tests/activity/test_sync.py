@@ -65,8 +65,12 @@ def item(sid: str, ts: int) -> PlatformSubmission:
 
 
 def make_engine(tmp_path, adapter: FakeAdapter) -> tuple[SyncEngine, UserStore]:
-    store = UserStore(tmp_path / "user", "default")
-    return SyncEngine(store, {"codeforces": adapter}), store
+    root = tmp_path / "user"
+    store = UserStore(root, "default")
+    return SyncEngine(root, {"codeforces": adapter}), store
+
+
+USER = "default"
 
 
 async def test_first_sync_advances_cursor(tmp_path):
@@ -74,7 +78,7 @@ async def test_first_sync_advances_cursor(tmp_path):
     engine, store = make_engine(tmp_path, adapter)
     store.save_account(Account(platform="codeforces", handle="demo"))
 
-    status = await engine.sync_account("codeforces", "demo")
+    status = await engine.sync_account(USER, "codeforces", "demo")
 
     assert adapter.calls == [None]  # 首次全量
     assert status.state is SyncState.IDLE
@@ -91,7 +95,7 @@ async def test_incremental_sync_uses_cursor(tmp_path):
         Account(platform="codeforces", handle="demo", last_synced_at=2000)
     )
 
-    status = await engine.sync_account("codeforces", "demo")
+    status = await engine.sync_account(USER, "codeforces", "demo")
 
     assert adapter.calls == [2000]  # 增量带游标
     assert status.state is SyncState.IDLE
@@ -105,11 +109,11 @@ async def test_no_new_submissions_keeps_cursor(tmp_path):
         Account(platform="codeforces", handle="demo", last_synced_at=2000)
     )
 
-    await engine.sync_account("codeforces", "demo")
+    await engine.sync_account(USER, "codeforces", "demo")
 
     assert adapter.calls == [2000]
     assert store.load_profile().accounts[0].last_synced_at == 2000  # 游标不变
-    assert engine.status_of("codeforces", "demo").state is SyncState.IDLE
+    assert engine.status_of(USER, "codeforces", "demo").state is SyncState.IDLE
 
 
 async def test_failure_degrades_to_diagnostic(tmp_path):
@@ -119,7 +123,7 @@ async def test_failure_degrades_to_diagnostic(tmp_path):
     store.save_account(Account(platform="codeforces", handle="demo"))
 
     # 失败不抛出，只降级为该账号诊断
-    status = await engine.sync_account("codeforces", "demo")
+    status = await engine.sync_account(USER, "codeforces", "demo")
 
     assert status.state is SyncState.ERROR
     assert "limit" in (status.error or "")
@@ -133,7 +137,7 @@ async def test_auth_expired_marked_with_error_code(tmp_path):
     engine, store = make_engine(tmp_path, adapter)
     store.save_account(Account(platform="codeforces", handle="demo"))
 
-    status = await engine.sync_account("codeforces", "demo")
+    status = await engine.sync_account(USER, "codeforces", "demo")
 
     assert status.state is SyncState.ERROR
     assert status.error_code == "auth_expired"
@@ -145,7 +149,7 @@ async def test_unbound_account_raises_not_found(tmp_path):
     engine, _store = make_engine(tmp_path, adapter)
 
     with pytest.raises(NotFoundError):
-        await engine.sync_account("codeforces", "ghost")
+        await engine.sync_account(USER, "codeforces", "ghost")
 
 
 async def test_unsupported_platform_raises(tmp_path):
@@ -153,16 +157,50 @@ async def test_unsupported_platform_raises(tmp_path):
     engine, _store = make_engine(tmp_path, adapter)
 
     with pytest.raises(NotFoundError):
-        await engine.sync_account("luogu", "demo")
+        await engine.sync_account(USER, "luogu", "demo")
 
 
 async def test_drop_status_clears_runtime(tmp_path):
     adapter = FakeAdapter(pages=[[item("1", 1000)]])
     engine, store = make_engine(tmp_path, adapter)
     store.save_account(Account(platform="codeforces", handle="demo"))
-    await engine.sync_account("codeforces", "demo")
+    await engine.sync_account(USER, "codeforces", "demo")
 
-    engine.drop_status("codeforces", "demo")
-    st = engine.status_of("codeforces", "demo")
+    engine.drop_status(USER, "codeforces", "demo")
+    st = engine.status_of(USER, "codeforces", "demo")
+    assert st.state is SyncState.IDLE
+    assert st.last_synced_at is None
+
+
+async def test_status_isolated_per_user_group(tmp_path):
+    """同步状态按用户组隔离：组 A 同步不影响组 B 的状态查询。"""
+    adapter = FakeAdapter(pages=[[item("1", 1000)]])
+    root = tmp_path / "user"
+    UserStore(root, "groupA").save_account(
+        Account(platform="codeforces", handle="demo")
+    )
+    engine = SyncEngine(root, {"codeforces": adapter})
+
+    await engine.sync_account("groupA", "codeforces", "demo")
+
+    assert engine.status_of("groupA", "codeforces", "demo").state is SyncState.IDLE
+    # 组 B 无任何同步记录（默认 idle、无同步时间）
+    st_b = engine.status_of("groupB", "codeforces", "demo")
+    assert st_b.state is SyncState.IDLE
+    assert st_b.last_synced_at is None
+
+
+async def test_drop_user_clears_runtime(tmp_path):
+    """删除用户组时清理其全部运行时状态。"""
+    adapter = FakeAdapter(pages=[[item("1", 1000)]])
+    root = tmp_path / "user"
+    UserStore(root, "groupA").save_account(
+        Account(platform="codeforces", handle="demo")
+    )
+    engine = SyncEngine(root, {"codeforces": adapter})
+    await engine.sync_account("groupA", "codeforces", "demo")
+
+    engine.drop_user("groupA")
+    st = engine.status_of("groupA", "codeforces", "demo")
     assert st.state is SyncState.IDLE
     assert st.last_synced_at is None
