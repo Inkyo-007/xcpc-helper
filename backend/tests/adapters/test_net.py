@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from adapters.base import PlatformError
+from adapters.base import Credentials, PlatformError
 from adapters.net import HttpFetcher
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -188,6 +188,102 @@ async def test_backoff_respects_min_interval():
         assert data == {"ok": True}
         elapsed = timestamps[1] - timestamps[0]
         assert elapsed >= min_interval - 0.005
+    finally:
+        await fetcher.aclose()
+
+
+async def test_credentials_cookies_applied():
+    """凭据 cookies 统一应用到请求（adapter 不自行拼 Cookie 头）。"""
+    seen: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["cookie"] = request.headers.get("cookie", "")
+        return ok_json({"ok": True})
+
+    fetcher = make_fetcher(handler)
+    try:
+        creds = Credentials(cookies={"_uid": "123", "__client_id": "abc"})
+        await fetcher.get_json(
+            "https://example.com/api",
+            platform="p",
+            min_interval=0,
+            credentials=creds,
+        )
+        assert "_uid=123" in seen["cookie"]
+        assert "__client_id=abc" in seen["cookie"]
+    finally:
+        await fetcher.aclose()
+
+
+async def test_credentials_headers_merged_caller_wins():
+    """凭据 headers 与调用方显式 headers 合并，调用方优先。"""
+    seen: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["ua"] = request.headers.get("user-agent", "")
+        seen["x"] = request.headers.get("x-token", "")
+        return ok_json({"ok": True})
+
+    fetcher = make_fetcher(handler)
+    try:
+        creds = Credentials(headers={"User-Agent": "cred-ua", "X-Token": "from-cred"})
+        await fetcher.get_json(
+            "https://example.com/api",
+            platform="p",
+            min_interval=0,
+            credentials=creds,
+            headers={"X-Token": "from-caller"},
+        )
+        assert seen["ua"] == "cred-ua"  # 仅凭据提供
+        assert seen["x"] == "from-caller"  # 调用方覆盖
+    finally:
+        await fetcher.aclose()
+
+
+async def test_post_json_sends_body():
+    """post_json 语法糖：POST + JSON body（GraphQL 平台用）。"""
+    seen: dict = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["method"] = request.method
+        seen["body"] = request.content.decode()
+        return ok_json({"data": {"ok": True}})
+
+    fetcher = make_fetcher(handler)
+    try:
+        data = await fetcher.post_json(
+            "https://example.com/graphql",
+            json={"query": "{ me { id } }"},
+            platform="p",
+            min_interval=0,
+        )
+        assert data == {"data": {"ok": True}}
+        assert seen["method"] == "POST"
+        assert "query" in seen["body"]
+    finally:
+        await fetcher.aclose()
+
+
+async def test_per_call_max_retries_override():
+    """单次调用可覆盖全局重试次数（平台专项策略）。"""
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(429)
+
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(handler),
+        max_retries=3,
+        base_backoff=0.01,
+    )
+    try:
+        with pytest.raises(PlatformError):
+            await fetcher.get_json(
+                "https://example.com/api", platform="p", min_interval=0, max_retries=1
+            )
+        assert calls == 2  # 1 次初试 + 1 次重试（覆盖全局 3 次）
     finally:
         await fetcher.aclose()
 
