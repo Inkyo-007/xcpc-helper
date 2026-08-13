@@ -76,7 +76,7 @@ Submission {
   problem_name
   problem_url
   difficulty      # 原始难度值，不做跨平台归一
-  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE
+  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中，CF 的 SUBMITTED / TESTING）
   submitted_at    # UTC 秒级时间戳
   language
 }
@@ -107,7 +107,7 @@ Submission {
 5. **右栏 · activity 热力图**：GitHub 式一年图（53 周 × 7 天，周日起始）。hover 时格子上浮（放大 + 投影 + 置顶，不被相邻格遮挡）并出 tooltip（日期 + 提交/通过数）；**点击选中某天**：选中格维持上浮态并加 accent 描边，其余格子淡化且不再响应悬停动效，联动左栏提交列表；再次点击该格取消选中。
 6. **右栏 · 柱状图行**（洛谷主页风格，两张并排，窄屏堆叠）：左「近 7 天通过」日粒度、右「近 12 个月通过」月粒度，均为 AC 数；accent 色圆角柱，hover tooltip。
 
-verdict 徽章配色固定、不随主题色相变化：AC 绿、WA 红、CE 黄、RE 紫，TLE / MLE / OLE / UKE 深蓝。
+verdict 徽章配色固定、不随主题色相变化：AC 绿、WA 红、CE 黄、RE 紫、JG 浅蓝，TLE / MLE / OLE / UKE 深蓝。
 
 ### 4.3 热力图着色规则
 
