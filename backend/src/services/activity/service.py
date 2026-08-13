@@ -52,8 +52,8 @@ logger = logging.getLogger("xcpc.service.activity")
 # 近期提交条数上限：全部历史按时间倒序取最后 N 条，
 # 不按时间窗口过滤（保证"近期没做题"的账号也能看到最近记录）
 RECENT_LIMIT = 200
-# 信息卡头像 data URL 长度上限（128px JPEG 约 10KB，预留余量）
-AVATAR_MAX_CHARS = 300_000
+# 信息卡头像 data URL 长度上限（512px JPEG 约 40-80KB，base64 后留足余量）
+AVATAR_MAX_CHARS = 500_000
 
 
 class ActivityService:

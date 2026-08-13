@@ -153,8 +153,9 @@ export function useUserGroups() {
   }
 }
 
-/** 读取图片文件，居中裁剪并缩放为方形头像 data URL（控制传输体积） */
-export async function fileToAvatar(file: File, size = 128): Promise<string> {
+/** 读取图片文件，居中裁剪并缩放为方形头像 data URL。
+ * 512px 保证信息卡显示（约 268px 容器）有 2 倍超采样，避免模糊。 */
+export async function fileToAvatar(file: File, size = 512): Promise<string> {
   const bitmap = await createImageBitmap(file)
   try {
     const side = Math.min(bitmap.width, bitmap.height)
@@ -163,6 +164,7 @@ export async function fileToAvatar(file: File, size = 128): Promise<string> {
     canvas.height = size
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('canvas 2d 上下文不可用')
+    ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(
       bitmap,
       (bitmap.width - side) / 2,
@@ -174,7 +176,7 @@ export async function fileToAvatar(file: File, size = 128): Promise<string> {
       size,
       size,
     )
-    return canvas.toDataURL('image/jpeg', 0.85)
+    return canvas.toDataURL('image/jpeg', 0.9)
   } finally {
     bitmap.close()
   }
