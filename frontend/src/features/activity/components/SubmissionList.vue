@@ -50,7 +50,6 @@ interface Row {
   problemName: string
   problemUrl: string
   verdict: Verdict
-  language: string
   timeLabel: string
 }
 
@@ -105,13 +104,12 @@ function openProblem(row: Row): void {
         <span class="row-top">
           <span class="verdict mono" :class="VERDICT_CLASS[row.verdict]">{{ row.verdict }}</span>
           <span class="sub-problem">
-            <span class="sub-platform">{{ platformName(row.platform) }}</span>
             <span class="sub-name">{{ row.problemKey }}. {{ row.problemName }}</span>
             <ExternalLink class="sub-link" :size="11" />
           </span>
         </span>
         <span class="row-bottom">
-          <span class="sub-lang mono">{{ row.language }}</span>
+          <span class="sub-plat">{{ platformName(row.platform) }}</span>
           <span class="sub-time mono">{{ row.timeLabel }}</span>
         </span>
       </button>
@@ -272,8 +270,7 @@ function openProblem(row: Row): void {
   font-size: 12.5px;
 }
 
-.sub-platform {
-  flex: none;
+.sub-plat {
   font-size: 11px;
   color: var(--faint);
 }
@@ -296,11 +293,6 @@ function openProblem(row: Row): void {
 
 .sub-row:hover .sub-link {
   opacity: 1;
-}
-
-.sub-lang {
-  font-size: 11px;
-  color: var(--faint);
 }
 
 .sub-time {
