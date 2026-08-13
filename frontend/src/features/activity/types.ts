@@ -41,7 +41,8 @@ export interface OverviewData {
   daily: DayActivity[]
 }
 
-export type Verdict = 'AC' | 'WA' | 'CE' | 'RE' | 'TLE' | 'MLE' | 'OLE' | 'UKE'
+/** 评测结果；JG = 评测中（如 Codeforces 的 SUBMITTED / TESTING） */
+export type Verdict = 'AC' | 'WA' | 'CE' | 'RE' | 'TLE' | 'MLE' | 'OLE' | 'UKE' | 'JG'
 
 export interface SubmissionEntry {
   id: string

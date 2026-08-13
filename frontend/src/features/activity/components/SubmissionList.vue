@@ -64,12 +64,13 @@ const rows = computed<Row[]>(() => {
   }))
 })
 
-/** verdict 徽章固定配色：AC 绿 / WA 红 / CE 黄 / RE 紫 / 资源超限与未知深蓝 */
+/** verdict 徽章固定配色：AC 绿 / WA 红 / CE 黄 / RE 紫 / JG 浅蓝 / 资源超限与未知深蓝 */
 const VERDICT_CLASS: Record<Verdict, string> = {
   AC: 'v-ac',
   WA: 'v-wa',
   CE: 'v-ce',
   RE: 'v-re',
+  JG: 'v-jg',
   TLE: 'v-limit',
   MLE: 'v-limit',
   OLE: 'v-limit',
@@ -246,6 +247,12 @@ function openProblem(row: Row): void {
 .v-re {
   color: #8a5cf0;
   background: hsl(262 70% 60% / 0.14);
+}
+
+/* 评测中（CF 的 SUBMITTED / TESTING）：浅蓝 */
+.v-jg {
+  color: #2b8fc8;
+  background: hsl(199 68% 55% / 0.15);
 }
 
 .v-limit {

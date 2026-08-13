@@ -126,7 +126,7 @@ function problemUrl(platform: PlatformId, key: string): string {
 }
 
 const LANGUAGES = ['C++17', 'C++20', 'C++20', 'Python3', 'C++17', 'Java21']
-const FAIL_VERDICTS: Verdict[] = ['WA', 'WA', 'WA', 'CE', 'RE', 'TLE', 'MLE', 'OLE', 'UKE']
+const FAIL_VERDICTS: Verdict[] = ['WA', 'WA', 'WA', 'CE', 'RE', 'TLE', 'MLE', 'OLE', 'UKE', 'JG']
 
 /** 生成某 (账号, 日期) 的提交明细，数量与当日聚合一致 */
 export function generateEntries(
