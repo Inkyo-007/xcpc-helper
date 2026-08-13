@@ -10,9 +10,9 @@ import logging
 from datetime import datetime, timedelta, tzinfo
 
 from adapters import REGISTRY, HttpFetcher
-from adapters.base import PlatformAdapter, UserNotFoundError
+from adapters.base import PlatformAdapter, PlatformError, UserNotFoundError
 from core.config import Settings, get_settings
-from core.exceptions import BadRequestError, NotFoundError
+from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
 from modules.activity import aggregate
 from modules.activity import store as activity_store
 from modules.activity.models import DEFAULT_USER_ID, Account, Submission
@@ -106,6 +106,8 @@ class ActivityService:
             info = await adapter.verify(handle)
         except UserNotFoundError as exc:
             raise BadRequestError(str(exc)) from exc
+        except PlatformError as exc:
+            raise BadGatewayError(f"平台暂时不可用：{exc}") from exc
         return VerifyOut(platform=payload.platform, handle=info.handle, avatar=info.avatar)
 
     # ===== 绑定 / 解绑 =====

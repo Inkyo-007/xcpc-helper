@@ -11,7 +11,7 @@ import pytest
 
 from adapters.net import HttpFetcher
 from core.config import Settings
-from core.exceptions import BadRequestError, NotFoundError
+from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
 from modules.activity.schemas import BindIn, VerifyIn
 from services.activity.service import ActivityService
 
@@ -106,6 +106,23 @@ async def test_verify_user_not_found(tmp_path):
 async def test_verify_unsupported_platform(service: ActivityService):
     with pytest.raises(BadRequestError):
         await service.verify(VerifyIn(platform="luogu", handle="demo"))
+
+
+async def test_verify_platform_failure_is_bad_gateway(tmp_path):
+    """平台网络故障（重试耗尽）转 502，前端可读。"""
+
+    async def failing_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429)
+
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(failing_handler), base_backoff=0.01
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        with pytest.raises(BadGatewayError):
+            await svc.verify(VerifyIn(platform="codeforces", handle="tourist"))
+    finally:
+        await svc.aclose()
 
 
 async def test_bind_triggers_first_sync(service: ActivityService):
