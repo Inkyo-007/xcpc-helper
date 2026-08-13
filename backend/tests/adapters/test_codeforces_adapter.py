@@ -376,3 +376,36 @@ async def test_fetch_malformed_row_raises_platform_error():
             )
     finally:
         await fetcher.aclose()
+
+
+async def test_fetch_row_missing_timestamp_raises_platform_error():
+    """提交行缺 creationTimeSeconds：必填校验失败抛 PlatformError。
+
+    时间戳若默认 0，增量拉取会把它当作"旧于游标"提前终止，
+    静默丢弃同页后续新提交；必须暴露为平台格式异常。
+    """
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return ok_json({"status": "OK", "result": [{"id": 1}]})
+
+    adapter, fetcher = make_adapter(handler)
+    try:
+        with pytest.raises(PlatformError):
+            await adapter.fetch_submissions(
+                "example",
+                since=None,
+                full_window_days=FULL_WINDOW_DAYS,
+                full_min_rows=FULL_MIN_ROWS,
+            )
+    finally:
+        await fetcher.aclose()
+
+
+def test_to_submission_null_problem_name():
+    """problem.name 为 null 时收敛为空串，不向 str 字段传 None。"""
+    r = row(1, 1755100000)
+    r["problem"]["name"] = None
+    s = CodeforcesAdapter._to_submission(CfSubmissionRow.model_validate(r), 1755100000)
+    assert s.problem_name == ""
+    # problem_key 走 contestId + index，不受题名缺失影响
+    assert s.problem_key == "2245F"

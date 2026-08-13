@@ -163,7 +163,9 @@ class CodeforcesAdapter(PlatformAdapter):
         problem = row.problem
         contest_id = problem.contestId if problem else None
         index = problem.index if problem else None
-        name = problem.name if problem else ""
+        # problem.name 可能为 null：收敛为空串，避免 None 传入 PlatformSubmission
+        # 的 str 字段抛 ValidationError 逃逸 AdapterError 契约
+        name = (problem.name or "") if problem else ""
         return PlatformSubmission(
             submission_id=str(row.id),
             problem_key=problem_key(contest_id, index, name),

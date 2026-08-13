@@ -8,6 +8,10 @@ CfSubmissionRow）。
 容错语义：可选字段用 Field 默认值 / None 承载（对应旧 dict.get 兜底，
 字段缺失不炸批）；类型不匹配则校验失败，由 adapter 统一转为
 PlatformError（平台格式异常，不阻断其他账号）。
+
+必填字段：id（去重依据）与 creationTimeSeconds（增量游标语义）——
+缺失即校验失败暴露平台格式变化；creationTimeSeconds 若给默认值 0，
+增量拉取会把它当作"旧于游标"提前终止，静默丢弃后续新提交。
 """
 
 from pydantic import BaseModel, Field
@@ -41,7 +45,7 @@ class CfSubmissionRow(BaseModel):
     """user.status 单条提交（仅解析第一期需要的字段，多余字段忽略）。"""
 
     id: int
-    creationTimeSeconds: int = 0
+    creationTimeSeconds: int
     problem: CfProblem | None = None
     programmingLanguage: str = ""
     verdict: str = ""
