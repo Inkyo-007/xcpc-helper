@@ -150,7 +150,7 @@ async def test_fetch_full_pages_until_empty(monkeypatch):
         assert [s.submission_id for s in items] == ["3", "2", "1"]
         assert items[0].verdict == Verdict.AC
         assert items[0].problem_key == "2245F"
-        assert items[0].problem_url == "https://codeforces.com/problemset/problem/2245/F"
+        assert items[0].problem_url == "https://codeforces.com/contest/2245/problem/F"
     finally:
         await fetcher.aclose()
 
@@ -256,8 +256,13 @@ def test_verdict_mapping():
     assert map_verdict("SOME_FUTURE_VERDICT") is Verdict.UKE
 
 
-def test_problem_url_fallback():
-    assert problem_url(2245, "F") == "https://codeforces.com/problemset/problem/2245/F"
+def test_problem_url_contest_vs_gym():
+    # 主题库：四位数 contestId → /contest/ 页
+    assert problem_url(2245, "F") == "https://codeforces.com/contest/2245/problem/F"
+    # gym 题库：六位数 contestId → /gym/ 页
+    assert problem_url(103091, "A") == "https://codeforces.com/gym/103091/problem/A"
+    assert problem_url(100495, "B") == "https://codeforces.com/gym/100495/problem/B"
+    # 缺失信息兜底平台主页
     assert problem_url(None, None) == "https://codeforces.com"
     assert problem_url(2245, None) == "https://codeforces.com"
 

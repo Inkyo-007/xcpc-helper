@@ -23,9 +23,15 @@ def map_verdict(raw: str) -> Verdict:
 
 
 def problem_url(contest_id: int | None, index: str | None) -> str:
-    """题目外链；缺 contestId / index 时兜底平台主页。"""
+    """题目外链；缺 contestId / index 时兜底平台主页。
+
+    CF 主题库与 gym 题库的 URL 形式不同，按 contest_id 位数区分：
+    主题库一般为四位数（/contest/ 页），gym 一般为六位数（/gym/ 页）。
+    """
     if contest_id is not None and index:
-        return f"https://codeforces.com/problemset/problem/{contest_id}/{index}"
+        if contest_id >= 100000:
+            return f"https://codeforces.com/gym/{contest_id}/problem/{index}"
+        return f"https://codeforces.com/contest/{contest_id}/problem/{index}"
     return "https://codeforces.com"
 
 
