@@ -76,7 +76,7 @@ Submission {
   submission_id   # 平台内唯一提交 id（去重依据）
   problem_key     # 平台内题目标识（CF "2245F" / AT "abc001_a" / LG "P1001"）
   problem_name
-  problem_url
+  problem_url     # 平台内题目外链（CF 按 contestId 位数区分：四位数主题库 /contest/，六位数 gym /gym/）
   difficulty      # 原始难度值，不做跨平台归一
   verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中，CF 的 SUBMITTED / TESTING）
   submitted_at    # UTC 秒级时间戳
@@ -188,7 +188,7 @@ backend/src/
 | POST | `/api/activity/accounts` | 绑定账号 `{platform, handle, credentials?}`，成功后自动触发首次同步（201） |
 | DELETE | `/api/activity/accounts/{platform}/{handle}` | 解绑并删除该账号本地数据（204） |
 | GET | `/api/activity/overview?platform=` | 概览：all-time 总量 + streak + 近 370 天日序列 `[{date, submissions, solved}]`；缺省为汇总 |
-| GET | `/api/activity/submissions?date=&platform=` | 提交列表：带 `date` 为当日明细；不带 `date` 为近 21 天近期提交（跨账号合并、时间倒序）；平台过滤可选 |
+| GET | `/api/activity/submissions?date=&platform=` | 提交列表：带 `date` 为当日明细；不带 `date` 为最后 200 条近期提交（跨账号合并、时间倒序，不按时间窗口过滤）；平台过滤可选 |
 | POST | `/api/activity/sync` | 触发同步 `{platform?}`，空为全部账号；立即返回（202），后台执行 |
 | GET | `/api/activity/sync/status` | 各账号同步状态（idle/running/上次结果/错误诊断），前端轮询 |
 

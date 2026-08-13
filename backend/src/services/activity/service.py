@@ -7,7 +7,7 @@ adapter 只允许被本服务与 modules/activity/sync.py 触碰。
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, tzinfo
+from datetime import datetime, tzinfo
 
 from adapters import REGISTRY, HttpFetcher
 from adapters.base import PlatformAdapter, PlatformError, UserNotFoundError
@@ -33,8 +33,9 @@ from modules.activity.sync import SyncEngine
 
 logger = logging.getLogger("xcpc.service.activity")
 
-# 近期提交窗口（天），对齐前端 mock 的 RECENT_DAYS
-RECENT_DAYS = 21
+# 近期提交条数上限：全部历史按时间倒序取最后 N 条，
+# 不按时间窗口过滤（保证"近期没做题"的账号也能看到最近记录）
+RECENT_LIMIT = 200
 
 
 class ActivityService:
@@ -190,15 +191,10 @@ class ActivityService:
                 == date
             ]
         else:
-            # 近期提交：近 RECENT_DAYS 天，跨账号合并，时间倒序（新在上）
-            today = datetime.now(tz=tz).date()
-            start = today - timedelta(days=RECENT_DAYS - 1)
-            items = [
-                s
-                for s in submissions
-                if datetime.fromtimestamp(s.submitted_at, tz=tz).date() >= start
-            ]
-            items.sort(key=lambda s: s.submitted_at, reverse=True)
+            # 近期提交：全部历史按时间倒序，取最后 RECENT_LIMIT 条
+            items = sorted(
+                submissions, key=lambda s: s.submitted_at, reverse=True
+            )[:RECENT_LIMIT]
         return SubmissionsOut(items=[self._submission_out(s, tz) for s in items])
 
     @staticmethod

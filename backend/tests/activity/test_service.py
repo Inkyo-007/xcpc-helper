@@ -196,6 +196,44 @@ async def test_submissions_recent_and_by_date(service: ActivityService):
     assert bad.items == []
 
 
+async def test_recent_limits_to_200(tmp_path):
+    """近期提交最多返回最后 200 条（超过时按时间倒序截断）。"""
+    rows = [cf_row(i, sys_today_ts(0, 10) - i * 60, "OK", "A") for i in range(205)]
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler(status_rows=rows)),
+        base_backoff=0.01,
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        await svc.bind(BindIn(platform="codeforces", handle="demo"))
+        await wait_sync_done(svc)
+        recent = svc.submissions(date=None, platform=None)
+        assert len(recent.items) == 200
+        # 最新 200 条（sid 0 最新，最旧的 sid 200–204 被截断）
+        assert recent.items[0].id == "0"
+        assert recent.items[-1].id == "199"
+    finally:
+        await svc.aclose()
+
+
+async def test_recent_includes_old_submissions(tmp_path):
+    """很久以前的提交也出现在近期提交（不按时间窗口过滤）。"""
+    rows = [cf_row(1, sys_today_ts(300, 10), "OK", "A")]
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler(status_rows=rows)),
+        base_backoff=0.01,
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        await svc.bind(BindIn(platform="codeforces", handle="demo"))
+        await wait_sync_done(svc)
+        recent = svc.submissions(date=None, platform=None)
+        assert len(recent.items) == 1
+        assert recent.items[0].id == "1"
+    finally:
+        await svc.aclose()
+
+
 async def test_sync_and_status(service: ActivityService):
     await service.bind(BindIn(platform="codeforces", handle="demo"))
     await wait_sync_done(service)
