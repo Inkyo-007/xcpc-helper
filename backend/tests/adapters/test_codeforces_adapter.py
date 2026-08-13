@@ -10,6 +10,7 @@ import pytest
 
 from adapters.base import PlatformError, PlatformSubmission, UserNotFoundError, Verdict
 from adapters.codeforces import CodeforcesAdapter
+from adapters.codeforces.api_models import CfSubmissionRow
 from adapters.codeforces.normalize import map_verdict, problem_key, problem_url
 from adapters.net import HttpFetcher
 
@@ -312,7 +313,8 @@ def test_difficulty_accepts_str():
 
 
 def test_to_submission_row_mapping():
-    s = CodeforcesAdapter._to_submission(SAMPLE["result"][0], 1755100000)
+    row = CfSubmissionRow.model_validate(SAMPLE["result"][0])
+    s = CodeforcesAdapter._to_submission(row, 1755100000)
     assert isinstance(s, PlatformSubmission)
     assert s.submission_id == "102938475"
     assert s.problem_key == "2245F"
@@ -321,3 +323,19 @@ def test_to_submission_row_mapping():
     assert s.verdict is Verdict.AC
     assert s.language == "GNU C++17"
     assert s.submitted_at == 1755100000
+
+
+async def test_fetch_malformed_row_raises_platform_error():
+    """平台响应畸形（result 行类型不符）时抛 PlatformError，不静默吞错。"""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return ok_json(
+            {"status": "OK", "result": [{"id": "not_an_int", "creationTimeSeconds": 1}]}
+        )
+
+    adapter, fetcher = make_adapter(handler)
+    try:
+        with pytest.raises(PlatformError):
+            await adapter.fetch_submissions("example", since=None)
+    finally:
+        await fetcher.aclose()

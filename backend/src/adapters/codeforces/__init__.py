@@ -6,7 +6,9 @@ rating / 比赛记录属后续增量（Capability.RATING 已预留，本期不�
 
 import logging
 import time
-from typing import Any
+from typing import Any, TypeVar
+
+from pydantic import ValidationError
 
 from adapters.base import (
     AuthMode,
@@ -18,10 +20,17 @@ from adapters.base import (
     UserInfo,
     UserNotFoundError,
 )
+from adapters.codeforces.api_models import (
+    CfEnvelope,
+    CfSubmissionRow,
+    CfUserInfo,
+)
 from adapters.codeforces.normalize import map_verdict, problem_key, problem_url
 from adapters.net import HttpFetcher
 
 logger = logging.getLogger("xcpc.adapters.codeforces")
+
+T = TypeVar("T")
 
 API_BASE = "https://codeforces.com/api"
 STATUS_URL = f"{API_BASE}/user.status"
@@ -53,16 +62,15 @@ class CodeforcesAdapter(PlatformAdapter):
             min_interval=self.min_interval,
             should_retry=self._should_retry_envelope,
         )
-        if not isinstance(data, dict) or data.get("status") != "OK":
-            comment = str(data.get("comment") or "") if isinstance(data, dict) else ""
-            if "not found" in comment.lower():
+        envelope = self._parse_envelope(data, CfUserInfo)
+        if envelope.status != "OK":
+            if "not found" in envelope.comment.lower():
                 raise UserNotFoundError(f"Codeforces 用户不存在: {handle}")
-            raise PlatformError(f"Codeforces API 返回失败: {comment}")
-        results = data.get("result") or []
-        if not results:
+            raise PlatformError(f"Codeforces API 返回失败: {envelope.comment}")
+        if not envelope.result:
             raise UserNotFoundError(f"Codeforces 用户不存在: {handle}")
-        user = results[0]
-        return UserInfo(handle=str(user.get("handle") or handle), avatar=user.get("avatar"))
+        user = envelope.result[0]
+        return UserInfo(handle=user.handle or handle, avatar=user.avatar)
 
     # ===== 提交拉取 =====
 
@@ -96,16 +104,17 @@ class CodeforcesAdapter(PlatformAdapter):
                 min_interval=self.min_interval,
                 should_retry=self._should_retry_envelope,
             )
-            self._check_envelope(data)
-            rows = data.get("result") or []
+            envelope = self._parse_envelope(data, CfSubmissionRow)
+            self._check_envelope(envelope)
+            rows = envelope.result
             if not rows:
                 break
             for row in rows:
-                ts = int(row.get("creationTimeSeconds") or 0)
+                ts = row.creationTimeSeconds
                 if since is not None and ts < since:
                     return out
                 out.append(self._to_submission(row, ts))
-            last_ts = int(rows[-1].get("creationTimeSeconds") or 0)
+            last_ts = rows[-1].creationTimeSeconds
             # 全量停止条件：已越过窗口起点且累计条数达标；或页不满
             if since is None and last_ts < window_start and len(out) >= FULL_MIN_ROWS:
                 break
@@ -116,33 +125,49 @@ class CodeforcesAdapter(PlatformAdapter):
     # ===== 内部 =====
 
     @staticmethod
-    def _check_envelope(data: Any) -> None:
-        """CF API 信封校验：status != OK 抛 PlatformError（可重试的限流信封
+    def _parse_envelope(data: Any, item_type: type[T]) -> CfEnvelope[T]:
+        """外部 JSON 第一时间转信封模型；格式异常统一抛 PlatformError。"""
+        try:
+            return CfEnvelope[item_type].model_validate(data)
+        except ValidationError as exc:
+            raise PlatformError(f"Codeforces API 响应格式异常: {exc}") from exc
+
+    @staticmethod
+    def _check_envelope(envelope: CfEnvelope[Any]) -> None:
+        """信封校验：status != OK 抛 PlatformError（可重试的限流信封
         已在 net 层经 should_retry 消化，走到这里的是不可重试失败）。"""
-        if not isinstance(data, dict) or data.get("status") != "OK":
-            comment = str(data.get("comment") or "") if isinstance(data, dict) else ""
-            raise PlatformError(f"Codeforces API 返回失败: {comment}")
+        if envelope.status != "OK":
+            raise PlatformError(f"Codeforces API 返回失败: {envelope.comment}")
 
     @staticmethod
     def _should_retry_envelope(data: Any) -> bool:
-        """限流信封（以 200 返回的 FAILED + Call limit exceeded）应重试。"""
-        if not isinstance(data, dict) or data.get("status") == "OK":
+        """限流信封（以 200 返回的 FAILED + Call limit exceeded）应重试。
+
+        net 层回调传入原始 JSON；无法识别为信封时返回 False，
+        交由 _parse_envelope 的格式校验抛错。
+        """
+        try:
+            envelope = CfEnvelope[Any].model_validate(data)
+        except ValidationError:
             return False
-        comment = str(data.get("comment") or "")
-        return "call limit exceeded" in comment.lower()
+        return (
+            envelope.status != "OK"
+            and "call limit exceeded" in envelope.comment.lower()
+        )
 
     @staticmethod
-    def _to_submission(row: dict[str, Any], ts: int) -> PlatformSubmission:
-        problem = row.get("problem") or {}
-        contest_id = problem.get("contestId")
-        index = problem.get("index")
+    def _to_submission(row: CfSubmissionRow, ts: int) -> PlatformSubmission:
+        problem = row.problem
+        contest_id = problem.contestId if problem else None
+        index = problem.index if problem else None
+        name = problem.name if problem else ""
         return PlatformSubmission(
-            submission_id=str(row.get("id")),
-            problem_key=problem_key(contest_id, index, str(problem.get("name") or "")),
-            problem_name=str(problem.get("name") or ""),
+            submission_id=str(row.id),
+            problem_key=problem_key(contest_id, index, name),
+            problem_name=name,
             problem_url=problem_url(contest_id, index),
-            difficulty=problem.get("rating"),
-            verdict=map_verdict(str(row.get("verdict") or "")),
+            difficulty=problem.rating if problem else None,
+            verdict=map_verdict(row.verdict),
             submitted_at=ts,
-            language=str(row.get("programmingLanguage") or ""),
+            language=row.programmingLanguage,
         )
