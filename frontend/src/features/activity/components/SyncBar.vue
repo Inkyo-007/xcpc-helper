@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /** 同步区：新鲜度 + 立即同步 + 账号管理弹层（解绑）+ 右侧账号入口。
  * 汇总视图为用户组下拉菜单；平台视图为该平台绑定账号的 ID（未绑定则
- * 显示「未绑定账号」），点击进入绑定 / 换绑。 */
+ * 显示「未绑定账号」），点击进入绑定 / 换绑。
+ * 立即同步的范围随视图：汇总视图同步全部平台（点击先弹确认，说明
+ * 可能较慢），平台视图只同步该平台（直接触发）。 */
 
 import { computed, ref } from 'vue'
 import { Link2, Plus, RefreshCw, Unlink, Users } from 'lucide-vue-next'
-import { NButton, NPopover, NTooltip } from 'naive-ui'
+import { NButton, NModal, NPopover, NTooltip } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
 import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
 import { useActivity } from '@/features/activity/store'
@@ -46,6 +48,21 @@ function confirmUnbind(): void {
   emit('unbind', removing.value.platform, removing.value.handle)
   removing.value = null
 }
+
+/* ---------- 同步全部平台确认 ---------- */
+
+const showSyncAllConfirm = ref(false)
+
+function onSyncClick(): void {
+  // 平台视图只同步当前平台，直接触发；汇总视图先确认
+  if (props.activePlatform === 'all') showSyncAllConfirm.value = true
+  else emit('sync')
+}
+
+function confirmSyncAll(): void {
+  showSyncAllConfirm.value = false
+  emit('sync')
+}
 </script>
 
 <template>
@@ -59,7 +76,7 @@ function confirmUnbind(): void {
           :class="{ spinning: syncing }"
           :disabled="syncing || accounts.length === 0"
           aria-label="立即同步"
-          @click="emit('sync')"
+          @click="onSyncClick"
         >
           <RefreshCw :size="15" />
         </button>
@@ -122,6 +139,29 @@ function confirmUnbind(): void {
       @update:show="removing = null"
       @confirm="confirmUnbind"
     />
+    <NModal
+      :show="showSyncAllConfirm"
+      preset="card"
+      title="同步全部平台"
+      class="create-modal"
+      :style="{ width: 'min(420px, calc(100vw - 40px))' }"
+      @update:show="showSyncAllConfirm = $event"
+    >
+      <div class="sync-all-body">
+        <p class="sync-all-text">
+          将依次同步全部 {{ accounts.length }} 个已绑定平台的训练数据，
+          平台与数据量较多时可能需要等待一段时间，期间页面会显示加载遮罩。
+        </p>
+        <p class="sync-all-hint">只想同步单个平台时，可先切换到对应平台视图再点「立即同步」。</p>
+      </div>
+      <div class="modal-actions">
+        <NButton size="small" quaternary @click="showSyncAllConfirm = false">取消</NButton>
+        <NButton size="small" type="primary" @click="confirmSyncAll">
+          <template #icon><RefreshCw :size="14" /></template>
+          开始同步
+        </NButton>
+      </div>
+    </NModal>
   </div>
 </template>
 
@@ -248,5 +288,23 @@ function confirmUnbind(): void {
 .account-unbind:hover {
   color: #c63b57;
   background: hsl(350 60% 50% / 0.1);
+}
+
+.sync-all-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sync-all-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.sync-all-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
 }
 </style>
