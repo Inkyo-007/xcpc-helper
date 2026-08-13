@@ -122,9 +122,11 @@ function openProblem(row: Row): void {
     </div>
 
     <footer v-if="totalPages > 1" class="list-foot">
+      <!-- page-slot 7：默认 9 个槽位（1 2 3 4 5 6 7 … 末页）会溢出左栏宽度 -->
       <NPagination
         :page="page"
         :page-count="totalPages"
+        :page-slot="7"
         size="small"
         @update:page="(p: number) => emit('update:page', p)"
       />
