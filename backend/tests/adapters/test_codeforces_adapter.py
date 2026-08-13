@@ -10,7 +10,12 @@ import pytest
 
 from adapters.base import PlatformError, PlatformSubmission, UserNotFoundError, Verdict
 from adapters.codeforces import CodeforcesAdapter
-from adapters.codeforces.fixtures import map_verdict, problem_key, problem_url
+from adapters.codeforces.fixtures import (
+    map_verdict,
+    normalize_problem_url,
+    problem_key,
+    problem_url,
+)
 from adapters.net import HttpFetcher
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -270,6 +275,30 @@ def test_problem_url_contest_vs_gym():
 def test_problem_key_fallback():
     assert problem_key(2245, "F", "X Axis") == "2245F"
     assert problem_key(None, None, "X Axis") == "X Axis"
+
+
+def test_normalize_problem_url():
+    # 旧格式（四位数主题库）→ /contest/
+    assert (
+        normalize_problem_url("https://codeforces.com/problemset/problem/2245/F")
+        == "https://codeforces.com/contest/2245/problem/F"
+    )
+    # 旧格式（六位数 gym）→ /gym/
+    assert (
+        normalize_problem_url("https://codeforces.com/problemset/problem/103091/A")
+        == "https://codeforces.com/gym/103091/problem/A"
+    )
+    # 新格式幂等
+    assert (
+        normalize_problem_url("https://codeforces.com/contest/2245/problem/F")
+        == "https://codeforces.com/contest/2245/problem/F"
+    )
+    assert (
+        normalize_problem_url("https://codeforces.com/gym/103091/problem/A")
+        == "https://codeforces.com/gym/103091/problem/A"
+    )
+    # 无法识别的链接原样返回
+    assert normalize_problem_url("https://codeforces.com") == "https://codeforces.com"
 
 
 def test_to_submission_row_mapping():

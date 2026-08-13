@@ -29,7 +29,7 @@ def sub(
         submission_id=sid,
         problem_key=key,
         problem_name="X",
-        problem_url="https://codeforces.com/problemset/problem/2245/A",
+        problem_url="https://codeforces.com/contest/2245/problem/A",
         verdict=Verdict(verdict),
         submitted_at=ts_at(days_ago),
         language="GNU C++17",

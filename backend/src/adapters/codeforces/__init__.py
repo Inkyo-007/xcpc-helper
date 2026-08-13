@@ -18,7 +18,12 @@ from adapters.base import (
     UserInfo,
     UserNotFoundError,
 )
-from adapters.codeforces.fixtures import map_verdict, problem_key, problem_url
+from adapters.codeforces.fixtures import (
+    map_verdict,
+    normalize_problem_url,
+    problem_key,
+    problem_url,
+)
 from adapters.net import HttpFetcher
 
 logger = logging.getLogger("xcpc.adapters.codeforces")
@@ -112,6 +117,10 @@ class CodeforcesAdapter(PlatformAdapter):
         return out
 
     # ===== 内部 =====
+
+    def normalize_url(self, url: str) -> str:
+        """旧格式 problemset 链接幂等转换为 contest/gym 格式。"""
+        return normalize_problem_url(url)
 
     @staticmethod
     def _check_envelope(data: Any) -> None:

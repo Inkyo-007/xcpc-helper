@@ -54,7 +54,7 @@ def item(sid: str, ts: int) -> PlatformSubmission:
         submission_id=sid,
         problem_key="2245A",
         problem_name="X",
-        problem_url="https://codeforces.com/problemset/problem/2245/A",
+        problem_url="https://codeforces.com/contest/2245/problem/A",
         verdict="AC",
         submitted_at=ts,
         language="GNU C++17",

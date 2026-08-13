@@ -12,6 +12,7 @@ import pytest
 from adapters.net import HttpFetcher
 from core.config import Settings
 from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
+from modules.activity.models import Account, Submission
 from modules.activity.schemas import BindIn, VerifyIn
 from services.activity.service import ActivityService
 
@@ -230,6 +231,51 @@ async def test_recent_includes_old_submissions(tmp_path):
         recent = svc.submissions(date=None, platform=None)
         assert len(recent.items) == 1
         assert recent.items[0].id == "1"
+    finally:
+        await svc.aclose()
+
+
+async def test_old_problem_url_normalized_on_read(tmp_path):
+    """历史旧格式（problemset）链接在读取时幂等转换为 contest/gym 格式，
+    无需重新同步。"""
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler()), base_backoff=0.01
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        svc._store.save_account(Account(platform="codeforces", handle="demo"))
+        svc._store.merge_submissions(
+            "codeforces",
+            "demo",
+            [
+                Submission(
+                    platform="codeforces",
+                    handle="demo",
+                    submission_id="1",
+                    problem_key="2245F",
+                    problem_name="X",
+                    problem_url="https://codeforces.com/problemset/problem/2245/F",
+                    verdict="AC",
+                    submitted_at=sys_today_ts(0, 10),
+                    language="GNU C++17",
+                ),
+                Submission(
+                    platform="codeforces",
+                    handle="demo",
+                    submission_id="2",
+                    problem_key="103091A",
+                    problem_name="Y",
+                    problem_url="https://codeforces.com/problemset/problem/103091/A",
+                    verdict="AC",
+                    submitted_at=sys_today_ts(0, 11),
+                    language="GNU C++17",
+                ),
+            ],
+        )
+        recent = svc.submissions(date=None, platform=None)
+        urls = {i.problemUrl for i in recent.items}
+        assert "https://codeforces.com/contest/2245/problem/F" in urls
+        assert "https://codeforces.com/gym/103091/problem/A" in urls
     finally:
         await svc.aclose()
 

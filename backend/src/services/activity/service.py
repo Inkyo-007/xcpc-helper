@@ -146,7 +146,11 @@ class ActivityService:
     # ===== 聚合读取 =====
 
     def _submissions(self, platform: str | None) -> list[Submission]:
-        """当前用户组全部账号（可按平台过滤）的提交合并。"""
+        """当前用户组全部账号（可按平台过滤）的提交合并。
+
+        读取时经 adapter 规范化题目外链（历史旧格式幂等迁移，见
+        PlatformAdapter.normalize_url），保证前端拿到当前格式链接。
+        """
         profile = self._store.load_profile()
         out: list[Submission] = []
         for acc in profile.accounts:
@@ -160,6 +164,10 @@ class ActivityService:
                     acc.platform,
                     acc.handle,
                 )
+            adapter = self._adapters.get(acc.platform)
+            if adapter is not None:
+                for s in items:
+                    s.problem_url = adapter.normalize_url(s.problem_url)
             out.extend(items)
         return out
 

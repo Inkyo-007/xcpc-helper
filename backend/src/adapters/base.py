@@ -116,3 +116,11 @@ class PlatformAdapter(ABC):
         增量语义由各平台自行解释（CF 按时间过滤、AtCoder 透传 from_second）。
         失败抛 PlatformError。
         """
+
+    def normalize_url(self, url: str) -> str:
+        """数据读取时的 URL 规范化钩子（旧数据迁移用）；默认原样返回。
+
+        各平台外链规则演进后，历史数据中的旧格式链接经此幂等转换为新格式，
+        无需重新同步。实现方应保证幂等（新格式输入原样返回）。
+        """
+        return url
