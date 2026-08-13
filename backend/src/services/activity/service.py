@@ -159,10 +159,12 @@ class ActivityService:
             profile.id = payload.id.strip()
         if payload.signature is not None:
             profile.signature = payload.signature.strip()
-        if payload.avatar is not None:
-            if len(payload.avatar) > AVATAR_MAX_CHARS:
+        # avatar 用 fields_set 判断：显式传 null 表示清除头像
+        if "avatar" in payload.model_fields_set:
+            avatar = payload.avatar
+            if avatar is not None and len(avatar) > AVATAR_MAX_CHARS:
                 raise BadRequestError("头像文件过大，请换一张小一点的图片")
-            profile.avatar = payload.avatar or None
+            profile.avatar = avatar or None
         self._store().save_profile(profile)
         return ProfileOut(
             id=profile.id, signature=profile.signature, avatar=profile.avatar

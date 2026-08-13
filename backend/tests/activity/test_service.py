@@ -375,6 +375,10 @@ async def test_profile_update_independent_of_group_name(tmp_path):
         # 头像过大拒绝
         with pytest.raises(BadRequestError):
             svc.update_profile(ProfileUpdateIn(avatar="x" * 300_001))
+
+        # 显式传 null 清除头像
+        cleared = svc.update_profile(ProfileUpdateIn(avatar=None))
+        assert cleared.avatar is None
     finally:
         await svc.aclose()
 
