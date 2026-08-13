@@ -77,7 +77,7 @@ Submission {
   problem_key     # 平台内题目标识（CF "2245F" / AT "abc001_a" / LG "P1001"）
   problem_name
   problem_url     # 平台内题目外链（CF 按 contestId 位数区分：四位数主题库 /contest/，六位数 gym /gym/）
-  difficulty      # 原始难度值，不做跨平台归一
+  difficulty      # 原始难度值，不做跨平台归一（int | str：CF 分数 / LC 档位 / 洛谷难度）
   verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中，CF 的 SUBMITTED / TESTING）
   submitted_at    # UTC 秒级时间戳
   language

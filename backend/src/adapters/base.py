@@ -54,7 +54,7 @@ class PlatformSubmission(BaseModel):
     problem_key: str  # 平台内题目标识（CF "2245F" / AT "abc001_a"）
     problem_name: str
     problem_url: str
-    difficulty: int | None = None  # 原始难度值，不做跨平台归一
+    difficulty: int | str | None = None  # 原始难度值，不做跨平台归一（CF 分数 / LC 档位）
     verdict: Verdict
     submitted_at: int  # UTC 秒级时间戳
     language: str
@@ -116,11 +116,3 @@ class PlatformAdapter(ABC):
         增量语义由各平台自行解释（CF 按时间过滤、AtCoder 透传 from_second）。
         失败抛 PlatformError。
         """
-
-    def normalize_url(self, url: str) -> str:
-        """数据读取时的 URL 规范化钩子（旧数据迁移用）；默认原样返回。
-
-        各平台外链规则演进后，历史数据中的旧格式链接经此幂等转换为新格式，
-        无需重新同步。实现方应保证幂等（新格式输入原样返回）。
-        """
-        return url

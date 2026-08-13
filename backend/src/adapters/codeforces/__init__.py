@@ -18,12 +18,7 @@ from adapters.base import (
     UserInfo,
     UserNotFoundError,
 )
-from adapters.codeforces.fixtures import (
-    map_verdict,
-    normalize_problem_url,
-    problem_key,
-    problem_url,
-)
+from adapters.codeforces.normalize import map_verdict, problem_key, problem_url
 from adapters.net import HttpFetcher
 
 logger = logging.getLogger("xcpc.adapters.codeforces")
@@ -80,7 +75,9 @@ class CodeforcesAdapter(PlatformAdapter):
     ) -> list[PlatformSubmission]:
         """按页拉取提交（返回按时间倒序）。
 
-        - 增量（since 非空）：只取游标之后的提交，遇旧即停；
+        - 增量（since 非空）：只取游标之后的提交，遇旧即停；停止条件为
+          ts < since，游标当秒的提交会重复拉取，由 store 层按
+          submission_id 去重吸收（避免同秒多提交被永久漏掉）；
         - 全量（since 为空）：拉到覆盖近 370 天窗口为止，窗口内不足
           FULL_MIN_ROWS 条时继续拉满该数（为 all-time 总量留缓冲）；
         - 绝对护栏：最多 MAX_PAGES 页。
@@ -105,7 +102,7 @@ class CodeforcesAdapter(PlatformAdapter):
                 break
             for row in rows:
                 ts = int(row.get("creationTimeSeconds") or 0)
-                if since is not None and ts <= since:
+                if since is not None and ts < since:
                     return out
                 out.append(self._to_submission(row, ts))
             last_ts = int(rows[-1].get("creationTimeSeconds") or 0)
@@ -117,10 +114,6 @@ class CodeforcesAdapter(PlatformAdapter):
         return out
 
     # ===== 内部 =====
-
-    def normalize_url(self, url: str) -> str:
-        """旧格式 problemset 链接幂等转换为 contest/gym 格式。"""
-        return normalize_problem_url(url)
 
     @staticmethod
     def _check_envelope(data: Any) -> None:

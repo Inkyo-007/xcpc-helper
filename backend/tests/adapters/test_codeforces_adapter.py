@@ -10,12 +10,7 @@ import pytest
 
 from adapters.base import PlatformError, PlatformSubmission, UserNotFoundError, Verdict
 from adapters.codeforces import CodeforcesAdapter
-from adapters.codeforces.fixtures import (
-    map_verdict,
-    normalize_problem_url,
-    problem_key,
-    problem_url,
-)
+from adapters.codeforces.normalize import map_verdict, problem_key, problem_url
 from adapters.net import HttpFetcher
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -182,6 +177,30 @@ async def test_fetch_incremental_stops_at_cursor():
         await fetcher.aclose()
 
 
+async def test_fetch_incremental_repeats_cursor_second():
+    """游标当秒的提交会被重复拉取（ts < since 才停），同秒多提交不丢失。
+
+    停止条件放宽后靠 store 按 submission_id 去重吸收重复，无漏拉风险。
+    """
+    since = now_minus(2)
+    pages = [
+        [row(3, since + 60), row(2, since)],  # 第二条与游标同秒 → 应被拉取
+        [row(1, since - 60)],  # 旧于游标 → 停止
+    ]
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        from_ = int(request.url.params["from"])
+        idx = (from_ - 1) // 1000
+        return ok_json({"status": "OK", "result": pages[idx]})
+
+    adapter, fetcher = make_adapter(handler)
+    try:
+        items = await adapter.fetch_submissions("example", since=since)
+        assert [s.submission_id for s in items] == ["3", "2"]
+    finally:
+        await fetcher.aclose()
+
+
 async def test_fetch_full_stops_past_window_with_min_rows(monkeypatch):
     """全量：越过窗口起点且累计 ≥ FULL_MIN_ROWS 即停。"""
     monkeypatch.setattr("adapters.codeforces.PAGE_SIZE", 2)
@@ -277,28 +296,19 @@ def test_problem_key_fallback():
     assert problem_key(None, None, "X Axis") == "X Axis"
 
 
-def test_normalize_problem_url():
-    # 旧格式（四位数主题库）→ /contest/
-    assert (
-        normalize_problem_url("https://codeforces.com/problemset/problem/2245/F")
-        == "https://codeforces.com/contest/2245/problem/F"
+def test_difficulty_accepts_str():
+    """difficulty 保留平台原始值：CF 为分数（int），LeetCode/洛谷为档位（str）。"""
+    s = PlatformSubmission(
+        submission_id="1",
+        problem_key="two-sum",
+        problem_name="两数之和",
+        problem_url="https://leetcode.cn/problems/two-sum/",
+        difficulty="easy",
+        verdict=Verdict.AC,
+        submitted_at=1000,
+        language="Python3",
     )
-    # 旧格式（六位数 gym）→ /gym/
-    assert (
-        normalize_problem_url("https://codeforces.com/problemset/problem/103091/A")
-        == "https://codeforces.com/gym/103091/problem/A"
-    )
-    # 新格式幂等
-    assert (
-        normalize_problem_url("https://codeforces.com/contest/2245/problem/F")
-        == "https://codeforces.com/contest/2245/problem/F"
-    )
-    assert (
-        normalize_problem_url("https://codeforces.com/gym/103091/problem/A")
-        == "https://codeforces.com/gym/103091/problem/A"
-    )
-    # 无法识别的链接原样返回
-    assert normalize_problem_url("https://codeforces.com") == "https://codeforces.com"
+    assert s.difficulty == "easy"
 
 
 def test_to_submission_row_mapping():

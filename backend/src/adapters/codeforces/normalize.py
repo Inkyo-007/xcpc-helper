@@ -1,7 +1,5 @@
 """Codeforces 数据归一化纯函数（无 IO，便于单测）。"""
 
-import re
-
 from adapters.base import Verdict
 
 # verdict 归一化：OK→AC 等；未列出的（CHALLENGED / SKIPPED / PARTIAL /
@@ -35,24 +33,6 @@ def problem_url(contest_id: int | None, index: str | None) -> str:
             return f"https://codeforces.com/gym/{contest_id}/problem/{index}"
         return f"https://codeforces.com/contest/{contest_id}/problem/{index}"
     return "https://codeforces.com"
-
-
-# 旧格式（problemset/problem/<contest_id>/<index>）识别用
-_PROBLEMSET_URL_RE = re.compile(
-    r"^https://codeforces\.com/problemset/problem/(\d+)/([A-Za-z0-9_]+)$"
-)
-
-
-def normalize_problem_url(url: str) -> str:
-    """把旧格式 problemset 链接幂等转换为新格式（contest/gym）。
-
-    新格式链接与无法识别的链接原样返回；用于读取旧数据时迁移，
-    无需重新同步即可让历史提交显示正确外链。
-    """
-    m = _PROBLEMSET_URL_RE.match(url)
-    if not m:
-        return url
-    return problem_url(int(m.group(1)), m.group(2))
 
 
 def problem_key(contest_id: int | None, index: str | None, name: str) -> str:
