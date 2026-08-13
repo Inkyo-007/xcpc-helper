@@ -34,6 +34,10 @@ backend/data/user/*/secrets.json
 # 训练统计：写操作的原子暂存文件（正常会自动清理，防御崩溃残留）
 backend/data/user/**/.tmp-*
 
+# 训练统计：用户组运行数据（每次同步都会变更，不入库；格式样例见
+# backend/data/user/example/，该目录随 example 样例文件入 git）
+backend/data/user/default/
+
 # 可视化写操作的原子暂存目录（正常会自动清理，防御崩溃残留）
 backend/content/.tmp-*/
 
