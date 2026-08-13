@@ -1,9 +1,9 @@
 <script setup lang="ts">
-/** 汇总 / 单平台分段切换器：汇总 + 全部支持平台（与是否绑定无关，
- * 未绑定平台的视图用于引导绑定 / 换绑）。 */
+/** 汇总 / 单平台分段切换器：汇总 + 全部支持平台（来自后端平台注册表，
+ * 与是否绑定无关；未绑定平台的视图用于引导绑定 / 换绑）。 */
 
 import { LayoutGrid } from 'lucide-vue-next'
-import { PLATFORMS } from '@/features/activity/model/mock'
+import { useActivity } from '@/features/activity/store'
 import type { PlatformScope } from '@/features/activity/store'
 
 defineProps<{
@@ -14,7 +14,7 @@ const emit = defineEmits<{
   'update:modelValue': [value: PlatformScope]
 }>()
 
-const platforms = PLATFORMS
+const { platforms } = useActivity()
 </script>
 
 <template>

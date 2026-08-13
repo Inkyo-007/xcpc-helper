@@ -2,13 +2,13 @@
 /** 绑定平台账号弹窗：平台选择 → handle 输入 → 验证回执 → 确认绑定。
  * 从平台视图的账号按钮打开时锁定该平台；该平台已有账号时为换绑
  * （新账号替换旧账号及其本地数据，见 store.bindAccount）。
- * mock 阶段：验证为模拟延迟 + 示例回执；后端就绪后替换为真实 verify 请求。
+ * 平台下拉由后端平台注册表驱动（第一期仅 Codeforces）。
  */
 
 import { computed, ref, watch } from 'vue'
 import { BadgeCheck, Link2, Search } from 'lucide-vue-next'
 import { NButton, NInput, NModal, NSelect } from 'naive-ui'
-import { hashSeed, PLATFORMS } from '@/features/activity/model/mock'
+import { verifyAccount } from '@/features/activity/api'
 import { useActivity } from '@/features/activity/store'
 import type { PlatformId } from '@/features/activity/types'
 
@@ -23,16 +23,18 @@ const emit = defineEmits<{
   bind: [platform: PlatformId, handle: string]
 }>()
 
-const { isBound, boundOn } = useActivity()
+const { platforms, platformName, isBound, boundOn } = useActivity()
 
-const platformOptions = PLATFORMS.map((p) => ({ label: p.name, value: p.id }))
+const platformOptions = computed(() =>
+  platforms.value.map((p) => ({ label: p.name, value: p.id })),
+)
 
 const platform = ref<PlatformId>(props.platform ?? 'codeforces')
 const handle = ref('')
 const verifying = ref(false)
 const errorText = ref('')
-/** 验证成功的回执（mock 示例数据） */
-const receipt = ref<{ handle: string; rating: number } | null>(null)
+/** 验证成功的回执（真实接口返回的平台内用户信息） */
+const receipt = ref<{ handle: string; avatar: string | null } | null>(null)
 
 /** 锁定平台：从平台视图的账号按钮打开时不可切换平台 */
 const platformLocked = computed(() => props.platform != null)
@@ -44,7 +46,7 @@ watch(
   () => props.show,
   (show) => {
     if (show) {
-      platform.value = props.platform ?? 'codeforces'
+      platform.value = props.platform ?? platforms.value[0]?.id ?? 'codeforces'
       handle.value = ''
       verifying.value = false
       errorText.value = ''
@@ -69,9 +71,14 @@ async function verify(): Promise<void> {
   }
   verifying.value = true
   errorText.value = ''
-  await new Promise((r) => setTimeout(r, 700))
-  verifying.value = false
-  receipt.value = { handle: name, rating: 1300 + (hashSeed(name) % 900) }
+  try {
+    const res = await verifyAccount(platform.value, name)
+    receipt.value = { handle: res.handle, avatar: res.avatar }
+  } catch (e) {
+    errorText.value = e instanceof Error ? e.message : '验证失败，请稍后重试'
+  } finally {
+    verifying.value = false
+  }
 }
 
 function confirm(): void {
@@ -116,7 +123,7 @@ function confirm(): void {
         <span class="receipt-avatar">{{ receipt.handle.slice(0, 1).toUpperCase() }}</span>
         <div class="receipt-body">
           <div class="receipt-handle mono">{{ receipt.handle }}</div>
-          <div class="receipt-meta mono">rating {{ receipt.rating }} · 示例数据</div>
+          <div class="receipt-meta mono">{{ platformName(platform) }} 账号验证通过</div>
         </div>
         <BadgeCheck class="receipt-check" :size="17" />
       </div>

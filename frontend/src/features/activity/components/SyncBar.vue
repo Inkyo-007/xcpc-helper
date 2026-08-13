@@ -8,7 +8,7 @@ import { Link2, Plus, RefreshCw, Unlink, Users } from 'lucide-vue-next'
 import { NButton, NPopover, NTooltip } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
 import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
-import { platformName } from '@/features/activity/model/mock'
+import { useActivity } from '@/features/activity/store'
 import type { PlatformScope } from '@/features/activity/store'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
@@ -24,6 +24,8 @@ const emit = defineEmits<{
   bind: [platform: PlatformId]
   unbind: [platform: PlatformId, handle: string]
 }>()
+
+const { platformName } = useActivity()
 
 const removing = ref<BoundAccount | null>(null)
 

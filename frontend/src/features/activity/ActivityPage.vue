@@ -145,8 +145,21 @@ function openBind(platform: PlatformId | null): void {
 
 async function onBind(platform: PlatformId, handle: string): Promise<void> {
   const rebinding = boundOn(platform) !== null
-  await bindAccount(platform, handle)
-  message.success(rebinding ? '换绑成功，已重新同步' : '绑定成功，已完成首次同步')
+  try {
+    await bindAccount(platform, handle)
+    message.success(rebinding ? '换绑成功，已重新同步' : '绑定成功，已完成首次同步')
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : '绑定失败，请稍后重试')
+  }
+}
+
+async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
+  try {
+    await unbindAccount(platform, handle)
+    message.success('已解绑并删除本地数据')
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : '解绑失败，请稍后重试')
+  }
 }
 </script>
 
@@ -164,7 +177,7 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
         :active-platform="activePlatform"
         @sync="syncNow"
         @bind="openBind"
-        @unbind="unbindAccount"
+        @unbind="onUnbind"
       />
     </div>
 

@@ -7,7 +7,6 @@ import {
   buildMonthLabels,
   weekCount,
 } from '@/features/activity/model/heatmap-grid'
-import { generateDaily } from '@/features/activity/model/mock'
 import type { DayActivity } from '@/features/activity/types'
 
 function makeDaily(start: string, days: number): DayActivity[] {
@@ -20,7 +19,8 @@ function makeDaily(start: string, days: number): DayActivity[] {
 
 describe('weekCount', () => {
   it('近一年的日序列占 53–55 列', () => {
-    const weeks = weekCount(generateDaily('codeforces/demo_coder'))
+    // 370 天连续序列（首日 2025-08-10 为周日，无前置占位）
+    const weeks = weekCount(makeDaily('2025-08-10', 370))
     expect(weeks).toBeGreaterThanOrEqual(53)
     expect(weeks).toBeLessThanOrEqual(55)
   })
@@ -72,8 +72,8 @@ describe('buildHeatmapCells', () => {
     expect(cells[2]?.level).toBe(4)
   })
 
-  it('近一年 mock 序列格子数 = 周数 × 7', () => {
-    const daily = generateDaily('codeforces/demo_coder')
+  it('近一年序列格子数 = 周数 × 7', () => {
+    const daily = makeDaily('2025-08-10', 370)
     expect(buildHeatmapCells(daily)).toHaveLength(weekCount(daily) * 7)
   })
 })

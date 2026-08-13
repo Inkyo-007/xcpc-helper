@@ -7,9 +7,11 @@ import { computed } from 'vue'
 import { ExternalLink, Inbox } from 'lucide-vue-next'
 import { NPagination } from 'naive-ui'
 import { parseDate, todayStr, weekdayCn } from '@/features/activity/model/dates'
-import { platformName } from '@/features/activity/model/mock'
 import { pageCount, paged } from '@/features/activity/model/pagination'
+import { useActivity } from '@/features/activity/store'
 import type { RecentSubmission, SubmissionEntry, Verdict } from '@/features/activity/types'
+
+const { platformName } = useActivity()
 
 const props = defineProps<{
   /** 热力图选中的日期；null 表示近期提交模式 */
