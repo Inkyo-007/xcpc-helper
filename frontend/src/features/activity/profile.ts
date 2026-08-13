@@ -1,15 +1,17 @@
-/** 用户组与用户信息（样式原型阶段）：多用户组 + 组内头像 / ID / 签名，
- * localStorage 持久化。后端 data/user/<userid>/profile.json 就绪后迁移到 API，
- * 组件层不变。
+/** 用户组与用户信息（后端驱动）。
  *
- * 用户组的 ID 即 profile.name（主标签）：左侧用户信息卡编辑 ID 就是
- * 重命名当前组；账号绑定与训练数据按组隔离（见 store.ts 的 groupScope）。
+ * 用户组 = data/user/<user_id>/ 目录（目录名即组名，支持中文），
+ * 新建/重命名同步目录名，删除物理删除；切换组后其余 API 作用于新组。
+ * 信息卡（ID / 签名 / 头像）存于组内 profile.json，与组名分离、
+ * 独立编辑（ID 编辑不影响组名，组名编辑不影响 ID）。
+ * 组件层接口与旧 localStorage 版本保持一致。
  */
 
-import { computed, nextTick, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import * as api from '@/features/activity/api'
 
 export interface UserProfile {
-  /** 主标签：ID（即用户组 ID，可重命名） */
+  /** 主标签：信息卡显示 ID（独立于用户组名） */
   name: string
   /** 副标签：签名 */
   signature: string
@@ -17,175 +19,141 @@ export interface UserProfile {
   avatar: string | null
 }
 
-/** 用户组：key 为数据归属的稳定内部键（重命名不影响数据），name 为可改的显示 ID */
-export interface UserGroup extends UserProfile {
+/** 用户组：key 与 name 均为目录名（组名），由后端返回 */
+export interface UserGroup {
   key: string
+  name: string
 }
 
-const STORAGE_KEY = 'xcpc-helper:activity-groups'
-/** 用户组功能上线前的单档案存储键，读取后整体迁入首个用户组 */
-const LEGACY_KEY = 'xcpc-helper:activity-profile'
-const DEFAULT_GROUP_NAME = 'default'
+const groups = ref<UserGroup[]>([])
+const currentKey = ref('')
 
-const storage: Storage | null = typeof localStorage === 'undefined' ? null : localStorage
+/** 组件层共享的当前组档案视图：编辑时防抖提交后端 */
+const profile = reactive<UserProfile>({ name: '', signature: '', avatar: null })
 
-interface GroupsState {
-  current: string
-  groups: UserGroup[]
+/** loadProfile 同步中标记，避免 watch 回写 */
+let syncingProfile = false
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+function applyProfile(p: api.ApiProfile): void {
+  syncingProfile = true
+  profile.name = p.id
+  profile.signature = p.signature
+  profile.avatar = p.avatar
+  syncingProfile = false
 }
 
-function sanitizeGroup(raw: unknown): UserGroup | null {
-  if (typeof raw !== 'object' || raw === null) return null
-  const g = raw as Partial<UserGroup>
-  if (typeof g.key !== 'string' || !g.key) return null
-  return {
-    key: g.key,
-    name: typeof g.name === 'string' ? g.name : '',
-    signature: typeof g.signature === 'string' ? g.signature : '',
-    avatar: typeof g.avatar === 'string' ? g.avatar : null,
-  }
-}
-
-function loadLegacy(): UserProfile {
+async function loadProfile(): Promise<void> {
   try {
-    const raw = storage?.getItem(LEGACY_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<UserProfile>
-      return {
-        name: typeof parsed.name === 'string' ? parsed.name : '',
-        signature: typeof parsed.signature === 'string' ? parsed.signature : '',
-        avatar: typeof parsed.avatar === 'string' ? parsed.avatar : null,
-      }
-    }
+    applyProfile(await api.fetchProfile())
   } catch {
-    /* 本地数据损坏时回退到空档案 */
+    /* 后端暂不可用时保持现有档案 */
   }
-  return { name: '', signature: '', avatar: null }
 }
 
-function load(): GroupsState {
+async function refreshGroups(): Promise<void> {
+  const res = await api.fetchGroups()
+  groups.value = res.groups.map((g) => ({ key: g.name, name: g.name }))
+  const current = res.groups.find((g) => g.current)
+  if (current) {
+    currentKey.value = current.name
+    await loadProfile()
+  }
+}
+
+/** 首次加载（页面 init 时调用） */
+let loaded = false
+async function ensureLoaded(): Promise<void> {
+  if (loaded) return
+  loaded = true
+  await refreshGroups()
+}
+
+/** 错误信息提取（供组件提示） */
+function errMsg(e: unknown, fallback: string): string {
+  return e instanceof Error && e.message ? e.message : fallback
+}
+
+async function createGroup(name: string): Promise<string | null> {
   try {
-    const raw = storage?.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<GroupsState>
-      const groups = Array.isArray(parsed.groups)
-        ? parsed.groups.map(sanitizeGroup).filter((g): g is UserGroup => g !== null)
-        : []
-      if (groups.length > 0) {
-        const current =
-          typeof parsed.current === 'string' && groups.some((g) => g.key === parsed.current)
-            ? parsed.current
-            : groups[0].key
-        return { current, groups }
-      }
-    }
-  } catch {
-    /* 本地数据损坏时回落到初始组 */
-  }
-  const legacy = loadLegacy()
-  return {
-    current: 'default',
-    groups: [{ key: 'default', ...pickProfile(legacy) }],
+    await api.createGroup(name)
+    await refreshGroups()
+    return null
+  } catch (e) {
+    return errMsg(e, '创建用户组失败')
   }
 }
 
-function pickProfile(p: UserProfile): UserProfile {
-  return { name: p.name || DEFAULT_GROUP_NAME, signature: p.signature, avatar: p.avatar }
+async function switchGroup(key: string): Promise<string | null> {
+  try {
+    await api.switchGroup(key)
+    await refreshGroups()
+    return null
+  } catch (e) {
+    return errMsg(e, '切换用户组失败')
+  }
 }
 
-const state = reactive<GroupsState>(load())
+/** 重命名当前用户组（目录名同步，数据归属不变） */
+async function renameGroup(newName: string): Promise<string | null> {
+  try {
+    await api.renameGroup(currentKey.value, newName)
+    await refreshGroups()
+    return null
+  } catch (e) {
+    return errMsg(e, '重命名失败')
+  }
+}
 
-/** 初始组沿用 key 'default'，后续组用递增序号保证 key 稳定且不与组名耦合；
- * 从已有序号的最大值继续，避免与历史组的 key 冲突 */
-let keyCounter = state.groups.reduce((max, g) => {
-  const m = g.key.match(/^g(\d+)$/)
-  return m ? Math.max(max, Number(m[1])) : max
-}, state.groups.length)
+/** 删除当前用户组（含账号绑定、训练数据与信息卡，不可找回） */
+async function deleteGroup(): Promise<string | null> {
+  try {
+    await api.deleteGroup(currentKey.value)
+    await refreshGroups()
+    return null
+  } catch (e) {
+    return errMsg(e, '删除用户组失败')
+  }
+}
 
+/* 信息卡编辑：防抖提交后端（ID 与组名分离，不影响组名） */
 watch(
-  state,
+  profile,
   (value) => {
-    try {
-      storage?.setItem(STORAGE_KEY, JSON.stringify(value))
-    } catch {
-      /* 头像超出 localStorage 配额时静默失败，内存态本次会话仍生效 */
-    }
+    if (syncingProfile) return
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(async () => {
+      try {
+        await api.updateProfile({
+          id: value.name,
+          signature: value.signature,
+          avatar: value.avatar,
+        })
+      } catch (e) {
+        /* 保存失败保持内存态，下次编辑重试 */
+        console.error('信息卡保存失败', e)
+      }
+    }, 400)
   },
   { deep: true },
 )
 
-function currentGroup(): UserGroup {
-  return state.groups.find((g) => g.key === state.current) ?? state.groups[0]
-}
-
-/** 组件层共享的当前组档案视图：与 currentGroup 双向同步 */
-const profile = reactive<UserProfile>({ name: '', signature: '', avatar: null })
-
-let syncingProfile = false
-
-function loadProfile(): void {
-  const g = currentGroup()
-  syncingProfile = true
-  profile.name = g.name
-  profile.signature = g.signature
-  profile.avatar = g.avatar
-  void nextTick(() => {
-    syncingProfile = false
-  })
-}
-
-watch(() => state.current, loadProfile, { immediate: true })
-
-watch(profile, (value) => {
-  if (syncingProfile) return
-  const g = currentGroup()
-  const name = value.name.trim()
-  // ID 与用户组 ID 保持同一：为空或与其他组重名时回退，不制造分歧
-  if (name && name !== g.name && state.groups.some((o) => o.key !== g.key && o.name === name)) {
-    loadProfile()
-    return
-  }
-  g.name = name || g.name
-  if (!name) loadProfile()
-  g.signature = value.signature
-  g.avatar = value.avatar
-})
-
 export function useUserGroups() {
-  const groups = computed(() => state.groups)
-  const currentKey = computed(() => state.current)
+  const list = computed(() => groups.value)
+  const current = computed(() => currentKey.value)
 
-  /** 新建用户组并切换过去；ID 为空或重名时返回错误信息 */
-  function createGroup(name: string): string | null {
-    const id = name.trim()
-    if (!id) return '请输入用户组 ID'
-    if (state.groups.some((g) => g.name === id)) return '该用户组已存在'
-    keyCounter += 1
-    const group: UserGroup = { key: `g${keyCounter}`, name: id, signature: '', avatar: null }
-    state.groups.push(group)
-    state.current = group.key
-    return null
+  return {
+    groups: list,
+    currentKey: current,
+    ensureLoaded,
+    createGroup,
+    switchGroup,
+    renameGroup,
+    deleteGroup,
   }
-
-  function switchGroup(key: string): void {
-    if (state.groups.some((g) => g.key === key)) state.current = key
-  }
-
-  /** 删除用户组（仅删档案，第一期训练数据不按组隔离）；
-   * 仅剩一个组或 key 不存在时返回错误信息；删除当前组则切换到剩余首个组 */
-  function deleteGroup(key: string): string | null {
-    if (state.groups.length <= 1) return '至少保留一个用户组'
-    const index = state.groups.findIndex((g) => g.key === key)
-    if (index < 0) return '用户组不存在'
-    state.groups.splice(index, 1)
-    if (state.current === key) state.current = state.groups[0].key
-    return null
-  }
-
-  return { groups, currentKey, createGroup, switchGroup, deleteGroup }
 }
 
-/** 读取图片文件，居中裁剪并缩放为方形头像 data URL（控制 localStorage 体积） */
+/** 读取图片文件，居中裁剪并缩放为方形头像 data URL（控制传输体积） */
 export async function fileToAvatar(file: File, size = 128): Promise<string> {
   const bitmap = await createImageBitmap(file)
   try {

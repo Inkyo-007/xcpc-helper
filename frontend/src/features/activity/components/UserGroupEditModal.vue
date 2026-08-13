@@ -1,8 +1,10 @@
 <script setup lang="ts">
 /** 编辑用户组弹窗（汇总视图工具条「编辑用户组」打开）：
  * 列表式交互——每项一行，左描述右操作。
- * · 重命名用户组：右侧输入框 + 保存（等价于用户信息卡编辑 ID）；
- * · 删除用户组：右侧删除按钮（DeleteConfirmModal 确认，删当前组后关闭弹窗）；
+ * · 重命名用户组：右侧输入框 + 保存（修改组名 = data/user 目录名，
+ *   数据归属不变；信息卡 ID 独立、不受影响）；
+ * · 删除用户组：右侧删除按钮（DeleteConfirmModal 确认，删除该组全部
+ *   数据：账号绑定、训练数据、信息卡；删当前组后关闭弹窗并回退）；
  * · 平台账号：按平台逐行列出——已绑定的显示 handle，右侧「换绑」「解绑」；
  *   未绑定的右侧「绑定」，两者均打开锁定该平台的绑定弹窗。 */
 
@@ -11,7 +13,7 @@ import { Link2, PencilLine, Plus, Trash2, Unlink } from 'lucide-vue-next'
 import { NButton, NInput, NModal, useMessage } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
 import { useActivity } from '@/features/activity/store'
-import { useProfile, useUserGroups } from '@/features/activity/profile'
+import { useUserGroups } from '@/features/activity/profile'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
 const props = defineProps<{
@@ -26,11 +28,10 @@ const emit = defineEmits<{
 }>()
 
 const { platforms, platformName } = useActivity()
-const { profile } = useProfile()
-const { groups, currentKey, deleteGroup } = useUserGroups()
+const { groups, currentKey, renameGroup, deleteGroup } = useUserGroups()
 const message = useMessage()
 
-/* ---------- 重命名 ---------- */
+/* ---------- 重命名（组名 = 目录名） ---------- */
 
 const renameDraft = ref('')
 const renameError = ref('')
@@ -39,7 +40,7 @@ watch(
   () => props.show,
   (show) => {
     if (show) {
-      renameDraft.value = profile.name
+      renameDraft.value = currentKey.value
       renameError.value = ''
     }
   },
@@ -54,19 +55,23 @@ const duplicated = computed(() =>
   groups.value.some((g) => g.key !== currentKey.value && g.name === renameDraft.value.trim()),
 )
 
-function confirmRename(): void {
-  const id = renameDraft.value.trim()
-  if (!id) {
-    renameError.value = '请输入用户组 ID'
+async function confirmRename(): Promise<void> {
+  const name = renameDraft.value.trim()
+  if (!name) {
+    renameError.value = '请输入用户组名称'
     return
   }
   if (duplicated.value) {
     renameError.value = '该用户组已存在'
     return
   }
-  if (id === profile.name) return
-  profile.name = id
-  message.success(`已重命名为 ${id}`)
+  if (name === currentKey.value) return
+  const error = await renameGroup(name)
+  if (error) {
+    renameError.value = error
+    return
+  }
+  message.success(`已重命名为 ${name}`)
 }
 
 /* ---------- 删除 ---------- */
@@ -76,15 +81,15 @@ const showDelete = ref(false)
 /** 仅剩一个用户组时禁止删除 */
 const deleteDisabled = computed(() => groups.value.length <= 1)
 
-function confirmDelete(): void {
-  const name = profile.name
-  const error = deleteGroup(currentKey.value)
+async function confirmDelete(): Promise<void> {
+  const name = currentKey.value
+  const error = await deleteGroup()
   showDelete.value = false
   if (error) {
     message.error(error)
     return
   }
-  message.success(`已删除用户组 ${name}`)
+  message.success(`已删除用户组 ${name} 及其全部数据`)
   // 删除的是当前组，弹窗随之关闭
   emit('update:show', false)
 }
@@ -127,21 +132,21 @@ function stateLabel(acc: BoundAccount): string {
       <div class="edit-row">
         <div class="edit-desc">
           <span class="edit-title">重命名用户组</span>
-          <span class="edit-hint">修改当前用户组的 ID（数据归属不变）</span>
+          <span class="edit-hint">修改组名（目录名，数据归属不变；信息卡 ID 不受影响）</span>
         </div>
         <div class="edit-action">
           <NInput
             v-model:value="renameDraft"
             size="small"
             class="rename-input"
-            placeholder="输入用户组 ID"
+            placeholder="输入用户组名称"
             @keyup.enter="confirmRename"
           />
           <NButton
             size="small"
             type="primary"
             secondary
-            :disabled="!renameDraft.trim() || renameDraft.trim() === profile.name"
+            :disabled="!renameDraft.trim() || renameDraft.trim() === currentKey"
             @click="confirmRename"
           >
             <template #icon><PencilLine :size="14" /></template>
@@ -154,7 +159,7 @@ function stateLabel(acc: BoundAccount): string {
       <div class="edit-row">
         <div class="edit-desc">
           <span class="edit-title">删除用户组</span>
-          <span class="edit-hint">删除当前用户组的档案（ID / 签名 / 头像），至少保留一个组</span>
+          <span class="edit-hint">删除该组全部数据（账号、训练数据、信息卡），不可找回，至少保留一个组</span>
         </div>
         <div class="edit-action">
           <NButton size="small" type="error" secondary :disabled="deleteDisabled" @click="showDelete = true">
@@ -199,7 +204,7 @@ function stateLabel(acc: BoundAccount): string {
     <DeleteConfirmModal
       :show="showDelete"
       title="删除用户组"
-      :target="profile.name"
+      :target="currentKey"
       @update:show="showDelete = $event"
       @confirm="confirmDelete"
     />

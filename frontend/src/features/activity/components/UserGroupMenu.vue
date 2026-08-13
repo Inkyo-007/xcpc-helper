@@ -1,14 +1,13 @@
 <script setup lang="ts">
-/** 用户组菜单（汇总视图）：按钮显示当前用户 ID（与左侧用户信息卡一致），
+/** 用户组菜单（汇总视图）：按钮显示当前用户组名称（目录名），
  * 下拉菜单顶部为「新建用户组」，下方为用户组列表，点击切换。
- * 重命名与删除在「编辑用户组」弹窗中操作（见 UserGroupEditModal）。 */
+ * 新建/切换均作用于后端 data/user/<user_id>/ 目录（组名即目录名）。 */
 
 import { computed, h, nextTick, ref, watch } from 'vue'
 import { Check, ChevronDown, Plus, UserRound } from 'lucide-vue-next'
 import { NButton, NDropdown, NInput, NModal, useMessage, type DropdownOption } from 'naive-ui'
-import { useProfile, useUserGroups } from '@/features/activity/profile'
+import { useUserGroups } from '@/features/activity/profile'
 
-const { profile } = useProfile()
 const { groups, currentKey, createGroup, switchGroup } = useUserGroups()
 const message = useMessage()
 
@@ -29,7 +28,7 @@ function onSelect(key: string | number): void {
     void openCreate()
     return
   }
-  switchGroup(String(key))
+  void switchGroup(String(key))
 }
 
 /* ---------- 新建用户组弹窗 ---------- */
@@ -51,9 +50,13 @@ async function openCreate(): Promise<void> {
   createInput.value?.focus()
 }
 
-function confirmCreate(): void {
+async function confirmCreate(): Promise<void> {
   const id = createName.value.trim()
-  const error = createGroup(id)
+  if (!id) {
+    createError.value = '请输入用户组名称'
+    return
+  }
+  const error = await createGroup(id)
   if (error) {
     createError.value = error
     return
@@ -67,7 +70,7 @@ function confirmCreate(): void {
   <NDropdown trigger="click" placement="bottom-end" :options="options" @select="onSelect">
     <NButton size="small" type="primary" secondary>
       <template #icon><UserRound :size="14" /></template>
-      <span class="group-name mono">{{ profile.name || '未设置 ID' }}</span>
+      <span class="group-name mono">{{ currentKey || 'default' }}</span>
       <ChevronDown :size="13" class="group-caret" />
     </NButton>
   </NDropdown>
@@ -85,7 +88,7 @@ function confirmCreate(): void {
         ref="createInput"
         v-model:value="createName"
         size="small"
-        placeholder="输入用户组 ID"
+        placeholder="输入用户组名称（支持中文）"
         @keyup.enter="confirmCreate"
       />
       <p v-if="createError" class="create-error">{{ createError }}</p>

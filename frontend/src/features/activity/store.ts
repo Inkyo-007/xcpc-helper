@@ -1,12 +1,12 @@
 /** 训练统计数据 store（真实后端接入）。
  *
- * 账号与训练数据来自后端 data/user/default（第一期固定用户组）；
- * 用户组菜单仅影响档案（ID/签名/头像，见 profile.ts），不参与数据隔离。
- * 组件层只消费本模块暴露的状态与动作，接口名与样式原型阶段保持一致。
+ * 账号与训练数据来自后端当前用户组目录（data/user/<user_id>/）；
+ * 切组（currentKey 变化）后重新拉取该组数据，组件层无感知。
  */
 
 import { computed, ref, watch } from 'vue'
 import * as api from '@/features/activity/api'
+import { useUserGroups } from '@/features/activity/profile'
 import type {
   BoundAccount,
   DayActivity,
@@ -18,6 +18,8 @@ import type {
 } from '@/features/activity/types'
 
 export type PlatformScope = 'all' | PlatformId
+
+const { currentKey, ensureLoaded } = useUserGroups()
 
 const accounts = ref<BoundAccount[]>([])
 const platforms = ref<PlatformMeta[]>([])
@@ -116,7 +118,10 @@ async function pollUntilIdle(timeoutMs = 30_000): Promise<void> {
 function init(): void {
   if (initialized.value) return
   initialized.value = true
-  void refreshAll()
+  void (async () => {
+    await ensureLoaded() // 用户组列表 + 当前组 + 信息卡
+    await refreshAll()
+  })()
 }
 
 function setPlatform(scope: PlatformScope): void {
@@ -218,6 +223,14 @@ const lastSyncLabel = computed(() => {
 watch([activePlatform, selectedDate], () => {
   void refreshOverview()
   void refreshSubmissions()
+})
+
+/* 切换用户组：重置视图并拉取该组数据 */
+watch(currentKey, () => {
+  selectedDate.value = null
+  recentPage.value = 1
+  dayPage.value = 1
+  void refreshAll()
 })
 
 export function useActivity() {

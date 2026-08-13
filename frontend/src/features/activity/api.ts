@@ -100,3 +100,73 @@ export function triggerSync(platform?: PlatformId): Promise<void> {
 export function fetchSyncStatus(): Promise<BoundAccount[]> {
   return request<BoundAccount[]>('/activity/sync/status')
 }
+
+/* ---------- 用户组与信息卡 ---------- */
+
+export interface ApiGroup {
+  name: string
+  current: boolean
+}
+
+export interface ApiGroupsResponse {
+  groups: ApiGroup[]
+}
+
+export interface ApiProfile {
+  id: string
+  signature: string
+  avatar: string | null
+}
+
+export function fetchGroups(): Promise<ApiGroupsResponse> {
+  return request<ApiGroupsResponse>('/activity/groups')
+}
+
+export function createGroup(name: string): Promise<ApiGroup> {
+  return request<ApiGroup>('/activity/groups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function renameGroup(name: string, newName: string): Promise<ApiGroupsResponse> {
+  return request<ApiGroupsResponse>(
+    `/activity/groups/${encodeURIComponent(name)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newName }),
+    },
+  )
+}
+
+export function deleteGroup(name: string): Promise<void> {
+  return request<void>(`/activity/groups/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  })
+}
+
+export function switchGroup(name: string): Promise<ApiGroup> {
+  return request<ApiGroup>('/activity/current-group', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+}
+
+export function fetchProfile(): Promise<ApiProfile> {
+  return request<ApiProfile>('/activity/profile')
+}
+
+export function updateProfile(payload: {
+  id?: string
+  signature?: string
+  avatar?: string | null
+}): Promise<ApiProfile> {
+  return request<ApiProfile>('/activity/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
