@@ -13,6 +13,7 @@ import PlatformTabs from '@/features/activity/components/PlatformTabs.vue'
 import StatCards from '@/features/activity/components/StatCards.vue'
 import SubmissionList from '@/features/activity/components/SubmissionList.vue'
 import SyncBar from '@/features/activity/components/SyncBar.vue'
+import SyncOverlay from '@/features/activity/components/SyncOverlay.vue'
 import UserProfileCard from '@/features/activity/components/UserProfileCard.vue'
 import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
 import { parseDate, toDateStr } from '@/features/activity/model/dates'
@@ -26,6 +27,7 @@ const {
   selectedDate,
   listPage,
   syncing,
+  busy,
   mergedDaily,
   totals,
   entries,
@@ -249,6 +251,7 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
     </div>
 
     <AccountBindModal v-model:show="showBind" :platform="bindPreset" @bind="onBind" />
+    <SyncOverlay :show="busy" />
   </div>
 </template>
 

@@ -28,6 +28,8 @@ const recentPage = ref(1)
 /** 当日明细列表的分页页码（从 1 起；与近期提交各自独立，切换日期时重置） */
 const dayPage = ref(1)
 const syncing = ref(false)
+/** 绑定或同步进行中（驱动全屏加载遮罩，背景不可操作） */
+const busy = ref(false)
 const initialized = ref(false)
 
 const overviewData = ref<api.ApiOverviewResponse | null>(null)
@@ -154,20 +156,27 @@ function setListPage(page: number): void {
 async function syncNow(): Promise<void> {
   if (syncing.value) return
   syncing.value = true
+  busy.value = true
   try {
     await api.triggerSync(activePlatform.value === 'all' ? undefined : activePlatform.value)
     await pollUntilIdle()
     await refreshAll()
   } finally {
     syncing.value = false
+    busy.value = false
   }
 }
 
 /** 绑定（或换绑）账号：后端自动触发首次同步，等待完成后刷新数据 */
 async function bindAccount(platform: PlatformId, handle: string): Promise<void> {
-  await api.bindAccount(platform, handle)
-  await pollUntilIdle()
-  await refreshAll()
+  busy.value = true
+  try {
+    await api.bindAccount(platform, handle)
+    await pollUntilIdle()
+    await refreshAll()
+  } finally {
+    busy.value = false
+  }
 }
 
 /** 解绑并删除该账号本地数据 */
@@ -219,6 +228,7 @@ export function useActivity() {
     selectedDate,
     listPage,
     syncing,
+    busy,
     initialized,
     mergedDaily,
     totals,
