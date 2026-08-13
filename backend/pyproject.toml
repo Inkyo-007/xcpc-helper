@@ -11,13 +11,13 @@ dependencies = [
     "pyyaml>=6.0",
     "watchdog>=6.0",
     "python-multipart>=0.0.32",
+    "httpx>=0.28",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
-    "httpx>=0.28",
     "ruff>=0.12",
 ]
 desktop = [

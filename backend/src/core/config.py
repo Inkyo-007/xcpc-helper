@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     data_dir: Path = BACKEND_ROOT / "data"
     db_name: str = "index.db"
 
+    # 训练统计：用户数据目录（data/user/<userid>/，第一期固定 default）
+    user_data_dir: Path = BACKEND_ROOT / "data" / "user"
+
     # 是否监听 content/ 变更并自动重建索引
     watch_enabled: bool = True
     # 文件变更后的去抖时间（秒），避免频繁重建
