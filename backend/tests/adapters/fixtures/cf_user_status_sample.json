@@ -1,0 +1,68 @@
+{
+  "status": "OK",
+  "result": [
+    {
+      "id": 102938475,
+      "contestId": 2245,
+      "creationTimeSeconds": 1755100000,
+      "relativeTimeSeconds": 100,
+      "problem": {
+        "contestId": 2245,
+        "index": "F",
+        "name": "X Axis",
+        "rating": 800,
+        "tags": ["math"]
+      },
+      "author": {
+        "contestId": 2245,
+        "members": [{"handle": "example"}],
+        "participantType": "CONTESTANT"
+      },
+      "programmingLanguage": "GNU C++17",
+      "verdict": "OK",
+      "passedTestCount": 12
+    },
+    {
+      "id": 102938474,
+      "contestId": 2245,
+      "creationTimeSeconds": 1755099900,
+      "relativeTimeSeconds": 90,
+      "problem": {
+        "contestId": 2245,
+        "index": "F",
+        "name": "X Axis",
+        "rating": 800,
+        "tags": ["math"]
+      },
+      "author": {
+        "contestId": 2245,
+        "members": [{"handle": "example"}],
+        "participantType": "CONTESTANT"
+      },
+      "programmingLanguage": "GNU C++17",
+      "verdict": "WRONG_ANSWER",
+      "passedTestCount": 2
+    },
+    {
+      "id": 102938473,
+      "contestId": 2246,
+      "creationTimeSeconds": 1755099800,
+      "relativeTimeSeconds": 80,
+      "problem": {
+        "contestId": 2246,
+        "index": "A",
+        "name": "X Axis",
+        "rating": 900,
+        "tags": ["brute force"]
+      },
+      "author": {
+        "contestId": 2246,
+        "members": [{"handle": "example"}],
+        "participantType": "CONTESTANT"
+      },
+      "programmingLanguage": "Python 3",
+      "verdict": "TESTING",
+      "passedTestCount": 0
+    }
+  ]
+}

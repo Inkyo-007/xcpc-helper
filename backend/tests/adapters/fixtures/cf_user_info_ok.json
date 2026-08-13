@@ -1,0 +1,26 @@
+{
+  "status": "OK",
+  "result": [
+    {
+      "handle": "tourist",
+      "email": "",
+      "vkId": "",
+      "openId": "",
+      "firstName": "",
+      "lastName": "",
+      "country": "BY",
+      "city": "",
+      "organization": "",
+      "contribution": 120,
+      "rank": "legendary grandmaster",
+      "rating": 3979,
+      "maxRank": "legendary grandmaster",
+      "maxRating": 4007,
+      "lastOnlineTimeSeconds": 1755100000,
+      "registrationTimeSeconds": 1300000000,
+      "friendOfCount": 12000,
+      "avatar": "https://userpic.codeforces.org/no-avatar.jpg",
+      "titlePhoto": "https://userpic.codeforces.org/no-title.jpg"
+    }
+  ]
+}
