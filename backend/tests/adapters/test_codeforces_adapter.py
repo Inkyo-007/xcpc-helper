@@ -22,6 +22,10 @@ INFO_NOT_FOUND = json.loads(
     (FIXTURES / "cf_user_info_not_found.json").read_text(encoding="utf-8")
 )
 
+# 全量同步策略参数（生产由 Settings 注入，测试直接传）
+FULL_WINDOW_DAYS = 370
+FULL_MIN_ROWS = 5000
+
 
 def make_fetcher(handler) -> HttpFetcher:
     return HttpFetcher(transport=httpx.MockTransport(handler), base_backoff=0.01)
@@ -147,7 +151,12 @@ async def test_fetch_full_pages_until_empty(monkeypatch):
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions("example", since=None)
+        items = await adapter.fetch_submissions(
+            "example",
+            since=None,
+            full_window_days=FULL_WINDOW_DAYS,
+            full_min_rows=FULL_MIN_ROWS,
+        )
         assert [s.submission_id for s in items] == ["3", "2", "1"]
         assert items[0].verdict == Verdict.AC
         assert items[0].problem_key == "2245F"
@@ -172,7 +181,12 @@ async def test_fetch_incremental_stops_at_cursor():
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions("example", since=since)
+        items = await adapter.fetch_submissions(
+            "example",
+            since=since,
+            full_window_days=FULL_WINDOW_DAYS,
+            full_min_rows=FULL_MIN_ROWS,
+        )
         assert [s.submission_id for s in items] == ["3", "2"]
     finally:
         await fetcher.aclose()
@@ -196,16 +210,20 @@ async def test_fetch_incremental_repeats_cursor_second():
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions("example", since=since)
+        items = await adapter.fetch_submissions(
+            "example",
+            since=since,
+            full_window_days=FULL_WINDOW_DAYS,
+            full_min_rows=FULL_MIN_ROWS,
+        )
         assert [s.submission_id for s in items] == ["3", "2"]
     finally:
         await fetcher.aclose()
 
 
 async def test_fetch_full_stops_past_window_with_min_rows(monkeypatch):
-    """全量：越过窗口起点且累计 ≥ FULL_MIN_ROWS 即停。"""
+    """全量：越过窗口起点且累计 ≥ full_min_rows 即停。"""
     monkeypatch.setattr("adapters.codeforces.PAGE_SIZE", 2)
-    monkeypatch.setattr("adapters.codeforces.FULL_MIN_ROWS", 3)
     now = int(time.time())
     pages = [
         [row(4, now - 86400), row(3, now - 2 * 86400)],  # 窗口内
@@ -220,16 +238,20 @@ async def test_fetch_full_stops_past_window_with_min_rows(monkeypatch):
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions("example", since=None)
+        items = await adapter.fetch_submissions(
+            "example",
+            since=None,
+            full_window_days=FULL_WINDOW_DAYS,
+            full_min_rows=3,
+        )
         assert [s.submission_id for s in items] == ["4", "3", "2", "1"]
     finally:
         await fetcher.aclose()
 
 
 async def test_fetch_full_keeps_pulling_inside_window(monkeypatch):
-    """全量：窗口内的数据即使超过 FULL_MIN_ROWS 也继续拉（保证热力图完整）。"""
+    """全量：窗口内的数据即使超过 full_min_rows 也继续拉（保证热力图完整）。"""
     monkeypatch.setattr("adapters.codeforces.PAGE_SIZE", 2)
-    monkeypatch.setattr("adapters.codeforces.FULL_MIN_ROWS", 3)
     now = int(time.time())
     pages = [
         [row(4, now - 86400), row(3, now - 2 * 86400)],
@@ -246,7 +268,12 @@ async def test_fetch_full_keeps_pulling_inside_window(monkeypatch):
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions("example", since=None)
+        items = await adapter.fetch_submissions(
+            "example",
+            since=None,
+            full_window_days=FULL_WINDOW_DAYS,
+            full_min_rows=FULL_MIN_ROWS,
+        )
         assert [s.submission_id for s in items] == ["4", "3", "2", "1"]
     finally:
         await fetcher.aclose()
@@ -259,7 +286,12 @@ async def test_fetch_envelope_failure_raises():
     adapter, fetcher = make_adapter(handler)
     try:
         with pytest.raises(PlatformError):
-            await adapter.fetch_submissions("example", since=None)
+            await adapter.fetch_submissions(
+                "example",
+                since=None,
+                full_window_days=FULL_WINDOW_DAYS,
+                full_min_rows=FULL_MIN_ROWS,
+            )
     finally:
         await fetcher.aclose()
 
@@ -336,6 +368,11 @@ async def test_fetch_malformed_row_raises_platform_error():
     adapter, fetcher = make_adapter(handler)
     try:
         with pytest.raises(PlatformError):
-            await adapter.fetch_submissions("example", since=None)
+            await adapter.fetch_submissions(
+                "example",
+                since=None,
+                full_window_days=FULL_WINDOW_DAYS,
+                full_min_rows=FULL_MIN_ROWS,
+            )
     finally:
         await fetcher.aclose()

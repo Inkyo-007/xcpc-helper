@@ -173,7 +173,10 @@ backend/src/
 - 依赖方向严格单向：`routers → services → modules → adapters`，adapters 不反向依赖任何功能域；
 - adapter 只允许被 `sync.py` 与 `service.py` 触碰，router 不直接 import adapter；
 - adapter 注册采用**显式注册表**（`base.py` 手写注册，静态可查），不用自动发现；
-- 新增平台的后端成本 = 一个 adapter 目录 + 注册一行，主干零改动。
+- 新增平台的后端成本 = 一个 adapter 目录 + 注册一行，主干零改动；
+- 全量同步窗口与条数下限属**功能域配置**（`Settings.activity_window_days` /
+  `activity_full_min_rows`，默认对齐热力图近一年），经 service → sync 注入
+  adapter 的 `fetch_submissions` 参数，adapter 不内置产品策略。
 
 新依赖：`httpx` 从 dev 组提升到主依赖；重试退避手写，不引新库。
 

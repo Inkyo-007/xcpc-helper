@@ -24,9 +24,15 @@ class SyncEngine:
         self,
         store: activity_store.UserStore,
         adapters: dict[str, PlatformAdapter],
+        *,
+        full_window_days: int = 370,
+        full_min_rows: int = 5000,
     ) -> None:
         self._store = store
         self._adapters = adapters
+        # 全量同步策略（来自上层配置，默认对齐热力图窗口；adapter 不内置）
+        self._full_window_days = full_window_days
+        self._full_min_rows = full_min_rows
         # 内存态：账号同步状态与单账号并发锁（重启后按 profile 游标续增量）
         self._status: dict[tuple[str, str], SyncStatus] = {}
         self._locks: dict[tuple[str, str], asyncio.Lock] = {}
@@ -97,7 +103,12 @@ class SyncEngine:
         if account is None:
             raise NotFoundError(f"账号未绑定: {platform}/{handle}")
         since = account.last_synced_at
-        raw = await adapter.fetch_submissions(handle, since=since)
+        raw = await adapter.fetch_submissions(
+            handle,
+            since=since,
+            full_window_days=self._full_window_days,
+            full_min_rows=self._full_min_rows,
+        )
         submissions = [
             Submission(platform=platform, handle=handle, **item.model_dump())
             for item in raw

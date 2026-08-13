@@ -51,7 +51,12 @@ class ActivityService:
             pid: cls(self._fetcher) for pid, cls in REGISTRY.items()
         }
         self._store = activity_store.UserStore(settings.user_data_dir, DEFAULT_USER_ID)
-        self._engine = SyncEngine(self._store, self._adapters)
+        self._engine = SyncEngine(
+            self._store,
+            self._adapters,
+            full_window_days=settings.activity_window_days,
+            full_min_rows=settings.activity_full_min_rows,
+        )
 
     async def aclose(self) -> None:
         await self._fetcher.aclose()
@@ -171,7 +176,10 @@ class ActivityService:
         return OverviewOut(
             totals=OverviewTotalsOut(**aggregate.overview_stats(submissions, tz=tz)),
             daily=[
-                DayActivityOut(**d) for d in aggregate.daily_series(submissions, tz=tz)
+                DayActivityOut(**d)
+                for d in aggregate.daily_series(
+                    submissions, tz=tz, days=self._settings.activity_window_days
+                )
             ],
         )
 

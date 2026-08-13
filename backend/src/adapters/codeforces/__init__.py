@@ -38,8 +38,6 @@ INFO_URL = f"{API_BASE}/user.info"
 
 PAGE_SIZE = 1000  # user.status 单页上限
 MAX_PAGES = 200  # 安全护栏（20 万条），正常路径不会触发
-FULL_WINDOW_DAYS = 370  # 全量窗口：对齐前端热力图窗口（近一年）
-FULL_MIN_ROWS = 5000  # 全量至少拉取的条数（一年内提交不足 5000 时拉满该数）
 
 
 class CodeforcesAdapter(PlatformAdapter):
@@ -80,18 +78,23 @@ class CodeforcesAdapter(PlatformAdapter):
         *,
         since: int | None,
         credentials: Credentials | None = None,
+        full_window_days: int,
+        full_min_rows: int,
     ) -> list[PlatformSubmission]:
         """按页拉取提交（返回按时间倒序）。
 
         - 增量（since 非空）：只取游标之后的提交，遇旧即停；停止条件为
           ts < since，游标当秒的提交会重复拉取，由 store 层按
           submission_id 去重吸收（避免同秒多提交被永久漏掉）；
-        - 全量（since 为空）：拉到覆盖近 370 天窗口为止，窗口内不足
-          FULL_MIN_ROWS 条时继续拉满该数（为 all-time 总量留缓冲）；
+        - 全量（since 为空）：拉到覆盖 full_window_days 窗口为止，窗口内
+          不足 full_min_rows 条时继续拉满该数（为 all-time 总量留缓冲）；
         - 绝对护栏：最多 MAX_PAGES 页。
+
+        full_window_days / full_min_rows 为同步策略，由调用方（sync 引擎）
+        按上层配置传入，见 core/config.py 的 activity_window_days 等。
         """
         out: list[PlatformSubmission] = []
-        window_start = int(time.time()) - FULL_WINDOW_DAYS * 86400
+        window_start = int(time.time()) - full_window_days * 86400
         for page in range(1, MAX_PAGES + 1):
             data = await self._fetcher.get_json(
                 STATUS_URL,
@@ -116,7 +119,7 @@ class CodeforcesAdapter(PlatformAdapter):
                 out.append(self._to_submission(row, ts))
             last_ts = rows[-1].creationTimeSeconds
             # 全量停止条件：已越过窗口起点且累计条数达标；或页不满
-            if since is None and last_ts < window_start and len(out) >= FULL_MIN_ROWS:
+            if since is None and last_ts < window_start and len(out) >= full_min_rows:
                 break
             if len(rows) < PAGE_SIZE:
                 break

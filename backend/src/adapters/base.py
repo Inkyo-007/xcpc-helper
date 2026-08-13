@@ -110,9 +110,13 @@ class PlatformAdapter(ABC):
         *,
         since: int | None,
         credentials: Credentials | None = None,
+        full_window_days: int,
+        full_min_rows: int,
     ) -> list[PlatformSubmission]:
         """拉取提交：since 为 UTC 秒级游标（None 表示全量）。
 
         增量语义由各平台自行解释（CF 按时间过滤、AtCoder 透传 from_second）。
+        full_window_days / full_min_rows 为同步策略（来自上层配置，
+        如热力图窗口），由调用方传入，adapter 不内置产品策略。
         失败抛 PlatformError。
         """

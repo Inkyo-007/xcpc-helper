@@ -40,6 +40,8 @@ class FakeAdapter(PlatformAdapter):
         *,
         since: int | None,
         credentials: Credentials | None = None,
+        full_window_days: int,
+        full_min_rows: int,
     ) -> list[PlatformSubmission]:
         self.calls.append(since)
         if self.fail_with is not None:
