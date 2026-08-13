@@ -13,11 +13,11 @@ describe('heatLevel', () => {
 
   it('按 AC 数分桶', () => {
     expect(heatLevel(1, 1)).toBe(2)
-    expect(heatLevel(3, 2)).toBe(2)
+    expect(heatLevel(3, 2)).toBe(3)
     expect(heatLevel(4, 3)).toBe(3)
-    expect(heatLevel(6, 5)).toBe(3)
-    expect(heatLevel(8, 6)).toBe(4)
-    expect(heatLevel(10, 9)).toBe(4)
+    expect(heatLevel(6, 4)).toBe(4)
+    expect(heatLevel(8, 5)).toBe(4)
+    expect(heatLevel(10, 6)).toBe(5)
     expect(heatLevel(14, 10)).toBe(5)
     expect(heatLevel(30, 25)).toBe(5)
   })

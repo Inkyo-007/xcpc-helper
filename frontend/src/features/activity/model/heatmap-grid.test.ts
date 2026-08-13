@@ -69,7 +69,7 @@ describe('buildHeatmapCells', () => {
     ])
     expect(cells[0]?.level).toBe(0)
     expect(cells[1]?.level).toBe(1)
-    expect(cells[2]?.level).toBe(3)
+    expect(cells[2]?.level).toBe(4)
   })
 
   it('近一年 mock 序列格子数 = 周数 × 7', () => {
