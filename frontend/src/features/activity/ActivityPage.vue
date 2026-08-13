@@ -41,6 +41,7 @@ const {
   setListPage,
   syncNow,
   bindAccount,
+  unbindAccount,
   boundOn,
 } = useActivity()
 
@@ -156,6 +157,15 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
     message.error(e instanceof Error ? e.message : '绑定失败，请稍后重试')
   }
 }
+
+async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
+  try {
+    await unbindAccount(platform, handle)
+    message.success('已解绑并删除本地数据')
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : '解绑失败，请稍后重试')
+  }
+}
 </script>
 
 <template>
@@ -244,7 +254,12 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
     </div>
 
     <AccountBindModal v-model:show="showBind" :platform="bindPreset" @bind="onBind" />
-    <UserGroupEditModal v-model:show="showGroupEdit" :accounts="accounts" @bind="openBind" />
+    <UserGroupEditModal
+      v-model:show="showGroupEdit"
+      :accounts="accounts"
+      @bind="openBind"
+      @unbind="onUnbind"
+    />
     <SyncOverlay :show="busy" />
   </div>
 </template>

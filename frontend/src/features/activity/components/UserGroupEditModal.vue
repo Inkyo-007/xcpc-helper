@@ -3,10 +3,11 @@
  * 列表式交互——每项一行，左描述右操作。
  * · 重命名用户组：右侧输入框 + 保存（等价于用户信息卡编辑 ID）；
  * · 删除用户组：右侧删除按钮（DeleteConfirmModal 确认，删当前组后关闭弹窗）；
- * · 已绑定账号：每账号一行，右侧「换绑」按钮打开绑定弹窗（锁定该平台）。 */
+ * · 平台账号：按平台逐行列出——已绑定的显示 handle，右侧「换绑」「解绑」；
+ *   未绑定的右侧「绑定」，两者均打开锁定该平台的绑定弹窗。 */
 
 import { computed, ref, watch } from 'vue'
-import { Link2, PencilLine, Trash2 } from 'lucide-vue-next'
+import { Link2, PencilLine, Plus, Trash2, Unlink } from 'lucide-vue-next'
 import { NButton, NInput, NModal, useMessage } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
 import { useActivity } from '@/features/activity/store'
@@ -21,9 +22,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:show': [value: boolean]
   bind: [platform: PlatformId]
+  unbind: [platform: PlatformId, handle: string]
 }>()
 
-const { platformName } = useActivity()
+const { platforms, platformName } = useActivity()
 const { profile } = useProfile()
 const { groups, currentKey, deleteGroup } = useUserGroups()
 const message = useMessage()
@@ -87,7 +89,23 @@ function confirmDelete(): void {
   emit('update:show', false)
 }
 
-/* ---------- 换绑 ---------- */
+/* ---------- 绑定 / 换绑 / 解绑 ---------- */
+
+/** 按平台逐行：绑定状态由 accounts 派生（每平台至多一个账号） */
+const platformRows = computed(() =>
+  platforms.value.map((p) => ({
+    platform: p,
+    account: props.accounts.find((a) => a.platform === p.id) ?? null,
+  })),
+)
+
+const unbinding = ref<BoundAccount | null>(null)
+
+function confirmUnbind(): void {
+  if (!unbinding.value) return
+  emit('unbind', unbinding.value.platform, unbinding.value.handle)
+  unbinding.value = null
+}
 
 function stateLabel(acc: BoundAccount): string {
   if (acc.syncState === 'running') return '同步中'
@@ -146,22 +164,33 @@ function stateLabel(acc: BoundAccount): string {
         </div>
       </div>
 
-      <div class="edit-section-title">已绑定账号</div>
-      <div v-if="accounts.length === 0" class="edit-empty">还没有绑定任何账号</div>
-      <div v-for="acc in accounts" :key="`${acc.platform}/${acc.handle}`" class="edit-row">
+      <div class="edit-section-title">平台账号</div>
+      <div v-if="platformRows.length === 0" class="edit-empty">平台列表加载中…</div>
+      <div v-for="row in platformRows" :key="row.platform.id" class="edit-row">
         <div class="edit-desc">
           <span class="edit-title">
-            {{ platformName(acc.platform) }}
-            <span class="account-handle mono">{{ acc.handle }}</span>
+            {{ row.platform.name }}
+            <span v-if="row.account" class="account-handle mono">{{ row.account.handle }}</span>
           </span>
-          <span v-if="stateLabel(acc)" class="edit-hint account-state" :class="acc.syncState">
-            {{ stateLabel(acc) }}
+          <span v-if="row.account && stateLabel(row.account)" class="edit-hint account-state" :class="row.account.syncState">
+            {{ stateLabel(row.account) }}
           </span>
+          <span v-else-if="!row.account" class="edit-hint">未绑定</span>
         </div>
         <div class="edit-action">
-          <NButton size="small" secondary @click="emit('bind', acc.platform)">
-            <template #icon><Link2 :size="14" /></template>
-            换绑
+          <template v-if="row.account">
+            <NButton size="small" secondary @click="emit('bind', row.platform.id)">
+              <template #icon><Link2 :size="14" /></template>
+              换绑
+            </NButton>
+            <NButton size="small" type="error" secondary @click="unbinding = row.account">
+              <template #icon><Unlink :size="14" /></template>
+              解绑
+            </NButton>
+          </template>
+          <NButton v-else size="small" dashed @click="emit('bind', row.platform.id)">
+            <template #icon><Plus :size="14" /></template>
+            绑定
           </NButton>
         </div>
       </div>
@@ -173,6 +202,13 @@ function stateLabel(acc: BoundAccount): string {
       :target="profile.name"
       @update:show="showDelete = $event"
       @confirm="confirmDelete"
+    />
+    <DeleteConfirmModal
+      :show="unbinding !== null"
+      title="解绑账号"
+      :target="unbinding ? `${platformName(unbinding.platform)}/${unbinding.handle}` : ''"
+      @update:show="unbinding = null"
+      @confirm="confirmUnbind"
     />
   </NModal>
 </template>
