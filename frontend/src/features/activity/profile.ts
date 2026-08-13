@@ -171,7 +171,18 @@ export function useUserGroups() {
     if (state.groups.some((g) => g.key === key)) state.current = key
   }
 
-  return { groups, currentKey, createGroup, switchGroup }
+  /** 删除用户组（仅删档案，第一期训练数据不按组隔离）；
+   * 仅剩一个组或 key 不存在时返回错误信息；删除当前组则切换到剩余首个组 */
+  function deleteGroup(key: string): string | null {
+    if (state.groups.length <= 1) return '至少保留一个用户组'
+    const index = state.groups.findIndex((g) => g.key === key)
+    if (index < 0) return '用户组不存在'
+    state.groups.splice(index, 1)
+    if (state.current === key) state.current = state.groups[0].key
+    return null
+  }
+
+  return { groups, currentKey, createGroup, switchGroup, deleteGroup }
 }
 
 /** 读取图片文件，居中裁剪并缩放为方形头像 data URL（控制 localStorage 体积） */
