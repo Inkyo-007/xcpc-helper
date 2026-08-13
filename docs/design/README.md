@@ -8,7 +8,7 @@
 | [template-library.md](template-library.md) | 模板库（template） | 已实现 |
 | [printbook.md](printbook.md) | 打印册（printbook） | 已实现 |
 | [transfer.md](transfer.md) | 导入 / 导出（transfer） | 已实现 |
-| [activity.md](activity.md) | 训练统计聚合（activity） | 设计中 |
+| [activity.md](activity.md) | 训练统计聚合（activity） | 已实现（第一期） |
 
 ## 状态约定
 

@@ -1,8 +1,8 @@
 # 训练统计聚合（activity）设计
 
-> 状态：设计中。完成后请更新 [README.md](README.md) 索引中的状态。
+> 状态：已实现（第一期：Codeforces 提交统计 + 绑定验证全链路；rating 折线与平台专属信息属后续增量，相关结构已预留）。
 > 需求背景见 [../cache/requirement.md](../cache/requirement.md)，平台接口依据见 [../cache/platform-api-research.md](../cache/platform-api-research.md)。
-> 当前进度：第一期范围（仅做题数据统计）已全部定稿；rating 折线与平台专属信息属后续增量，相关结构已预留。
+> 当前进度：第一期已上线——仅 Codeforces 适配，汇总视图当前仅参考 codeforces。
 
 ## 1. 背景与目标
 
@@ -56,11 +56,13 @@ backend/data/user/
    └─ secrets.json              # cookie 等凭据（gitignore，仅存本机）
 ```
 
-`.gitignore` 需补充（实现前先补）：
+`.gitignore` 已补充（实现时落实）：
 
 ```
 backend/data/user/*/secrets.json
 backend/data/user/**/.tmp-*
+backend/data/user/default/   # 用户组运行数据不入库（每次同步都会变更）；
+                             # 格式样例见 example/，随样例文件入 git
 ```
 
 ### 3.2 统一提交模型
@@ -181,14 +183,14 @@ backend/src/
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/activity/platforms` | 平台元数据（id/名称/capabilities）+ 已绑定账号及各账号同步状态 |
-| POST | `/api/activity/accounts/verify` | 校验 `{platform, handle}` 存在性，回执平台内用户基本信息 |
-| POST | `/api/activity/accounts` | 绑定账号 `{platform, handle, credentials?}`，成功后自动触发首次同步 |
+| GET | `/api/activity/platforms` | 平台元数据（id/名称/capabilities/auth）+ 已绑定账号及各账号同步状态 |
+| POST | `/api/activity/accounts/verify` | 校验 `{platform, handle}` 存在性，回执 `{platform, handle, avatar?}`；用户不存在 400，平台故障 502 |
+| POST | `/api/activity/accounts` | 绑定账号 `{platform, handle, credentials?}`，成功后自动触发首次同步（201） |
 | DELETE | `/api/activity/accounts/{platform}/{handle}` | 解绑并删除该账号本地数据（204） |
 | GET | `/api/activity/overview?platform=` | 概览：all-time 总量 + streak + 近 370 天日序列 `[{date, submissions, solved}]`；缺省为汇总 |
-| GET | `/api/activity/submissions?date=&platform=` | 某日提交明细（平台过滤可选） |
-| POST | `/api/activity/sync` | 触发同步 `{platform?}`，空为全部账号；立即返回 |
-| GET | `/api/activity/sync/status` | 各账号同步状态（idle/running/上次结果/错误诊断），前端 1.5s 轮询 |
+| GET | `/api/activity/submissions?date=&platform=` | 提交列表：带 `date` 为当日明细；不带 `date` 为近 21 天近期提交（跨账号合并、时间倒序）；平台过滤可选 |
+| POST | `/api/activity/sync` | 触发同步 `{platform?}`，空为全部账号；立即返回（202），后台执行 |
+| GET | `/api/activity/sync/status` | 各账号同步状态（idle/running/上次结果/错误诊断），前端轮询 |
 
 柱状图（近 7 天 / 近 12 月 AC 数）由前端 `model/bars.ts` 从日序列派生，不单独出 API。streak 由后端计算（可能超过日序列窗口）。
 
