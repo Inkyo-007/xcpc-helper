@@ -14,6 +14,7 @@ import StatCards from '@/features/activity/components/StatCards.vue'
 import SubmissionList from '@/features/activity/components/SubmissionList.vue'
 import SyncBar from '@/features/activity/components/SyncBar.vue'
 import SyncOverlay from '@/features/activity/components/SyncOverlay.vue'
+import UserGroupEditModal from '@/features/activity/components/UserGroupEditModal.vue'
 import UserProfileCard from '@/features/activity/components/UserProfileCard.vue'
 import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
 import { parseDate, toDateStr } from '@/features/activity/model/dates'
@@ -40,7 +41,6 @@ const {
   setListPage,
   syncNow,
   bindAccount,
-  unbindAccount,
   boundOn,
 } = useActivity()
 
@@ -48,6 +48,8 @@ const message = useMessage()
 const showBind = ref(false)
 /** 绑定弹窗锁定的平台：从平台视图的账号按钮打开时为该平台，空状态入口为 null */
 const bindPreset = ref<PlatformId | null>(null)
+/** 编辑用户组弹窗（重命名 / 删除 / 换绑账号） */
+const showGroupEdit = ref(false)
 
 const weeklyBars = computed(() => weeklySolved(mergedDaily.value))
 const monthlyBars = computed(() => monthlySolved(mergedDaily.value))
@@ -154,15 +156,6 @@ async function onBind(platform: PlatformId, handle: string): Promise<void> {
     message.error(e instanceof Error ? e.message : '绑定失败，请稍后重试')
   }
 }
-
-async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
-  try {
-    await unbindAccount(platform, handle)
-    message.success('已解绑并删除本地数据')
-  } catch (e) {
-    message.error(e instanceof Error ? e.message : '解绑失败，请稍后重试')
-  }
-}
 </script>
 
 <template>
@@ -179,7 +172,7 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
         :active-platform="activePlatform"
         @sync="syncNow"
         @bind="openBind"
-        @unbind="onUnbind"
+        @edit-group="showGroupEdit = true"
       />
     </div>
 
@@ -251,6 +244,7 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
     </div>
 
     <AccountBindModal v-model:show="showBind" :platform="bindPreset" @bind="onBind" />
+    <UserGroupEditModal v-model:show="showGroupEdit" :accounts="accounts" @bind="openBind" />
     <SyncOverlay :show="busy" />
   </div>
 </template>

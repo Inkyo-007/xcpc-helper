@@ -1,16 +1,14 @@
 <script setup lang="ts">
-/** 同步区：新鲜度 + 立即同步 + 账号管理弹层（解绑）+ 右侧账号入口。
+/** 同步区：新鲜度 + 立即同步 + 编辑用户组入口（仅汇总视图）+ 右侧账号入口。
  * 汇总视图为用户组下拉菜单；平台视图为该平台绑定账号的 ID（未绑定则
  * 显示「未绑定账号」），点击进入绑定 / 换绑。
  * 立即同步的范围随视图：汇总视图同步全部平台（点击先弹确认，说明
  * 可能较慢），平台视图只同步该平台（直接触发）。 */
 
 import { computed, ref } from 'vue'
-import { Link2, Plus, RefreshCw, Unlink, Users } from 'lucide-vue-next'
-import { NButton, NModal, NPopover, NTooltip } from 'naive-ui'
-import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
+import { Link2, Plus, RefreshCw, UserRoundPen } from 'lucide-vue-next'
+import { NButton, NModal, NTooltip } from 'naive-ui'
 import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
-import { useActivity } from '@/features/activity/store'
 import type { PlatformScope } from '@/features/activity/store'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
@@ -24,30 +22,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   sync: []
   bind: [platform: PlatformId]
-  unbind: [platform: PlatformId, handle: string]
+  'edit-group': []
 }>()
-
-const { platformName } = useActivity()
-
-const removing = ref<BoundAccount | null>(null)
 
 /** 平台视图下当前平台绑定的账号（每平台至多一个） */
 const platformAccount = computed<BoundAccount | null>(() => {
   if (props.activePlatform === 'all') return null
   return props.accounts.find((a) => a.platform === props.activePlatform) ?? null
 })
-
-function stateLabel(acc: BoundAccount): string {
-  if (acc.syncState === 'running') return '同步中'
-  if (acc.syncState === 'error') return acc.syncError ?? '同步失败'
-  return ''
-}
-
-function confirmUnbind(): void {
-  if (!removing.value) return
-  emit('unbind', removing.value.platform, removing.value.handle)
-  removing.value = null
-}
 
 /* ---------- 同步全部平台确认 ---------- */
 
@@ -83,35 +65,19 @@ function confirmSyncAll(): void {
       </template>
       立即同步
     </NTooltip>
-    <NPopover trigger="click" placement="bottom-end">
+    <NTooltip v-if="activePlatform === 'all'" :show-arrow="false">
       <template #trigger>
-        <button type="button" class="tool-icon-btn" aria-label="账号管理">
-          <Users :size="15" />
+        <button
+          type="button"
+          class="tool-icon-btn"
+          aria-label="编辑用户组"
+          @click="emit('edit-group')"
+        >
+          <UserRoundPen :size="15" />
         </button>
       </template>
-      <div class="account-panel">
-        <div class="account-panel-title">已绑定账号</div>
-        <div v-if="accounts.length === 0" class="account-empty">还没有绑定任何账号</div>
-        <div v-for="acc in accounts" :key="`${acc.platform}/${acc.handle}`" class="account-row">
-          <span class="account-platform">{{ platformName(acc.platform) }}</span>
-          <span class="account-handle mono">{{ acc.handle }}</span>
-          <span class="account-state" :class="acc.syncState">{{ stateLabel(acc) }}</span>
-          <NTooltip :show-arrow="false">
-            <template #trigger>
-              <button
-                type="button"
-                class="account-unbind"
-                aria-label="解绑"
-                @click="removing = acc"
-              >
-                <Unlink :size="13" />
-              </button>
-            </template>
-            解绑并删除本地数据
-          </NTooltip>
-        </div>
-      </div>
-    </NPopover>
+      编辑用户组
+    </NTooltip>
     <UserGroupMenu v-if="activePlatform === 'all'" />
     <NTooltip v-else :show-arrow="false">
       <template #trigger>
@@ -132,13 +98,6 @@ function confirmSyncAll(): void {
       </template>
       {{ platformAccount ? '点击换绑账号' : '点击绑定账号' }}
     </NTooltip>
-    <DeleteConfirmModal
-      :show="removing !== null"
-      title="解绑账号"
-      :target="removing ? `${platformName(removing.platform)}/${removing.handle}` : ''"
-      @update:show="removing = null"
-      @confirm="confirmUnbind"
-    />
     <NModal
       :show="showSyncAllConfirm"
       preset="card"
@@ -220,74 +179,6 @@ function confirmSyncAll(): void {
   to {
     transform: rotate(360deg);
   }
-}
-
-.account-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 240px;
-}
-
-.account-panel-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.account-empty {
-  font-size: 12px;
-  color: var(--faint);
-  padding: 6px 0;
-}
-
-.account-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-}
-
-.account-platform {
-  color: var(--muted);
-  flex: none;
-}
-
-.account-handle {
-  color: var(--text);
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.account-state {
-  font-size: 11px;
-  color: var(--faint);
-}
-
-.account-state.error {
-  color: #c63b57;
-}
-
-.account-unbind {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-left: auto;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--faint);
-  cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
-}
-
-.account-unbind:hover {
-  color: #c63b57;
-  background: hsl(350 60% 50% / 0.1);
 }
 
 .sync-all-body {
