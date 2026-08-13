@@ -18,9 +18,11 @@ from core.config import get_settings
 from core.exceptions import register_exception_handlers
 from core.logging import setup_logging
 from modules.template.watcher import ContentWatcher
+from routers.activity.router import router as activity_router
 from routers.printbook.router import router as printbook_router
 from routers.template.router import router as template_router
 from routers.transfer.router import router as transfer_router
+from services.activity.service import init_activity_service
 from services.printbook.service import init_print_book_service
 from services.template.service import init_template_service
 from services.transfer.service import init_transfer_service
@@ -38,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     init_print_book_service(settings, service)
     init_transfer_service(settings, service)
+    activity = init_activity_service(settings)
 
     watcher: ContentWatcher | None = None
     if settings.watch_enabled:
@@ -50,6 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    await activity.aclose()
     if watcher is not None:
         watcher.stop()
 
@@ -87,6 +91,7 @@ def create_app() -> FastAPI:
     )
     register_exception_handlers(app)
     app.add_exception_handler(StarletteHTTPException, spa_fallback_handler)
+    app.include_router(activity_router)
     app.include_router(template_router)
     app.include_router(printbook_router)
     app.include_router(transfer_router)
