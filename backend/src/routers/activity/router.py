@@ -10,8 +10,14 @@ from fastapi import APIRouter, Depends, Query
 from modules.activity.schemas import (
     BindIn,
     BoundAccountOut,
+    GroupCreateIn,
+    GroupOut,
+    GroupRenameIn,
+    GroupsOut,
     OverviewOut,
     PlatformsOut,
+    ProfileOut,
+    ProfileUpdateIn,
     SubmissionsOut,
     SyncIn,
     VerifyIn,
@@ -22,6 +28,48 @@ from services.activity.service import ActivityService, get_activity_service
 router = APIRouter(prefix="/api/activity", tags=["activity"])
 
 ServiceDep = Annotated[ActivityService, Depends(get_activity_service)]
+
+
+# ===== 用户组与信息卡 =====
+
+
+@router.get("/groups", response_model=GroupsOut)
+async def get_groups(service: ServiceDep) -> GroupsOut:
+    return service.groups()
+
+
+@router.post("/groups", response_model=GroupOut, status_code=201)
+async def create_group(payload: GroupCreateIn, service: ServiceDep) -> GroupOut:
+    return service.create_group(payload)
+
+
+@router.patch("/groups/{name}", response_model=GroupsOut)
+async def rename_group(
+    name: str, payload: GroupRenameIn, service: ServiceDep
+) -> GroupsOut:
+    return service.rename_group(name, payload)
+
+
+@router.delete("/groups/{name}", status_code=204)
+async def delete_group(name: str, service: ServiceDep) -> None:
+    service.delete_group(name)
+
+
+@router.post("/current-group", response_model=GroupOut)
+async def switch_group(payload: GroupCreateIn, service: ServiceDep) -> GroupOut:
+    return service.switch_group(payload.name)
+
+
+@router.get("/profile", response_model=ProfileOut)
+async def get_profile(service: ServiceDep) -> ProfileOut:
+    return service.current_profile()
+
+
+@router.patch("/profile", response_model=ProfileOut)
+async def update_profile(
+    payload: ProfileUpdateIn, service: ServiceDep
+) -> ProfileOut:
+    return service.update_profile(payload)
 
 
 @router.get("/platforms", response_model=PlatformsOut)

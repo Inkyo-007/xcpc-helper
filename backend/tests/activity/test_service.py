@@ -12,7 +12,13 @@ import pytest
 from adapters.net import HttpFetcher
 from core.config import Settings
 from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
-from modules.activity.schemas import BindIn, VerifyIn
+from modules.activity.schemas import (
+    BindIn,
+    GroupCreateIn,
+    GroupRenameIn,
+    ProfileUpdateIn,
+    VerifyIn,
+)
 from services.activity.service import ActivityService
 
 FIXTURES = Path(__file__).resolve().parents[1] / "adapters" / "fixtures"
@@ -162,10 +168,10 @@ async def test_bind_rebind_replaces_account(service: ActivityService):
     await service.bind(BindIn(platform="codeforces", handle="other"))
     await wait_sync_done(service)
 
-    profile = service._store.load_profile()
+    profile = service._store().load_profile()
     assert [a.handle for a in profile.accounts] == ["other"]
     # 旧账号数据文件已删除
-    items, _ = service._store.load_submissions("codeforces", "demo")
+    items, _ = service._store().load_submissions("codeforces", "demo")
     assert items == []
 
 
@@ -261,6 +267,132 @@ async def test_sync_and_status(service: ActivityService):
 async def test_sync_unsupported_platform(service: ActivityService):
     with pytest.raises(BadRequestError):
         await service.sync("luogu")
+
+
+# ===== 用户组管理 =====
+
+
+async def test_create_switch_rename_delete_group(tmp_path):
+    """用户组完整生命周期：新建（自动切换）→ 切换 → 重命名 → 删除回退。"""
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler()), base_backoff=0.01
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        # 默认组存在（default 目录即使未显式创建，操作时按空档案处理）
+        groups = svc.groups().groups
+        assert any(g.name == "default" and g.current for g in groups)
+
+        # 新建（中文组名）并自动切换
+        out = svc.create_group(GroupCreateIn(name="第一组"))
+        assert out.name == "第一组"
+        assert out.current
+        assert any(g.name == "第一组" and g.current for g in svc.groups().groups)
+
+        # 切换回 default
+        svc.switch_group("default")
+        assert any(g.name == "default" and g.current for g in svc.groups().groups)
+
+        # 重命名当前组（目录改名 + current 同步）
+        svc.switch_group("第一组")
+        result = svc.rename_group("第一组", GroupRenameIn(newName="第二组"))
+        assert svc._current_group == "第二组"
+        names = [g.name for g in result.groups]
+        assert "第一组" not in names and "第二组" in names
+
+        # 删除当前组 → 回退到剩余组
+        svc.delete_group("第二组")
+        assert svc._current_group != "第二组"
+        assert all(g.name != "第二组" for g in svc.groups().groups)
+
+        # 不允许删除最后一个组
+        remaining = svc.groups().groups
+        last = remaining[0].name
+        for g in remaining[1:]:
+            svc.delete_group(g.name)
+        with pytest.raises(BadRequestError):
+            svc.delete_group(last)
+
+        # 删除不存在 / 切换不存在
+        with pytest.raises(NotFoundError):
+            svc.switch_group("不存在的组")
+        with pytest.raises(NotFoundError):
+            svc.delete_group("不存在的组")
+    finally:
+        await svc.aclose()
+
+
+async def test_group_data_isolated(tmp_path):
+    """不同用户组的账号绑定与训练数据互相隔离。"""
+    rows = [cf_row(1, sys_today_ts(0, 10), "OK", "A")]
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler(status_rows=rows)),
+        base_backoff=0.01,
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        # 组 A 绑定账号并同步
+        svc.create_group(GroupCreateIn(name="A"))
+        await svc.bind(BindIn(platform="codeforces", handle="demo"))
+        await wait_sync_done(svc)
+        assert svc.overview(None).totals.totalSubmissions == 1
+
+        # 切到组 B：无账号、无数据
+        svc.create_group(GroupCreateIn(name="B"))
+        assert svc.platforms().platforms[0].account is None
+        assert svc.overview(None).totals.totalSubmissions == 0
+        assert svc.submissions(date=None, platform=None).items == []
+
+        # 切回组 A：数据仍在
+        svc.switch_group("A")
+        assert svc.platforms().platforms[0].account.handle == "demo"
+        assert svc.overview(None).totals.totalSubmissions == 1
+    finally:
+        await svc.aclose()
+
+
+async def test_profile_update_independent_of_group_name(tmp_path):
+    """信息卡（ID/签名/头像）独立于组名存储与编辑。"""
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler()), base_backoff=0.01
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        svc.create_group(GroupCreateIn(name="组名"))
+        # 信息卡 ID 初始为组名，但可独立修改（不与组名同步）
+        p = svc.update_profile(
+            ProfileUpdateIn(id="独立ID", signature="冲上紫名", avatar="data:image/png;base64,xx")
+        )
+        assert p.id == "独立ID"
+        assert p.signature == "冲上紫名"
+
+        # 重命名组不影响信息卡
+        svc.rename_group("组名", GroupRenameIn(newName="新组名"))
+        cur = svc.current_profile()
+        assert cur.id == "独立ID"
+        assert cur.signature == "冲上紫名"
+
+        # 头像过大拒绝
+        with pytest.raises(BadRequestError):
+            svc.update_profile(ProfileUpdateIn(avatar="x" * 300_001))
+    finally:
+        await svc.aclose()
+
+
+async def test_groups_are_persisted_dirs(tmp_path):
+    """用户组即目录：服务创建后目录真实存在，重启（新服务实例）仍可列出。"""
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler()), base_backoff=0.01
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    svc.create_group(GroupCreateIn(name="持久组"))
+    await svc.aclose()
+
+    svc2 = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        assert any(g.name == "持久组" for g in svc2.groups().groups)
+    finally:
+        await svc2.aclose()
 
 
 async def wait_sync_done(service: ActivityService, timeout: float = 3.0):

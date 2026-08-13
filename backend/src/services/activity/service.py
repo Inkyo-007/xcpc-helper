@@ -1,8 +1,12 @@
-"""activity 业务编排门面：账号 CRUD / 绑定验证、触发同步、聚合读取。
+"""activity 业务编排门面：用户组管理、账号 CRUD / 绑定验证、触发同步、聚合读取。
 
 依赖方向严格单向 routers → services → modules → adapters；
 adapter 只允许被本服务与 modules/activity/sync.py 触碰。
-第一期固定 default 用户组（存储层带 userid 维度，API 不暴露用户组管理）。
+
+用户组 = data/user/<user_id>/ 目录（目录名即组名，支持中文）；
+服务层维护"当前用户组"（单机本地应用，内存态，默认 default），
+其余 API 一律作用于当前组。信息卡（ID/签名/头像）存于组内 profile.json，
+与组名分离、独立编辑。
 """
 
 import asyncio
@@ -26,10 +30,16 @@ from modules.activity.schemas import (
     BindIn,
     BoundAccountOut,
     DayActivityOut,
+    GroupCreateIn,
+    GroupOut,
+    GroupRenameIn,
+    GroupsOut,
     OverviewOut,
     OverviewTotalsOut,
     PlatformMetaOut,
     PlatformsOut,
+    ProfileOut,
+    ProfileUpdateIn,
     SubmissionOut,
     SubmissionsOut,
     VerifyIn,
@@ -42,6 +52,8 @@ logger = logging.getLogger("xcpc.service.activity")
 # 近期提交条数上限：全部历史按时间倒序取最后 N 条，
 # 不按时间窗口过滤（保证"近期没做题"的账号也能看到最近记录）
 RECENT_LIMIT = 200
+# 信息卡头像 data URL 长度上限（128px JPEG 约 10KB，预留余量）
+AVATAR_MAX_CHARS = 300_000
 
 
 class ActivityService:
@@ -56,13 +68,17 @@ class ActivityService:
         self._adapters: dict[str, PlatformAdapter] = {
             pid: cls(self._fetcher) for pid, cls in REGISTRY.items()
         }
-        self._store = activity_store.UserStore(settings.user_data_dir, DEFAULT_USER_ID)
         self._engine = SyncEngine(
-            self._store,
+            settings.user_data_dir,
             self._adapters,
             full_window_days=settings.activity_window_days,
             full_min_rows=settings.activity_full_min_rows,
         )
+        # 确保默认用户组目录存在（惰性初始化，幂等）
+        if DEFAULT_USER_ID not in activity_store.list_groups(settings.user_data_dir):
+            activity_store.create_group(settings.user_data_dir, DEFAULT_USER_ID)
+        # 当前用户组（内存态；单机本地应用，前端切组时切换）
+        self._current_group = DEFAULT_USER_ID
 
     async def aclose(self) -> None:
         await self._fetcher.aclose()
@@ -73,10 +89,89 @@ class ActivityService:
             raise BadRequestError(f"不支持的平台: {platform}")
         return adapter
 
+    def _store(self) -> activity_store.UserStore:
+        """当前用户组的 store。"""
+        return activity_store.UserStore(
+            self._settings.user_data_dir, self._current_group
+        )
+
+    def _require_group(self, name: str) -> None:
+        """组存在性校验（目录即组）。"""
+        if name not in activity_store.list_groups(self._settings.user_data_dir):
+            raise NotFoundError(f"用户组不存在: {name}")
+
+    # ===== 用户组管理 =====
+
+    def groups(self) -> GroupsOut:
+        root = self._settings.user_data_dir
+        return GroupsOut(
+            groups=[
+                GroupOut(name=g, current=(g == self._current_group))
+                for g in activity_store.list_groups(root)
+            ]
+        )
+
+    def create_group(self, payload: GroupCreateIn) -> GroupOut:
+        """新建用户组并切换过去（信息卡 ID 初始为组名，之后独立编辑）。"""
+        name = activity_store.create_group(
+            self._settings.user_data_dir, payload.name.strip()
+        )
+        self._current_group = name
+        return GroupOut(name=name, current=True)
+
+    def rename_group(self, name: str, payload: GroupRenameIn) -> GroupsOut:
+        """用户组目录改名（数据归属不变）；当前组被改名时同步切换。"""
+        new_name = activity_store.rename_group(
+            self._settings.user_data_dir, name, payload.newName.strip()
+        )
+        if self._current_group == name:
+            self._current_group = new_name
+        return self.groups()
+
+    def delete_group(self, name: str) -> None:
+        """物理删除用户组（含全部数据）；当前组被删则回退到剩余组。"""
+        remaining = activity_store.list_groups(self._settings.user_data_dir)
+        if len(remaining) <= 1 and name in remaining:
+            raise BadRequestError("至少保留一个用户组")
+        activity_store.delete_group(self._settings.user_data_dir, name)
+        self._engine.drop_user(name)
+        if self._current_group == name:
+            rest = activity_store.list_groups(self._settings.user_data_dir)
+            self._current_group = rest[0] if rest else DEFAULT_USER_ID
+
+    def switch_group(self, name: str) -> GroupOut:
+        """切换当前用户组。"""
+        self._require_group(name)
+        self._current_group = name
+        return GroupOut(name=name, current=True)
+
+    # ===== 信息卡（profile）=====
+
+    def current_profile(self) -> ProfileOut:
+        profile = self._store().load_profile()
+        return ProfileOut(
+            id=profile.id, signature=profile.signature, avatar=profile.avatar
+        )
+
+    def update_profile(self, payload: ProfileUpdateIn) -> ProfileOut:
+        profile = self._store().load_profile()
+        if payload.id is not None:
+            profile.id = payload.id.strip()
+        if payload.signature is not None:
+            profile.signature = payload.signature.strip()
+        if payload.avatar is not None:
+            if len(payload.avatar) > AVATAR_MAX_CHARS:
+                raise BadRequestError("头像文件过大，请换一张小一点的图片")
+            profile.avatar = payload.avatar or None
+        self._store().save_profile(profile)
+        return ProfileOut(
+            id=profile.id, signature=profile.signature, avatar=profile.avatar
+        )
+
     # ===== 平台元数据 =====
 
     def platforms(self) -> PlatformsOut:
-        profile = self._store.load_profile()
+        profile = self._store().load_profile()
         metas: list[PlatformMetaOut] = []
         for pid, adapter in self._adapters.items():
             account = next(
@@ -94,7 +189,9 @@ class ActivityService:
         return PlatformsOut(platforms=metas)
 
     def _account_out(self, account: Account) -> BoundAccountOut:
-        status = self._engine.status_of(account.platform, account.handle)
+        status = self._engine.status_of(
+            self._current_group, account.platform, account.handle
+        )
         last_sync_at = status.last_synced_at
         if last_sync_at is None and account.last_synced_at:
             # 重启后内存状态缺失：以档案游标（最近成功同步的数据水位）近似展示
@@ -137,15 +234,18 @@ class ActivityService:
         handle = payload.handle.strip()
         if not handle:
             raise BadRequestError("请输入平台用户名")
+        store = self._store()
         # 换绑：每个平台每用户组只保留一个账号，旧账号连同本地数据删除
-        profile = self._store.load_profile()
+        profile = store.load_profile()
         for acc in profile.accounts:
             if acc.platform == payload.platform:
-                self._store.remove_account(acc.platform, acc.handle)
-                self._engine.drop_status(acc.platform, acc.handle)
+                store.remove_account(acc.platform, acc.handle)
+                self._engine.drop_status(
+                    self._current_group, acc.platform, acc.handle
+                )
                 break
         account = Account(platform=payload.platform, handle=handle)
-        self._store.save_account(account)
+        store.save_account(account)
         # 首次同步后台异步执行，前端轮询 /sync/status
         asyncio.create_task(self._safe_sync(payload.platform, handle))
         return self._account_out(account)
@@ -153,25 +253,27 @@ class ActivityService:
     def unbind(self, platform: str, handle: str) -> None:
         self._adapter(platform)
         handle = handle.strip()
-        profile = self._store.load_profile()
+        store = self._store()
+        profile = store.load_profile()
         if not any(
             acc.platform == platform and acc.handle == handle
             for acc in profile.accounts
         ):
             raise NotFoundError(f"账号未绑定: {platform}/{handle}")
-        self._store.remove_account(platform, handle)
-        self._engine.drop_status(platform, handle)
+        store.remove_account(platform, handle)
+        self._engine.drop_status(self._current_group, platform, handle)
 
     # ===== 聚合读取 =====
 
     def _submissions(self, platform: str | None) -> list[Submission]:
         """当前用户组全部账号（可按平台过滤）的提交合并。"""
-        profile = self._store.load_profile()
+        store = self._store()
+        profile = store.load_profile()
         out: list[Submission] = []
         for acc in profile.accounts:
             if platform is not None and acc.platform != platform:
                 continue
-            items, skipped = self._store.load_submissions(acc.platform, acc.handle)
+            items, skipped = store.load_submissions(acc.platform, acc.handle)
             if skipped:
                 logger.warning(
                     "提交数据 %d 行损坏被跳过 [%s/%s]",
@@ -239,7 +341,7 @@ class ActivityService:
     async def sync(self, platform: str | None) -> None:
         if platform is not None:
             self._adapter(platform)
-        profile = self._store.load_profile()
+        profile = self._store().load_profile()
         targets = [
             (acc.platform, acc.handle)
             for acc in profile.accounts
@@ -251,13 +353,13 @@ class ActivityService:
 
     async def _safe_sync(self, platform: str, handle: str) -> None:
         try:
-            await self._engine.sync_account(platform, handle)
+            await self._engine.sync_account(self._current_group, platform, handle)
         except Exception as exc:  # 兜底降级，见 sync()
             logger.exception("同步意外异常 [%s/%s]", platform, handle)
-            self._engine.mark_error(platform, handle, str(exc))
+            self._engine.mark_error(self._current_group, platform, handle, str(exc))
 
     def sync_status(self) -> list[BoundAccountOut]:
-        profile = self._store.load_profile()
+        profile = self._store().load_profile()
         return [self._account_out(acc) for acc in profile.accounts]
 
 

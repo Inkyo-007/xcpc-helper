@@ -98,3 +98,37 @@ class SubmissionsOut(BaseModel):
 
 class SyncIn(BaseModel):
     platform: str | None = None  # 为空则同步全部账号
+
+
+# ===== 用户组与信息卡 =====
+
+
+class GroupOut(BaseModel):
+    name: str  # 用户组名（目录名）
+    current: bool
+
+
+class GroupsOut(BaseModel):
+    groups: list[GroupOut]
+
+
+class GroupCreateIn(BaseModel):
+    name: str
+
+
+class GroupRenameIn(BaseModel):
+    newName: str
+
+
+class ProfileOut(BaseModel):
+    """信息卡：显示 ID（与组名分离）/ 签名 / 头像（data URL 或 null）。"""
+
+    id: str
+    signature: str
+    avatar: str | None = None
+
+
+class ProfileUpdateIn(BaseModel):
+    id: str | None = None
+    signature: str | None = None
+    avatar: str | None = None
