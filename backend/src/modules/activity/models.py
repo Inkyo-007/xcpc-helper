@@ -62,3 +62,4 @@ class SyncStatus(BaseModel):
     state: SyncState = SyncState.IDLE
     last_synced_at: datetime | None = None  # 最近一次同步结束时间（本地时区）
     error: str | None = None
+    error_code: str | None = None  # 结构化错误码（如 auth_expired，供前端分处置路径）

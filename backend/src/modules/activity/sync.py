@@ -9,7 +9,7 @@ import asyncio
 import logging
 from datetime import datetime
 
-from adapters.base import AdapterError, PlatformAdapter
+from adapters.base import AdapterError, AuthExpiredError, PlatformAdapter
 from core.exceptions import NotFoundError
 from modules.activity import store as activity_store
 from modules.activity.models import Account, Submission, SyncState, SyncStatus
@@ -70,6 +70,16 @@ class SyncEngine:
             )
             try:
                 await self._run_sync(platform, handle)
+            except AuthExpiredError as exc:
+                # 凭据过期：与平台故障处置路径不同，单独标记引导重新授权
+                logger.warning("同步失败（凭据过期） [%s/%s] %s", platform, handle, exc)
+                self._status[key] = SyncStatus(
+                    platform=platform,
+                    handle=handle,
+                    state=SyncState.ERROR,
+                    error=str(exc),
+                    error_code="auth_expired",
+                )
             except AdapterError as exc:
                 # 平台故障（网络/限流/格式等）：降级为该账号诊断，不抛出
                 logger.warning("同步失败 [%s/%s] %s", platform, handle, exc)

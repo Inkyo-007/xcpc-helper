@@ -90,6 +90,18 @@ async def test_verify_ok(service: ActivityService):
     assert out.avatar
 
 
+async def test_verify_accepts_credentials(service: ActivityService):
+    """verify 契约预留 credentials（第一期 CF 匿名忽略；cookie 平台需要）。"""
+    out = await service.verify(
+        VerifyIn(
+            platform="codeforces",
+            handle="tourist",
+            credentials={"cookies": {"_uid": "1", "__client_id": "2"}},
+        )
+    )
+    assert out.handle == "tourist"
+
+
 async def test_verify_user_not_found(tmp_path):
     fetcher = HttpFetcher(
         transport=httpx.MockTransport(make_handler(user_info=INFO_NOT_FOUND)),

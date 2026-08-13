@@ -3,6 +3,7 @@
 import pytest
 
 from adapters.base import (
+    AuthExpiredError,
     AuthMode,
     Capability,
     Credentials,
@@ -123,6 +124,20 @@ async def test_failure_degrades_to_diagnostic(tmp_path):
     assert status.state is SyncState.ERROR
     assert "limit" in (status.error or "")
     assert store.load_profile().accounts[0].last_synced_at is None
+
+
+async def test_auth_expired_marked_with_error_code(tmp_path):
+    """凭据过期单独标记 error_code=auth_expired，与平台故障处置路径分开。"""
+    adapter = FakeAdapter()
+    adapter.fail_with = AuthExpiredError("cookie 已过期，请重新授权")
+    engine, store = make_engine(tmp_path, adapter)
+    store.save_account(Account(platform="codeforces", handle="demo"))
+
+    status = await engine.sync_account("codeforces", "demo")
+
+    assert status.state is SyncState.ERROR
+    assert status.error_code == "auth_expired"
+    assert "cookie" in (status.error or "")
 
 
 async def test_unbound_account_raises_not_found(tmp_path):

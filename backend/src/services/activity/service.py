@@ -10,7 +10,13 @@ import logging
 from datetime import datetime, tzinfo
 
 from adapters import REGISTRY, HttpFetcher
-from adapters.base import PlatformAdapter, PlatformError, UserNotFoundError
+from adapters.base import (
+    Capability,
+    Credentials,
+    PlatformAdapter,
+    PlatformError,
+    UserNotFoundError,
+)
 from core.config import Settings, get_settings
 from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
 from modules.activity import aggregate
@@ -99,17 +105,25 @@ class ActivityService:
             lastSyncAt=last_sync_at,
             syncState=status.state.value,
             syncError=status.error,
+            syncErrorCode=status.error_code,
         )
 
     # ===== 绑定验证 =====
 
     async def verify(self, payload: VerifyIn) -> VerifyOut:
         adapter = self._adapter(payload.platform)
+        if Capability.USER_INFO not in adapter.capabilities:
+            raise BadRequestError(f"平台 {payload.platform} 不支持绑定验证")
         handle = payload.handle.strip()
         if not handle:
             raise BadRequestError("请输入平台用户名")
+        credentials = (
+            Credentials.model_validate(payload.credentials)
+            if payload.credentials
+            else None
+        )
         try:
-            info = await adapter.verify(handle)
+            info = await adapter.verify(handle, credentials)
         except UserNotFoundError as exc:
             raise BadRequestError(str(exc)) from exc
         except PlatformError as exc:

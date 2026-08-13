@@ -22,6 +22,7 @@ class BoundAccountOut(BaseModel):
     lastSyncAt: datetime | None = None  # 最近一次成功同步的结束时间
     syncState: SyncStateOut = "idle"
     syncError: str | None = None
+    syncErrorCode: str | None = None  # 结构化错误码（如 auth_expired），前端分处置路径
 
 
 class PlatformMetaOut(BaseModel):
@@ -41,6 +42,7 @@ class PlatformsOut(BaseModel):
 class VerifyIn(BaseModel):
     platform: str
     handle: str
+    credentials: dict[str, Any] | None = None  # 预留（cookie 授权平台验证需凭据）
 
 
 class VerifyOut(BaseModel):
