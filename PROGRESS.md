@@ -13,6 +13,20 @@
 
 ## 最近完成
 
+### 2026-08-13 会话 3
+
+- `dd82e36e` docs: 标记训练统计聚合设计文档为已实现并同步第一期实现细节
+- `49f232f5` feat(前端): activity 接入真实后端 API 并移除 mock 数据
+- `cc0a2ca8` fix(后端): 绑定验证遇平台故障返回 502 而非 500
+- `38144230` chore: 训练统计用户组运行数据不入库（保留 example 样例）
+- `0a74977b` chore(后端): 同步 uv.lock（httpx 移入主依赖）
+- `aa9b8557` feat(后端): 实现同步引擎与 activity API
+- `2e476c69` feat(后端): 实现 activity 数据模型与 user 目录读写层（含 example 样例）
+- `5578c7b3` feat(后端): 搭建 adapters 基座并实现 Codeforces 适配器
+- `aee9223e` chore(后端): 提升 httpx 为主依赖并补充 activity 用户数据目录配置
+- `cdcc3c76` feat(前端): 新增 JG 评测中 verdict 徽章并采用浅蓝配色
+- `38352a5b` docs: 补充 JG 评测中 verdict 的模型枚举与徽章配色说明
+
 ### 2026-08-13 会话 1
 
 - `565e46e7` docs: 更新训练统计热力图交互、近期提交分页与网址同步设计
