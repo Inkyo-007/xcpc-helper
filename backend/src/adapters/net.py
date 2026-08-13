@@ -5,6 +5,10 @@
 重试为手写指数退避（不引新库），should_retry 钩子供 adapter 声明
 "业务信封重试"（如 CF 以 200 返回的 FAILED 信封，由 net 层统一重试，
 避免各 adapter 各写一套重试循环）。
+
+退避基准与平台限流间隔联动：backoff = max(base_backoff, min_interval) × 2^n。
+第一次重试等满一个完整限流窗口，避免重试请求仍落在限流窗口内
+（如 CF 建议间隔 2s，若按固定 0.5s 起步大概率再撞 "Call limit exceeded"）。
 """
 
 import asyncio
@@ -74,11 +78,11 @@ class HttpFetcher:
                     resp = await self._client.get(url, params=params, headers=headers)
                 except _RETRYABLE_EXC as exc:
                     last_error = exc
-                    await self._backoff(attempt)
+                    await self._backoff(attempt, min_interval)
                     continue
                 if resp.status_code in _RETRY_STATUS:
                     last_error = PlatformError(f"平台返回 HTTP {resp.status_code}")
-                    await self._backoff(attempt)
+                    await self._backoff(attempt, min_interval)
                     continue
                 if resp.status_code >= 400:
                     raise PlatformError(
@@ -87,7 +91,7 @@ class HttpFetcher:
                 data = resp.json()
                 if should_retry is not None and should_retry(data):
                     last_error = PlatformError("平台返回失败信封（可重试）")
-                    await self._backoff(attempt)
+                    await self._backoff(attempt, min_interval)
                     continue
                 self._last_request[platform] = time.monotonic()
                 return data
@@ -102,5 +106,8 @@ class HttpFetcher:
         if elapsed < min_interval:
             await asyncio.sleep(min_interval - elapsed)
 
-    async def _backoff(self, attempt: int) -> None:
-        await asyncio.sleep(self._base_backoff * (2**attempt))
+    async def _backoff(self, attempt: int, min_interval: float) -> None:
+        """指数退避：基准取 max(全局 base_backoff, 平台 min_interval)，
+        保证首次重试已错开一个完整限流窗口。"""
+        base = max(self._base_backoff, min_interval)
+        await asyncio.sleep(base * (2**attempt))

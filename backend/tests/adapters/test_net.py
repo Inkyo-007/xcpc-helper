@@ -163,6 +163,35 @@ async def test_4xx_not_retried():
         await fetcher.aclose()
 
 
+async def test_backoff_respects_min_interval():
+    """重试退避基准不小于平台限流间隔：首次重试错开一个完整限流窗口。
+
+    防止重试请求仍落在限流窗口内（如 CF 2s 间隔下固定 0.5s 起步大概率再撞限流）。
+    """
+    min_interval = 0.05
+    timestamps: list[float] = []
+    calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        timestamps.append(time.monotonic())
+        calls += 1
+        if calls == 1:
+            return httpx.Response(429)
+        return ok_json({"ok": True})
+
+    fetcher = make_fetcher(handler)  # base_backoff=0.01 < min_interval
+    try:
+        data = await fetcher.get_json(
+            "https://example.com/api", platform="p", min_interval=min_interval
+        )
+        assert data == {"ok": True}
+        elapsed = timestamps[1] - timestamps[0]
+        assert elapsed >= min_interval - 0.005
+    finally:
+        await fetcher.aclose()
+
+
 async def test_rate_limit_paces_requests_per_platform():
     """同平台请求间隔不小于 min_interval；不同平台互不阻塞。"""
     MIN_INTERVAL = 0.05

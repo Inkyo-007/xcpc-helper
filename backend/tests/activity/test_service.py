@@ -118,6 +118,8 @@ async def test_verify_platform_failure_is_bad_gateway(tmp_path):
         transport=httpx.MockTransport(failing_handler), base_backoff=0.01
     )
     svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    # 退避时长由 test_net 覆盖，此处只看异常转换（禁用真实限流等待）
+    svc._adapters["codeforces"].min_interval = 0
     try:
         with pytest.raises(BadGatewayError):
             await svc.verify(VerifyIn(platform="codeforces", handle="tourist"))
