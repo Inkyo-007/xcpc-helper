@@ -52,7 +52,9 @@ class CodeforcesAdapter(PlatformAdapter):
 
     # ===== 绑定验证 =====
 
-    async def verify(self, handle: str) -> UserInfo:
+    async def verify(
+        self, handle: str, credentials: Credentials | None = None
+    ) -> UserInfo:
         data = await self._fetcher.get_json(
             INFO_URL,
             params={"handles": handle},
