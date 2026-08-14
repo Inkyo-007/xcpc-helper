@@ -4,6 +4,7 @@
 adapter 只允许被 modules/activity/sync.py 与 services/activity/service.py 触碰。
 """
 
+from adapters.atcoder import AtCoderAdapter
 from adapters.base import (
     AdapterError,
     AuthMode,
@@ -22,11 +23,13 @@ from adapters.net import HttpFetcher
 
 REGISTRY: dict[str, type[PlatformAdapter]] = {
     CodeforcesAdapter.platform_id: CodeforcesAdapter,
+    AtCoderAdapter.platform_id: AtCoderAdapter,
 }
 
 __all__ = [
     "REGISTRY",
     "AdapterError",
+    "AtCoderAdapter",
     "AuthMode",
     "Capability",
     "CodeforcesAdapter",

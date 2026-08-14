@@ -83,7 +83,7 @@ async def service(tmp_path):
 
 async def test_platforms_empty(service: ActivityService):
     out = service.platforms()
-    assert [p.id for p in out.platforms] == ["codeforces"]
+    assert [p.id for p in out.platforms] == ["codeforces", "atcoder"]
     meta = out.platforms[0]
     assert meta.name == "Codeforces"
     assert "submissions" in [c.value for c in meta.capabilities]
