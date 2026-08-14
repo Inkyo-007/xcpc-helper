@@ -12,8 +12,9 @@
 - max_retries / base_backoff 支持单次调用覆盖全局默认（平台专项重试策略，
   如洛谷 403 长延迟重试，落地时按需传入）。
 
-Credentials 统一应用：cookies 走 httpx cookies 参数、headers 与调用方
-显式请求头合并（调用方优先），adapter 不自行拼 Cookie 头。
+Credentials 统一应用：cookies 转为 Cookie 头（httpx 弃用了 per-request
+cookies 参数）、headers 与调用方显式请求头合并（调用方优先），
+adapter 不自行拼 Cookie 头。
 """
 
 import asyncio
