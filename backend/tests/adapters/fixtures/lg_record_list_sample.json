@@ -1,0 +1,535 @@
+{
+  "code": 200,
+  "currentTemplate": "RecordList",
+  "currentData": {
+    "records": {
+      "result": [
+        {
+          "time": 81,
+          "memory": 10304,
+          "problem": {
+            "pid": "T601462",
+            "title": "树上转移（6）",
+            "difficulty": 0,
+            "fullScore": 100,
+            "type": "T"
+          },
+          "contest": null,
+          "sourceCodeLength": 3361,
+          "submitTime": 1785505146,
+          "language": 27,
+          "id": 289883201,
+          "status": 12,
+          "enableO2": true,
+          "score": 100
+        },
+        {
+          "time": 1053,
+          "memory": 218204,
+          "problem": {
+            "pid": "P16967",
+            "title": "[SCCPC 2026] 环基基环树",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 2365,
+          "submitTime": 1780400096,
+          "language": 27,
+          "id": 280414034,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 2200,
+          "memory": 257740,
+          "problem": {
+            "pid": "P16967",
+            "title": "[SCCPC 2026] 环基基环树",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 2334,
+          "submitTime": 1780399963,
+          "language": 27,
+          "id": 280413653,
+          "status": 14,
+          "enableO2": true
+        },
+        {
+          "time": 1043,
+          "memory": 180052,
+          "problem": {
+            "pid": "P16967",
+            "title": "[SCCPC 2026] 环基基环树",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 2206,
+          "submitTime": 1780398860,
+          "language": 27,
+          "id": 280410406,
+          "status": 14,
+          "enableO2": true
+        },
+        {
+          "time": 1098,
+          "memory": 185744,
+          "problem": {
+            "pid": "P16967",
+            "title": "[SCCPC 2026] 环基基环树",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 2095,
+          "submitTime": 1780398484,
+          "language": 27,
+          "id": 280409282,
+          "status": 14,
+          "enableO2": true
+        },
+        {
+          "time": 1097,
+          "memory": 166848,
+          "problem": {
+            "pid": "P16967",
+            "title": "[SCCPC 2026] 环基基环树",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 2193,
+          "submitTime": 1780398147,
+          "language": 27,
+          "id": 280408450,
+          "status": 14,
+          "enableO2": true
+        },
+        {
+          "time": 2200,
+          "memory": 307896,
+          "problem": {
+            "pid": "P16967",
+            "title": "[SCCPC 2026] 环基基环树",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 2182,
+          "submitTime": 1780397960,
+          "language": 27,
+          "id": 280407980,
+          "status": 14,
+          "enableO2": true
+        },
+        {
+          "time": 1115,
+          "memory": 90316,
+          "problem": {
+            "pid": "P16957",
+            "title": "[SCCPC 2026] 那一年的秘密基地",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 4674,
+          "submitTime": 1780390490,
+          "language": 27,
+          "id": 280389843,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 1164,
+          "memory": 90336,
+          "problem": {
+            "pid": "P16957",
+            "title": "[SCCPC 2026] 那一年的秘密基地",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 4675,
+          "submitTime": 1780390327,
+          "language": 27,
+          "id": 280389381,
+          "status": 14,
+          "enableO2": true
+        },
+        {
+          "time": 1172,
+          "memory": 90308,
+          "problem": {
+            "pid": "P16957",
+            "title": "[SCCPC 2026] 那一年的秘密基地",
+            "difficulty": 6,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 4674,
+          "submitTime": 1780390312,
+          "language": 27,
+          "id": 280389326,
+          "status": 14,
+          "enableO2": true
+        },
+        {
+          "time": 0,
+          "memory": 0,
+          "problem": {
+            "pid": "P1001",
+            "title": "A+B Problem",
+            "difficulty": 1,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": null,
+          "sourceCodeLength": 143,
+          "submitTime": 1780341211,
+          "language": 7,
+          "id": 280355677,
+          "status": 14,
+          "enableO2": false,
+          "score": 0
+        },
+        {
+          "time": 1190,
+          "memory": 128928,
+          "problem": {
+            "pid": "P16963",
+            "title": "[SCCPC 2026] 禁忌教典的消失咒文",
+            "difficulty": 3,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 930,
+          "submitTime": 1780339289,
+          "language": 27,
+          "id": 280355640,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 4,
+          "memory": 788,
+          "problem": {
+            "pid": "P16960",
+            "title": "[SCCPC 2026] 那一天的回文字符串",
+            "difficulty": 2,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 938,
+          "submitTime": 1780338119,
+          "language": 27,
+          "id": 280355608,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 45,
+          "memory": 1064,
+          "problem": {
+            "pid": "P16964",
+            "title": "[SCCPC 2026] 最大权独立集问题",
+            "difficulty": 2,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 607,
+          "submitTime": 1780337815,
+          "language": 27,
+          "id": 280355598,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 1366,
+          "memory": 14116,
+          "problem": {
+            "pid": "P16959",
+            "title": "[SCCPC 2026] 精灵对战",
+            "difficulty": 4,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 1246,
+          "submitTime": 1780337478,
+          "language": 27,
+          "id": 280355587,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 10,
+          "memory": 784,
+          "problem": {
+            "pid": "P16968",
+            "title": "[SCCPC 2026] 博德之跃 3",
+            "difficulty": 5,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 1422,
+          "submitTime": 1780316333,
+          "language": 27,
+          "id": 280327983,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 11,
+          "memory": 6336,
+          "problem": {
+            "pid": "P16968",
+            "title": "[SCCPC 2026] 博德之跃 3",
+            "difficulty": 5,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 1422,
+          "submitTime": 1780315982,
+          "language": 27,
+          "id": 280326905,
+          "status": 14,
+          "enableO2": true
+        },
+        {
+          "time": 130,
+          "memory": 20148,
+          "problem": {
+            "pid": "P16961",
+            "title": "[SCCPC 2026] 永恒的奥古斯都",
+            "difficulty": 4,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 2859,
+          "submitTime": 1780305760,
+          "language": 27,
+          "id": 280306238,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 127,
+          "memory": 6568,
+          "problem": {
+            "pid": "P16962",
+            "title": "[SCCPC 2026] 交换余生",
+            "difficulty": 5,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 4609,
+          "submitTime": 1780304255,
+          "language": 27,
+          "id": 280302941,
+          "status": 12,
+          "enableO2": true
+        },
+        {
+          "time": 127,
+          "memory": 6568,
+          "problem": {
+            "pid": "P16962",
+            "title": "[SCCPC 2026] 交换余生",
+            "difficulty": 5,
+            "fullScore": 100,
+            "type": "P"
+          },
+          "contest": {
+            "id": 330287,
+            "name": "SCCPC 2026 补题链接",
+            "startTime": 1780232400,
+            "endTime": 1781445600
+          },
+          "sourceCodeLength": 4610,
+          "submitTime": 1780303539,
+          "language": 27,
+          "id": 280301305,
+          "status": 14,
+          "enableO2": true
+        }
+      ],
+      "perPage": 20,
+      "count": 1565
+    }
+  },
+  "currentTitle": "记录列表",
+  "currentTheme": {
+    "id": 630,
+    "header": {
+      "imagePath": "https://cdn.luogu.com.cn/images/bg/fe/Day_And_Night_1.jpg",
+      "color": [
+        [
+          35,
+          37,
+          38,
+          1
+        ]
+      ],
+      "blur": 0,
+      "brightness": 0,
+      "degree": 90,
+      "repeat": 0,
+      "position": [
+        41,
+        58
+      ],
+      "size": [
+        -1,
+        -1
+      ],
+      "type": 1,
+      "__CLASS_NAME": "Luogu\\DataClass\\User\\ThemeConfig\\HeaderFooterConfig"
+    },
+    "sideNav": {
+      "logoBackgroundColor": [
+        0,
+        165,
+        22,
+        1
+      ],
+      "color": [
+        0,
+        0,
+        0,
+        0.93
+      ],
+      "invertColor": false,
+      "__CLASS_NAME": "Luogu\\DataClass\\User\\ThemeConfig\\SideNavConfig"
+    },
+    "footer": {
+      "imagePath": "https://cdn.luogu.com.cn/images/bg/fe/Day_And_Night_2.jpg",
+      "color": [
+        [
+          122,
+          24,
+          24,
+          1
+        ]
+      ],
+      "blur": 0,
+      "brightness": 0,
+      "degree": 0,
+      "repeat": 0,
+      "position": [
+        0,
+        15
+      ],
+      "size": [
+        -1,
+        -1
+      ],
+      "type": 1,
+      "__CLASS_NAME": "Luogu\\DataClass\\User\\ThemeConfig\\HeaderFooterConfig"
+    }
+  },
+  "currentTime": 1786737529
+}
