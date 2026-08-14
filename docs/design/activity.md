@@ -1,6 +1,6 @@
 # 训练统计聚合（activity）设计
 
-> 状态：已实现（第一期：Codeforces 提交统计 + 绑定验证 + 多用户组全链路）。
+> 状态：已实现（第一期 Codeforces + 第二期 AtCoder：提交统计 + 绑定验证 + 多用户组全链路）。
 > 本文档与实际实现同步，是后续多平台适配（AtCoder / LeetCode / 洛谷 / 牛客 / QOJ 等）
 > 与新增功能（rating 折线、比赛信息）的规范参考；改设计必须先改本文档再改代码。
 > 需求背景见 [../cache/requirement.md](../cache/requirement.md)，
@@ -48,7 +48,7 @@ router / service / modules 主干保持平台无关（不出现 `if platform == 
 ### 2.3 平台优先级（分期）
 
 1. Codeforces（官方 API，匿名可取，风险最低）——**已实现**
-2. AtCoder（kenkoooo API + 官方 rating 历史接口，验证框架复用）
+2. AtCoder（kenkoooo API + 官方用户主页 404 验证，匿名可取）——**已实现**
 3. LeetCode CN + 牛客（GraphQL 路径已探明 / rating 匿名接口）
 4. 洛谷（cookie 授权框架，QOJ 等后续平台复用同一套）
 5. 长尾平台（评估 ojhunt 依赖或手动导入）
@@ -278,7 +278,8 @@ AdapterError                    # 基类
 
 - **按平台限流**：per-platform `asyncio.Lock` + 上次请求时刻记账，请求前补齐
   `min_interval`（各 adapter 声明）；
-- **重试**：传输异常 / 429 / 5xx 重试，4xx 直接抛 `PlatformError`；`should_retry(data)`
+- **重试**：传输异常 / 429 / 5xx 重试，4xx 抛 `HttpStatusError`（`PlatformError`
+  子类，携带 `status_code`，供 adapter 区分 404 用户不存在等语义）；`should_retry(data)`
   钩子供 adapter 声明"业务信封重试"（CF 以 200 返回的 FAILED 信封）；响应体非 JSON 不判定；
 - **退避公式**：`backoff = max(base_backoff, min_interval) × 2^n`——首次重试等满一个
   完整限流窗口，避免重试仍落在窗口内（CF 2s 间隔下固定 0.5s 起步会再撞限流）；
@@ -302,7 +303,41 @@ AdapterError                    # 基类
   `full_min_rows` 条时继续拉满；信封 `_check_envelope` / `_should_retry_envelope`
   （Call limit exceeded 走重试，其余 FAILED 抛 `PlatformError`）。
 
-### 5.5 新平台接入清单（checklist）
+### 5.5 AtCoder 适配器（kenkoooo API，第二期）
+
+`adapters/atcoder/`，数据源与 CF 形态差异较大，要点：
+
+- **数据源**（均为匿名可取）：
+  - 提交明细：kenkoooo `GET /atcoder-api/v3/user/submissions?user=X&from_second=T`
+    （社区事实标准，**升序**返回、单页上限 500、`from_second` 含边界）；
+  - 题目目录：kenkoooo `/resources/problems.json`（`id → name`，`problem_name` 来源）
+    与 `/resources/problem-models.json`（kenkoooo 模型分，`difficulty` 来源）；
+    adapter 实例内**内存缓存 + 24h TTL，不落盘**（不新增数据目录与 gitignore）；
+  - 绑定验证：官方用户主页 `https://atcoder.jp/users/{handle}` 的 **404 判定**
+    （实测确认：`history/json` 对不存在用户也返回 200 `[]`，kenkoooo v2
+    `user_info` 对不存在用户返回 200 全零，均无法区分；主页 404 是唯一可靠信号）。
+- **失败语义分级**：`problems.json` 失败 → 抛 `PlatformError`（题名为核心展示字段，
+  宁可本次同步降级重试不落库坏数据）；`problem-models.json` 失败或目录缺题 →
+  `difficulty=None` 继续（非关键字段）；目录缺题时 `problem_name` 兜底 `problem_id`。
+- **增量 / 全量**（kenkoooo 只能升序翻页，与 CF 倒序回扫不同）：
+  - 增量：`from_second = since`（含边界，游标当秒重复拉取由 store 按
+    `submission_id` 去重吸收，与 §3.3 语义一致），升序翻页至短页（<500）为止；
+  - 全量：先拉 `full_window_days` 窗口；窗口内不足 `full_min_rows` 条时退到
+    `from_second=0` 拉全部历史（两步策略，不逐段扩展）；
+  - **页间去重与防停滞**：`from_second` 含边界 ⇒ 翻页下一页与上页末条同秒重叠，
+    adapter 内按 `id` 集合去重；单页无新 id 即停（防同秒 ≥500 条死循环）；
+    外加 `MAX_PAGES` 护栏；
+- **verdict 映射**：`AC/WA/TLE/MLE/RE/CE/OLE` 直映射；`WJ/WR/JUDGING` → `JG`
+  （评测中，对齐 CF 的 SUBMITTED/TESTING）；`IE/QLE` 与未知值 → `UKE`；
+- **URL**：`problem_url = https://atcoder.jp/contests/{contest_id}/tasks/{problem_id}`，
+  `problem_key = problem_id`（如 `abc001_a`）；
+- **限流**：`min_interval = 1.0`（kenkoooo 公益接口要求 ≥1s；verify 的 atcoder.jp
+  请求共用同一 platform 限流桶，保守串行）；
+- **net 层依赖**：verify 需区分 404（用户不存在）与其他 4xx（平台故障），
+  依赖 net 层 4xx 抛出的 `HttpStatusError`（`PlatformError` 子类，携带
+  `status_code`）——404 转 `UserNotFoundError`，其余维持 `PlatformError`。
+
+### 5.6 新平台接入清单（checklist）
 
 1. 调研数据源（官方 API / 第三方 / 非官方 / cookie），确认每项能力可取性与限流，
    参考 [../cache/platform-api-research.md](../cache/platform-api-research.md)；
@@ -468,4 +503,10 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
 - **能力方法默认抛 `CapabilityNotSupportedError`**：能力残缺平台不写空壳，
   service 按 capabilities 调用；
 - **用户组删除至少保留一个组**：后端强制，前端按钮禁用联动；
-- **汇总视图同步全部平台前弹确认框**（可能较慢）；平台视图只同步该平台。
+- **汇总视图同步全部平台前弹确认框**（可能较慢）；平台视图只同步该平台；
+- **kenkoooo `from_second` 含边界且只升序翻页**：AtCoder 增量/全量必须 adapter 内
+  按 id 去重 + 单页无新 id 即停，否则同秒重叠页会死循环（§5.5）；
+- **AtCoder 用户存在性只能看官方主页 404**：`history/json` 与 kenkoooo
+  `user_info` 对不存在用户均返回 200，不能用于绑定验证（实测确认，§5.5）；
+- **题目目录失败语义分级**：`problems.json` 失败抛错重试（题名核心）、
+  `problem-models.json` 失败 difficulty 留空继续（非关键），不反向混淆（§5.5）。
