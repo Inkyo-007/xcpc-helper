@@ -1,14 +1,15 @@
 # 技能树可视化（skill-tree）设计
 
-> 状态：已实现（第一期：Codeforces 标签 → 技能域/技能两级树 + SVG 放射状可视化；AtCoder 无标签暂不参与，保留后续按难度分档扩展）。
+> 状态：已实现（第一期：Codeforces 标签 → 技能域/技能两级树 + ECharts 旭日图（sunburst）可视化；AtCoder 无标签暂不参与，保留后续按难度分档扩展）。
 > 本功能是「训练统计（activity）」的增量，复用其提交数据与用户组隔离，不新建功能域。
 
 ## 1. 背景与目标
 
 选手的训练数据已由 activity 功能自动导入（Codeforces / AtCoder），但现有「数据总览」页只呈现
 热力图、统计卡片与提交列表，无法直观回答「我哪些算法强、哪些还薄弱」。本功能把 AC 过的题目
-按算法标签聚合成一棵**技能树**：以放射状 SVG 呈现「根 → 技能域 → 技能」两级结构，节点颜色深浅、
-大小按掌握度（0~1）缩放，hover 显示做题数、最高难度与掌握度百分比，帮助选手快速定位训练短板。
+按算法标签聚合成一棵**技能树**：以 ECharts 旭日图（sunburst）呈现「根 → 技能域 → 技能」两级结构，
+扇区大小反映做题量、颜色按域分类且深浅随掌握度（0~1）变化，hover 显示做题数、最高难度与掌握度
+百分比，点击领域可下钻查看技能，帮助选手快速定位训练短板。
 
 需求优先级归属见 [../requirements.md](../requirements.md)「做题统计」。
 
@@ -21,8 +22,10 @@
 - **技能来源 = Codeforces 标签（第一期）**：CF `user.status` 每道题自带 `problem.tags`，是最细粒度、
   无需额外请求的技能信号。AtCoder 无标签，其提交不参与技能映射（保留后续按难度分档扩展的空间）。
   因此第一期技能树只反映 Codeforces 数据，页面空状态文案说明这一点。
-- **自定义 SVG 放射状布局，不引 D3 / cytoscape**：节点数少（数十个），手写径向布局即可做到
-  「炫酷」的入场上浮、掌握度着色与 hover 动效，避免为一次性图表引入重型依赖（对齐 global.md 第 6 条）。
+- **复用 ECharts sunburst（旭日图），不引 D3 / cytoscape**：技能树是「根 → 域 → 技能」的两级
+  层次结构，旭日图正是其业界标准表达（面积 ∝ 做题量、按域分类色相、原生 tooltip/高亮/下钻）。
+  ECharts 已为柱状图引入（`echarts/charts` 的 `SunburstChart` 按需注册，仅增加少量打包体积），
+  无新增依赖，且沿用现有主题桥接（`model/echarts-theme.ts`），对齐 global.md 第 6 条。
 - **掌握度 = AC 难度加权累加的指数饱和**：单题按难度给权重，累加后经 `1 - e^(-score/3)` 压到 0~1，
   早期增长快、后期放缓，避免一两道水题刷满、也避免高难度题被淹没（公式见 §3.3）。
 - **只统计「AC 过的不同题目」**：同一题多次提交按 `(platform, problem_key)` 去重，只有 verdict=AC 计入，
@@ -32,10 +35,11 @@
 
 | 方案 | 结论 | 理由 |
 | --- | --- | --- |
-| ECharts graph / tree | 否决 | 树节点动效（逐个上浮、按掌握度渐变、hover 置顶）在 ECharts 上受制于其渲染器，且 activity 已为柱状图引入 ECharts，技能树更依赖精细 SVG 动画 |
+| ECharts sunburst（旭日图） | **采用** | 两级层次结构的业界标准表达：面积 ∝ 做题量、按域分类色相、原生 tooltip/高亮/下钻/图例，复用已有 ECharts 与主题桥接，无新增依赖 |
+| ECharts graph / tree（节点连线） | 否决 | 数十个叶子的放射节点连线标签必然互相挤压重叠（v1 已验证） |
 | D3 / cytoscape | 否决 | 节点数量级小，收益不足以抵消新增依赖 |
 | 力导向图（force） | 否决 | 布局不确定、每次抖动，不利于「稳定对比强弱」的阅读体验 |
-| 自定义 SVG 径向树 | **采用** | 布局纯函数可单测，颜色直接读 CSS 变量随主题联动，动效可控 |
+| 自定义 SVG 径向树 | 否决（v1 曾采用） | 手写放射布局下 12 域 × 多技能的叶子标签重叠、单一色相难区分域，维护成本高于收益 |
 
 ## 3. 数据模型与存储
 
@@ -112,25 +116,28 @@ SkillOut       { key, name, tag, proficiency, acCount, maxDifficulty }
 ### 4.1 信息架构
 
 「训练统计」组下新增子页「技能树」，路由 `/activity/skill-tree`（独立于「数据总览」页，
-给放射状树留出整页空间）。侧边栏 `nav.ts` 与 `router.ts` 各加一条。
+给旭日图留出整页空间）。侧边栏 `nav.ts` 与 `router.ts` 各加一条。
 
 ### 4.2 页面结构
 
-整页居中布局，标题「技能树」+ 副标题（说明基于 Codeforces 标签、掌握度口径）。主体为响应式 SVG：
+整页居中布局，标题「技能树」+ 副标题（说明基于 Codeforces 标签、掌握度口径与下钻交互）。
+主体为响应式 ECharts 旭日图（`ChartHost` 承载，SVG 渲染、随容器 resize）：
 
-- **根节点**：中心圆，显示「技能树」与全站总掌握度百分比；
-- **第一环 · 技能域**：12 个域节点按固定角度均布（顶端正上方起始、顺时针），节点大小随域掌握度缩放，
-  颜色 = accent 色相按掌握度取透明度/饱和度；
-- **第二环 · 技能**：每个域下的技能节点围绕其父域扇形排布，叶子节点更小，同样按掌握度着色；
-- **连线**：根 → 域为直线，域 → 技能为二次贝塞尔曲线（`path` 的 `Q` 指令），线宽/透明度随子节点掌握度渐变；
-- **动效**：入场时节点按深度顺序 stagger 上浮 + 淡入；hover 某节点时其子树连线高亮、该节点放大并出
-  tooltip（`名称 · AC 数 · 最高难度 · 掌握度%`），其余节点轻度降饱和（呼应热力图的选中淡化）。
+- **中心 · 根**：显示「技能树」与全站总掌握度百分比，作为整棵树的焦点；
+- **第一环 · 技能域**：12 个域按后端 `DOMAIN_ORDER` 固定顺序顺时针排布，扇区大小 ∝ 域内去重 AC 题数，
+  每个域取一个分类色相，明度随域掌握度缩放；
+- **第二环 · 技能**：每个域下的技能扇形紧邻其父域排布，扇区大小 ∝ 技能 AC 题数，继承域色相、
+  按技能掌握度调明度；过小扇区自动隐藏标签（`label.minAngle`），靠图例与 tooltip 兜底；
+- **图例**：主体下方以圆点 chip 列出各技能域（色点 + 名称 + 题数 + 掌握度%），与图表同源配色；
+- **交互**：hover 显示 tooltip（`名称 · AC 数 · 最高难度 · 掌握度%`）并高亮该子树、淡化其余
+  （`emphasis.focus: descendant`）；点击领域下钻查看其技能、点击中心返回（`nodeClick: rootToNode`）。
 
 ### 4.3 着色与主题桥接
 
-颜色不写死：沿用 `model/echarts-theme.ts` 的思路，组件层 `getComputedStyle` 读取 `--hue` / `--text` /
-`--surface-2` 等 CSS 变量，节点填充 `hsla(var(--hue), 68%, L%, α)`，α 随掌握度线性映射（0→0.15，1→1），
-明暗主题与色相切换自动跟随（MutationObserver 监听，与热力图一致）。
+颜色不写死：沿用 `model/echarts-theme.ts` 的思路，组件层 `useChartPalette` 读取 `--hue` / `--text` /
+`--surface` 等 CSS 变量，生成 12 个以 `--hue` 为起点、360° 均布的分类色相（`domainHues`）；每个节点
+填充 `domainFill(hue, 掌握度, dark)` —— 饱和度/明度随掌握度线性缩放（掌握度 0→暗、1→鲜艳），
+明暗主题与色相切换自动跟随（MutationObserver 监听，与热力图一致）。图例身份色取掌握度 1 的满强度色。
 
 ### 4.4 空状态
 
@@ -172,29 +179,37 @@ backend/src/
 frontend/src/features/activity/
 ├─ types.ts                          # 新增 SkillNode / SkillDomain / SkillTree 类型
 ├─ api.ts                            # 新增 fetchSkillTree(scope) 与响应类型
-├─ model/skill-tree.ts               # 新增：径向布局纯函数（角度/半径/坐标 → 节点渲染模型）
-├─ model/skill-tree.test.ts          # 新增：布局与掌握度映射单测
-├─ components/SkillTree.vue          # 新增：SVG 放射状技能树（连线/节点/动效/tooltip）
+├─ model/echarts-theme.ts            # 扩展：12 个技能域分类色相 domainHues + domainFill 填色
+├─ model/echarts-setup.ts            # 扩展：注册 SunburstChart 模块
+├─ model/skill-tree.ts               # 新增：数据/图例/option 构建纯函数（buildSunburstData 等）
+├─ model/skill-tree.test.ts          # 新增：数据映射与 option 结构单测
+├─ components/SkillTree.vue          # 新增：旭日图（ChartHost 承载）+ 图例 + 下钻提示
 └─ SkillTreePage.vue                 # 新增：整页（加载/空态/主题桥接/切组刷新）
 ```
 
-无新增依赖；复用 `shared/api/client` 与 lucide 图标。纯函数覆盖角度分配、半径计算与
-「数据 → 渲染节点」映射，供 vitest 覆盖。
+无新增依赖；复用 `ChartHost`、`useChartPalette`、`shared/api/client` 与 lucide 图标。纯函数覆盖
+「数据 → 旭日图节点 / 图例 / option」映射，供 vitest 覆盖。
 
 ## 6. 验证方式
 
 - 后端：`skill_tree` 纯函数 pytest（去重口径、标签→域映射、掌握度公式边界：空集=0、满集=1、
   难度 None 兜底、未命中标签归 other）；CF adapter 的 `tags` 透传用现有 fixture 补断言；`ruff check`。
-- 前端：`model/skill-tree.test.ts` 覆盖布局纯函数；`npm run typecheck` / `npm run test` / `npm run build`。
+- 前端：`model/skill-tree.test.ts` 与 `model/echarts-theme.test.ts` 覆盖数据映射、图例与分类色相；
+  `npm run typecheck` / `npm run test` / `npm run build`。
 - API 契约：起服务后 `curl http://127.0.0.1:8000/api/diagnostics` 与
   `curl http://127.0.0.1:8000/api/activity/skill-tree` 正常返回。
-- 手动走查：绑定 CF 账号 → 同步 → 技能树渲染各域/技能 → hover tooltip → 明暗主题与色相切换跟随 →
-  无数据时空态引导。
+- 手动走查：绑定 CF 账号 → 同步 → 技能树渲染各域/技能 → hover tooltip → 点击下钻/返回 →
+  明暗主题与色相切换跟随 → 无数据时空态引导。
 
-## 7. 实施顺序（原子化提交计划）
+## 7. 实施顺序（第一期：手写 SVG，已完成）
 
 1. `docs: 添加技能树可视化设计文档`
 2. `feat(后端): 提交模型与 CF 适配器补充题目标签字段`
 3. `feat(后端): 实现技能树聚合纯函数与 API 端点`
 4. `feat(前端): 新增技能树 SVG 可视化页面与布局模型`
 5. `docs: 标记技能树设计文档为已实现`
+
+## 8. 二期重构（可视化改为 ECharts 旭日图，已完成）
+
+1. `feat(前端): 技能树可视化重构为 ECharts 旭日图（分类配色/面积编码/下钻）`
+2. `docs: 同步技能树旭日图重构的设计说明`
