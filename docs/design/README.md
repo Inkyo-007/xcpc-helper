@@ -10,6 +10,7 @@
 | [transfer.md](transfer.md) | 导入 / 导出（transfer） | 已实现 |
 | [activity.md](activity.md) | 训练统计聚合（activity） | 已实现（第一期） |
 | [skill-tree.md](skill-tree.md) | 技能树可视化（skill-tree） | 已实现 |
+| [analysis.md](analysis.md) | 训练分析（analysis） | 设计中 |
 
 ## 状态约定
 
