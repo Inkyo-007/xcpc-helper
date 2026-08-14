@@ -21,7 +21,7 @@ alwaysApply: true
 8. 数据落盘必须走后端写层：对 git 管理的数据目录（`backend/content/`、`backend/books/` 等）的写操作必须经由后端对应的 writer/store（原子写入），禁止直接编辑数据文件绕过服务层；约定细节见 [../design/conventions.md](../design/conventions.md)。
 9. 修改 API 契约或数据格式时，同步更新 `docs/design/` 对应设计文档。
 10. 交付前跑通改动范围对应的验证命令（见根目录 AGENTS.md「验证命令」）。
-11. 当新功能开发完成，且所有验证通过时，同步更新文档内容，使文档维持时效性。
+11. 当新功能开发完成，且所有验证通过时，同步更新所有相关的文档内容，使文档维持时效性。
 
 ## 开发指南
 
