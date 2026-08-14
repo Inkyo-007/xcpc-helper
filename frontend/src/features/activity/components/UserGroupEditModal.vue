@@ -12,7 +12,7 @@ import { computed, ref, watch } from 'vue'
 import { Link2, PencilLine, Plus, Trash2, Unlink } from 'lucide-vue-next'
 import { NButton, NInput, NModal, useMessage } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
-import { useActivity } from '@/features/activity/store'
+import { accountLabel, useActivity } from '@/features/activity/store'
 import { useUserGroups } from '@/features/activity/profile'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
@@ -114,7 +114,11 @@ function confirmUnbind(): void {
 
 function stateLabel(acc: BoundAccount): string {
   if (acc.syncState === 'running') return '同步中'
-  if (acc.syncState === 'error') return acc.syncError ?? '同步失败'
+  if (acc.syncState === 'error') {
+    // 凭据过期：引导重新授权（换绑路径重新录入 cookie）
+    if (acc.syncErrorCode === 'auth_expired') return '凭据过期，请换绑重新授权'
+    return acc.syncError ?? '同步失败'
+  }
   return ''
 }
 </script>
@@ -175,7 +179,7 @@ function stateLabel(acc: BoundAccount): string {
         <div class="edit-desc">
           <span class="edit-title">
             {{ row.platform.name }}
-            <span v-if="row.account" class="account-handle mono">{{ row.account.handle }}</span>
+            <span v-if="row.account" class="account-handle mono">{{ accountLabel(row.account) }}</span>
           </span>
           <span v-if="row.account && stateLabel(row.account)" class="edit-hint account-state" :class="row.account.syncState">
             {{ stateLabel(row.account) }}
@@ -211,7 +215,7 @@ function stateLabel(acc: BoundAccount): string {
     <DeleteConfirmModal
       :show="unbinding !== null"
       title="解绑账号"
-      :target="unbinding ? `${platformName(unbinding.platform)}/${unbinding.handle}` : ''"
+      :target="unbinding ? `${platformName(unbinding.platform)}/${accountLabel(unbinding)}` : ''"
       @update:show="unbinding = null"
       @confirm="confirmUnbind"
     />

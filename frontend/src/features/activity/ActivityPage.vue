@@ -20,7 +20,7 @@ import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
 import { parseDate, toDateStr } from '@/features/activity/model/dates'
 import { pageCount } from '@/features/activity/model/pagination'
 import { useActivity, type PlatformScope } from '@/features/activity/store'
-import type { PlatformId } from '@/features/activity/types'
+import type { AccountCredentials, PlatformId } from '@/features/activity/types'
 
 const {
   accounts,
@@ -148,10 +148,14 @@ function openBind(platform: PlatformId | null): void {
   showBind.value = true
 }
 
-async function onBind(platform: PlatformId, handle: string): Promise<void> {
+async function onBind(
+  platform: PlatformId,
+  handle: string,
+  opts: { displayName?: string | null; credentials?: AccountCredentials } = {},
+): Promise<void> {
   const rebinding = boundOn(platform) !== null
   try {
-    await bindAccount(platform, handle)
+    await bindAccount(platform, handle, opts)
     message.success(rebinding ? '换绑成功，已重新同步' : '绑定成功，已完成首次同步')
   } catch (e) {
     message.error(e instanceof Error ? e.message : '绑定失败，请稍后重试')

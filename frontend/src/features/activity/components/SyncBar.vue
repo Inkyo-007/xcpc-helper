@@ -6,9 +6,10 @@
  * 可能较慢），平台视图只同步该平台（直接触发）。 */
 
 import { computed, ref } from 'vue'
-import { Link2, Plus, RefreshCw, UserRoundPen } from 'lucide-vue-next'
+import { Link2, Plus, RefreshCw, TriangleAlert, UserRoundPen } from 'lucide-vue-next'
 import { NButton, NModal, NTooltip } from 'naive-ui'
 import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
+import { accountLabel } from '@/features/activity/store'
 import type { PlatformScope } from '@/features/activity/store'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
@@ -30,6 +31,11 @@ const platformAccount = computed<BoundAccount | null>(() => {
   if (props.activePlatform === 'all') return null
   return props.accounts.find((a) => a.platform === props.activePlatform) ?? null
 })
+
+/** 凭据过期（auth_expired）：账号按钮警示态，点击重新授权（走换绑路径） */
+const authExpired = computed(
+  () => platformAccount.value?.syncErrorCode === 'auth_expired',
+)
 
 /* ---------- 同步全部平台确认 ---------- */
 
@@ -84,19 +90,30 @@ function confirmSyncAll(): void {
         <NButton
           v-if="platformAccount"
           size="small"
-          type="primary"
+          :type="authExpired ? 'warning' : 'primary'"
           secondary
           @click="emit('bind', platformAccount.platform)"
         >
-          <template #icon><Link2 :size="14" /></template>
-          <span class="bound-handle mono">{{ platformAccount.handle }}</span>
+          <template #icon>
+            <TriangleAlert v-if="authExpired" :size="14" />
+            <Link2 v-else :size="14" />
+          </template>
+          <span class="bound-handle mono">
+            {{ authExpired ? '凭据过期' : accountLabel(platformAccount) }}
+          </span>
         </NButton>
         <NButton v-else size="small" dashed @click="emit('bind', activePlatform as PlatformId)">
           <template #icon><Plus :size="14" /></template>
           未绑定账号
         </NButton>
       </template>
-      {{ platformAccount ? '点击换绑账号' : '点击绑定账号' }}
+      {{
+        authExpired
+          ? `登录凭据已过期（${accountLabel(platformAccount!)}），点击重新授权`
+          : platformAccount
+            ? '点击换绑账号'
+            : '点击绑定账号'
+      }}
     </NTooltip>
     <NModal
       :show="showSyncAllConfirm"

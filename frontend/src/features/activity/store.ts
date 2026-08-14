@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue'
 import * as api from '@/features/activity/api'
 import { useUserGroups } from '@/features/activity/profile'
 import type {
+  AccountCredentials,
   BoundAccount,
   DayActivity,
   OverviewTotals,
@@ -90,7 +91,12 @@ async function refreshSubmissions(): Promise<void> {
 async function refreshAccounts(): Promise<void> {
   try {
     const res = await api.fetchPlatforms()
-    platforms.value = res.platforms.map((p) => ({ id: p.id, name: p.name }))
+    platforms.value = res.platforms.map((p) => ({
+      id: p.id,
+      name: p.name,
+      auth: p.auth,
+      browserLogin: p.browserLogin,
+    }))
     accounts.value = res.platforms
       .map((p) => p.account)
       .filter((a): a is BoundAccount => a !== null)
@@ -172,11 +178,16 @@ async function syncNow(): Promise<void> {
   }
 }
 
-/** 绑定（或换绑）账号：后端自动触发首次同步，等待完成后刷新数据 */
-async function bindAccount(platform: PlatformId, handle: string): Promise<void> {
+/** 绑定（或换绑）账号：后端自动触发首次同步，等待完成后刷新数据；
+ * cookie 平台携带凭据（手动粘贴）或留空（消费一键登录暂存凭据） */
+async function bindAccount(
+  platform: PlatformId,
+  handle: string,
+  opts: { displayName?: string | null; credentials?: AccountCredentials } = {},
+): Promise<void> {
   busy.value = true
   try {
-    await api.bindAccount(platform, handle)
+    await api.bindAccount(platform, handle, opts)
     await pollUntilIdle()
     await refreshAll()
   } finally {
@@ -203,6 +214,16 @@ function isBound(platform: PlatformId, handle: string): boolean {
 
 function platformName(id: PlatformId): string {
   return platforms.value.find((p) => p.id === id)?.name ?? id
+}
+
+/** 平台完整元数据（auth / browserLogin，驱动绑定弹窗凭据区渲染） */
+function platformMeta(id: PlatformId): PlatformMeta | null {
+  return platforms.value.find((p) => p.id === id) ?? null
+}
+
+/** 账号展示名：优先 displayName（洛古用户名等），空回退 handle（API 主键） */
+export function accountLabel(account: BoundAccount): string {
+  return account.displayName || account.handle
 }
 
 const lastSyncLabel = computed(() => {
@@ -259,5 +280,7 @@ export function useActivity() {
     boundOn,
     isBound,
     platformName,
+    platformMeta,
+    accountLabel,
   }
 }

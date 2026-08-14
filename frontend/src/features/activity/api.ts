@@ -2,6 +2,7 @@
 
 import { request } from '@/shared/api/client'
 import type {
+  AccountCredentials,
   BoundAccount,
   DayActivity,
   OverviewTotals,
@@ -13,7 +14,6 @@ import type { PlatformScope } from '@/features/activity/store'
 
 export interface ApiPlatformMeta extends PlatformMeta {
   capabilities: string[]
-  auth: string
   /** 该平台当前绑定账号；未绑定为 null */
   account: BoundAccount | null
 }
@@ -25,7 +25,17 @@ export interface ApiPlatformsResponse {
 export interface ApiVerifyResponse {
   platform: string
   handle: string
+  displayName: string | null
   avatar: string | null
+}
+
+/** 浏览器一键登录会话状态（与后端 BrowserLoginStatusOut 对齐） */
+export interface ApiBrowserLoginStatus {
+  state: 'waiting' | 'success' | 'canceled' | 'timeout' | 'error'
+  handle: string | null
+  displayName: string | null
+  avatar: string | null
+  error: string | null
 }
 
 export interface ApiOverviewResponse {
@@ -51,20 +61,42 @@ export function fetchPlatforms(): Promise<ApiPlatformsResponse> {
   return request<ApiPlatformsResponse>('/activity/platforms')
 }
 
-export function verifyAccount(platform: string, handle: string): Promise<ApiVerifyResponse> {
+export function verifyAccount(
+  platform: string,
+  handle: string,
+  credentials?: AccountCredentials,
+): Promise<ApiVerifyResponse> {
   return request<ApiVerifyResponse>('/activity/accounts/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ platform, handle }),
+    body: JSON.stringify({ platform, handle, ...(credentials ? { credentials } : {}) }),
   })
 }
 
-export function bindAccount(platform: string, handle: string): Promise<BoundAccount> {
+export function bindAccount(
+  platform: string,
+  handle: string,
+  opts: { displayName?: string | null; credentials?: AccountCredentials } = {},
+): Promise<BoundAccount> {
   return request<BoundAccount>('/activity/accounts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ platform, handle }),
+    body: JSON.stringify({
+      platform,
+      handle,
+      ...(opts.displayName ? { displayName: opts.displayName } : {}),
+      ...(opts.credentials ? { credentials: opts.credentials } : {}),
+    }),
   })
+}
+
+/** 启动浏览器一键登录会话（202 立即返回；轮询 fetchBrowserLoginStatus） */
+export function startBrowserLogin(platform: PlatformId): Promise<void> {
+  return request<void>(`/activity/platforms/${platform}/browser-login`, { method: 'POST' })
+}
+
+export function fetchBrowserLoginStatus(platform: PlatformId): Promise<ApiBrowserLoginStatus> {
+  return request<ApiBrowserLoginStatus>(`/activity/platforms/${platform}/browser-login/status`)
 }
 
 export function unbindAccount(platform: string, handle: string): Promise<void> {

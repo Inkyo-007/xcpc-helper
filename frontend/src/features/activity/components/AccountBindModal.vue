@@ -2,28 +2,45 @@
 /** 绑定平台账号弹窗：平台选择 → handle 输入 → 验证回执 → 确认绑定。
  * 从平台视图的账号按钮打开时锁定该平台；该平台已有账号时为换绑
  * （新账号替换旧账号及其本地数据，见 store.bindAccount）。
- * 平台下拉由后端平台注册表驱动（第一期仅 Codeforces）。
+ * 平台下拉由后端平台注册表驱动。
+ *
+ * cookie 授权平台（洛古等，auth === 'cookie'）额外展开凭据区：
+ * · 一键登录（browserLogin 可用时）：后端拉起系统浏览器登录窗口，
+ *   用户自行登录，本弹窗轮询会话状态，成功后直接给出回执
+ *   （凭据由后端暂存，不经前端，确认绑定时消费）；
+ * · 手动粘贴：接受 JSON 或整串 Cookie 头（model/credentials.ts 解析），
+ *   验证时携带凭据（后端同时校验用户存在性与凭据有效性）。
  */
 
 import { computed, ref, watch } from 'vue'
-import { BadgeCheck, Link2, Search } from 'lucide-vue-next'
+import { BadgeCheck, Globe, Link2, Search } from 'lucide-vue-next'
 import { NButton, NInput, NModal, NSelect } from 'naive-ui'
-import { verifyAccount } from '@/features/activity/api'
+import { startBrowserLogin, fetchBrowserLoginStatus, verifyAccount } from '@/features/activity/api'
+import { parseCredentialInput } from '@/features/activity/model/credentials'
 import { useActivity } from '@/features/activity/store'
-import type { PlatformId } from '@/features/activity/types'
+import type { AccountCredentials, PlatformId } from '@/features/activity/types'
+
+/** cookie 平台所需的 cookie 字段（前端平台知识注册表，与后端 adapter 对齐） */
+const COOKIE_KEYS: Partial<Record<PlatformId, string[]>> = {
+  luogu: ['_uid', '__client_id'],
+}
 
 const props = defineProps<{
   show: boolean
-  /** 从平台视图打开时锁定该平台；null 表示自由选择平台 */
+  /** 从平台视图的账号按钮打开时锁定该平台；null 表示自由选择平台 */
   platform?: PlatformId | null
 }>()
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
-  bind: [platform: PlatformId, handle: string]
+  bind: [
+    platform: PlatformId,
+    handle: string,
+    opts: { displayName?: string | null; credentials?: AccountCredentials },
+  ]
 }>()
 
-const { platforms, platformName, isBound, boundOn } = useActivity()
+const { platforms, platformName, platformMeta, isBound, boundOn } = useActivity()
 
 const platformOptions = computed(() =>
   platforms.value.map((p) => ({ label: p.name, value: p.id })),
@@ -34,13 +51,34 @@ const handle = ref('')
 const verifying = ref(false)
 const errorText = ref('')
 /** 验证成功的回执（真实接口返回的平台内用户信息） */
-const receipt = ref<{ handle: string; avatar: string | null } | null>(null)
+const receipt = ref<{ handle: string; displayName: string | null; avatar: string | null } | null>(null)
+/** 回执来源为一键登录时，凭据由后端暂存，bind 不再携带 credentials */
+const receiptFromLogin = ref(false)
+
+/** cookie 平台的手动粘贴输入 */
+const cookieText = ref('')
+/** 一键登录等待中（后端登录窗口打开，轮询会话状态） */
+const loginWaiting = ref(false)
 
 /** 锁定平台：从平台视图的账号按钮打开时不可切换平台 */
 const platformLocked = computed(() => props.platform != null)
 
 /** 当前所选平台是否已有绑定账号：有则本次为换绑 */
 const rebinding = computed(() => boundOn(platform.value) !== null)
+
+/** 当前平台是否 cookie 授权（洛古等） */
+const isCookiePlatform = computed(() => platformMeta(platform.value)?.auth === 'cookie')
+/** 当前平台一键登录可用（后端具备浏览器登录能力） */
+const canBrowserLogin = computed(
+  () => isCookiePlatform.value && platformMeta(platform.value)?.browserLogin === true,
+)
+
+/** 手动粘贴解析出的凭据（缺失字段时为 null） */
+const parsedCredentials = computed<AccountCredentials | null>(() => {
+  if (!isCookiePlatform.value) return null
+  const keys = COOKIE_KEYS[platform.value] ?? []
+  return parseCredentialInput(cookieText.value, keys)
+})
 
 watch(
   () => props.show,
@@ -51,16 +89,26 @@ watch(
       verifying.value = false
       errorText.value = ''
       receipt.value = null
+      receiptFromLogin.value = false
+      cookieText.value = ''
+      loginWaiting.value = false
     }
   },
 )
 
-watch([platform, handle], () => {
+watch([platform, handle, cookieText], () => {
   errorText.value = ''
   receipt.value = null
+  receiptFromLogin.value = false
 })
 
-const canVerify = computed(() => handle.value.trim().length > 0 && !verifying.value)
+const canVerify = computed(() => {
+  if (verifying.value || loginWaiting.value) return false
+  if (!handle.value.trim()) return false
+  // cookie 平台手动路径：必须粘贴出完整凭据才可验证
+  if (isCookiePlatform.value) return parsedCredentials.value !== null
+  return true
+})
 
 async function verify(): Promise<void> {
   const name = handle.value.trim()
@@ -72,8 +120,12 @@ async function verify(): Promise<void> {
   verifying.value = true
   errorText.value = ''
   try {
-    const res = await verifyAccount(platform.value, name)
-    receipt.value = { handle: res.handle, avatar: res.avatar }
+    const res = await verifyAccount(
+      platform.value,
+      name,
+      parsedCredentials.value ?? undefined,
+    )
+    receipt.value = { handle: res.handle, displayName: res.displayName, avatar: res.avatar }
   } catch (e) {
     errorText.value = e instanceof Error ? e.message : '验证失败，请稍后重试'
   } finally {
@@ -81,11 +133,63 @@ async function verify(): Promise<void> {
   }
 }
 
+/** 一键登录：后端拉起系统浏览器登录窗口，轮询会话状态至结束 */
+async function browserLogin(): Promise<void> {
+  errorText.value = ''
+  receipt.value = null
+  loginWaiting.value = true
+  try {
+    await startBrowserLogin(platform.value)
+    // 轮询至终态（后端会话超时 3 分钟，前端留足余量）
+    const deadline = Date.now() + 200_000
+    while (Date.now() < deadline) {
+      const status = await fetchBrowserLoginStatus(platform.value)
+      if (status.state === 'success' && status.handle) {
+        receipt.value = {
+          handle: status.handle,
+          displayName: status.displayName,
+          avatar: status.avatar,
+        }
+        receiptFromLogin.value = true
+        handle.value = status.handle
+        return
+      }
+      if (status.state === 'canceled') {
+        errorText.value = '登录窗口已关闭，未完成登录'
+        return
+      }
+      if (status.state === 'timeout') {
+        errorText.value = '登录等待超时，请重试'
+        return
+      }
+      if (status.state === 'error') {
+        errorText.value = status.error ?? '登录失败，请改用手动粘贴 cookie'
+        return
+      }
+      await new Promise((r) => setTimeout(r, 1000))
+    }
+    errorText.value = '登录等待超时，请重试'
+  } catch (e) {
+    errorText.value = e instanceof Error ? e.message : '启动登录窗口失败，请改用手动粘贴 cookie'
+  } finally {
+    loginWaiting.value = false
+  }
+}
+
 function confirm(): void {
   if (!receipt.value) return
-  emit('bind', platform.value, receipt.value.handle)
+  emit('bind', platform.value, receipt.value.handle, {
+    displayName: receipt.value.displayName,
+    // 一键登录的凭据由后端暂存消费；手动粘贴路径携带解析出的凭据
+    credentials: receiptFromLogin.value ? undefined : (parsedCredentials.value ?? undefined),
+  })
   emit('update:show', false)
 }
+
+/** 回执展示名：优先 displayName（洛古用户名），空回退 handle */
+const receiptLabel = computed(() =>
+  receipt.value ? (receipt.value.displayName ?? receipt.value.handle) : '',
+)
 </script>
 
 <template>
@@ -95,7 +199,7 @@ function confirm(): void {
     :title="rebinding ? '换绑平台账号' : '绑定平台账号'"
     class="create-modal"
     :style="{ width: 'min(460px, calc(100vw - 40px))' }"
-    @update:show="emit('update:show', $event)"
+    @update:show="emit('update:show', false)"
   >
     <div class="bind-form">
       <div class="bind-row">
@@ -109,21 +213,69 @@ function confirm(): void {
         <n-input
           v-model:value="handle"
           size="small"
-          placeholder="输入平台用户名"
+          :placeholder="isCookiePlatform ? '输入平台用户名或 UID' : '输入平台用户名'"
           class="bind-handle"
           @keyup.enter="verify"
         />
-        <n-button size="small" :loading="verifying" :disabled="!canVerify" @click="verify">
+        <n-button
+          v-if="!isCookiePlatform"
+          size="small"
+          :loading="verifying"
+          :disabled="!canVerify"
+          @click="verify"
+        >
           <template #icon><Search :size="14" /></template>
           验证
         </n-button>
       </div>
+
+      <!-- cookie 平台凭据区 -->
+      <template v-if="isCookiePlatform">
+        <div v-if="canBrowserLogin" class="bind-row">
+          <n-button
+            size="small"
+            type="primary"
+            secondary
+            block
+            :loading="loginWaiting"
+            @click="browserLogin"
+          >
+            <template #icon><Globe :size="14" /></template>
+            {{ loginWaiting ? '等待浏览器中登录…' : '一键登录（打开浏览器登录）' }}
+          </n-button>
+        </div>
+        <n-input
+          v-model:value="cookieText"
+          type="textarea"
+          size="small"
+          :rows="2"
+          placeholder="手动粘贴 cookie（整串 Cookie 头或 JSON），需包含 _uid 与 __client_id"
+          class="bind-cookie"
+        />
+        <div class="bind-row">
+          <n-button
+            size="small"
+            :loading="verifying"
+            :disabled="!canVerify"
+            @click="verify"
+          >
+            <template #icon><Search :size="14" /></template>
+            验证
+          </n-button>
+          <span class="bind-cookie-hint">
+            {{ parsedCredentials ? '已识别凭据字段' : '粘贴 cookie 后可验证' }}
+          </span>
+        </div>
+      </template>
+
       <p v-if="errorText" class="bind-error">{{ errorText }}</p>
       <div v-if="receipt" class="bind-receipt">
-        <span class="receipt-avatar">{{ receipt.handle.slice(0, 1).toUpperCase() }}</span>
+        <span class="receipt-avatar">{{ receiptLabel.slice(0, 1).toUpperCase() }}</span>
         <div class="receipt-body">
-          <div class="receipt-handle mono">{{ receipt.handle }}</div>
-          <div class="receipt-meta mono">{{ platformName(platform) }} 账号验证通过</div>
+          <div class="receipt-handle mono">{{ receiptLabel }}</div>
+          <div class="receipt-meta mono">
+            {{ platformName(platform) }} 账号验证通过<template v-if="receipt.displayName">（UID {{ receipt.handle }}）</template>
+          </div>
         </div>
         <BadgeCheck class="receipt-check" :size="17" />
       </div>
@@ -148,6 +300,7 @@ function confirm(): void {
 .bind-row {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .bind-platform {
@@ -158,6 +311,15 @@ function confirm(): void {
 .bind-handle {
   flex: 1;
   min-width: 0;
+}
+
+.bind-cookie {
+  font-family: var(--font-mono, monospace);
+}
+
+.bind-cookie-hint {
+  font-size: 11.5px;
+  color: var(--faint);
 }
 
 .bind-error {
