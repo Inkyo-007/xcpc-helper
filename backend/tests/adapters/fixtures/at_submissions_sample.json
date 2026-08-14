@@ -1,0 +1,38 @@
+[
+  {
+    "id": 68710320,
+    "epoch_second": 1755940675,
+    "problem_id": "ahc052_a",
+    "contest_id": "ahc052",
+    "user_id": "chokudai",
+    "language": "C# 11.0 AOT (.NET 7.0.7)",
+    "point": 373332.0,
+    "length": 24869,
+    "result": "AC",
+    "execution_time": 1496
+  },
+  {
+    "id": 68710893,
+    "epoch_second": 1755941433,
+    "problem_id": "ahc052_a",
+    "contest_id": "ahc052",
+    "user_id": "chokudai",
+    "language": "C# 11.0 AOT (.NET 7.0.7)",
+    "point": 374408.0,
+    "length": 30568,
+    "result": "AC",
+    "execution_time": 1822
+  },
+  {
+    "id": 70291592,
+    "epoch_second": 1760872307,
+    "problem_id": "ahc055_a",
+    "contest_id": "ahc055",
+    "user_id": "chokudai",
+    "language": "C# 11.0 AOT (.NET 7.0.7)",
+    "point": 0.0,
+    "length": 8265,
+    "result": "TLE",
+    "execution_time": 2247
+  }
+]
