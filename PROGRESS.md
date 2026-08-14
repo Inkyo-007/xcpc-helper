@@ -13,6 +13,13 @@
 
 ## 最近完成
 
+### 2026-08-15 会话 1
+
+- `e259f7a3` test(后端): 补充 AtCoder 适配器录制 fixture 测试
+- `c5f85dc0` feat(后端): 新增 AtCoder 适配器并注册
+- `efd731d7` feat(后端): net 层 4xx 错误抛带状态码的 HttpStatusError
+- `7be2c424` docs: 补充 AtCoder 适配器设计与 net 层状态码错误约定
+
 ### 2026-08-14 会话 2
 
 - `bde82db8` fix(前端): 头像裁剪尺寸提升至 512px 消除显示模糊
