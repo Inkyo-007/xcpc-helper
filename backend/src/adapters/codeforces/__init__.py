@@ -174,6 +174,7 @@ class CodeforcesAdapter(PlatformAdapter):
             problem_name=name,
             problem_url=problem_url(contest_id, index),
             difficulty=problem.rating if problem else None,
+            tags=problem.tags if problem else [],
             verdict=map_verdict(row.verdict),
             submitted_at=ts,
             language=row.programmingLanguage,

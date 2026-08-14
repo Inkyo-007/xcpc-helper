@@ -60,6 +60,7 @@ class PlatformSubmission(BaseModel):
     problem_name: str
     problem_url: str
     difficulty: int | str | None = None  # 原始难度值，不做跨平台归一（CF 分数 / LC 档位）
+    tags: list[str] = Field(default_factory=list)  # 题目标签（CF problem.tags；AtCoder 无）
     verdict: Verdict
     submitted_at: int  # UTC 秒级时间戳
     language: str

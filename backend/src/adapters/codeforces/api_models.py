@@ -39,6 +39,7 @@ class CfProblem(BaseModel):
     index: str | None = None
     name: str | None = None
     rating: int | None = None
+    tags: list[str] = Field(default_factory=list)  # 题目标签（problem.tags）
 
 
 class CfSubmissionRow(BaseModel):
