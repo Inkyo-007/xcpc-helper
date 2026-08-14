@@ -166,3 +166,25 @@ export interface AnalysisData {
   rhythm: Rhythm
   weakPoints: WeakPoint[]
 }
+
+/* ---------- AI 分析报告 ---------- */
+
+/** AI 分析报告正文（对应后端 ReportOut） */
+export interface AnalysisReportData {
+  /** markdown 正文 */
+  content: string
+  /** llm = 在线模型生成；rule = 未配置/失败时规则化降级报告 */
+  source: 'llm' | 'rule'
+  /** source === 'llm' 时使用的模型名；否则 null */
+  model: string | null
+  /** 规则化降级时的说明文案；否则 null */
+  note: string | null
+}
+
+/** 报告生成配置（对应后端 ReportConfigOut；不泄露 api_key） */
+export interface ReportConfig {
+  /** api_key 是否已配置（false 时生成规则化报告） */
+  configured: boolean
+  model: string
+  baseUrl: string
+}

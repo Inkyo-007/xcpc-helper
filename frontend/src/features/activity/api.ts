@@ -3,11 +3,13 @@
 import { request } from '@/shared/api/client'
 import type {
   AnalysisData,
+  AnalysisReportData,
   BoundAccount,
   DayActivity,
   OverviewTotals,
   PlatformId,
   PlatformMeta,
+  ReportConfig,
   SkillTreeData,
   SubmissionEntry,
 } from '@/features/activity/types'
@@ -87,6 +89,18 @@ export function fetchSkillTree(scope: PlatformScope = 'all'): Promise<SkillTreeD
 export function fetchAnalysis(scope: PlatformScope = 'all'): Promise<AnalysisData> {
   const platform = scopeParam(scope)
   return request<AnalysisData>(`/activity/analysis${platform ? `?platform=${platform}` : ''}`)
+}
+
+export function fetchAnalysisReport(): Promise<AnalysisReportData> {
+  return request<AnalysisReportData>('/activity/analysis/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({}),
+  })
+}
+
+export function fetchReportConfig(): Promise<ReportConfig> {
+  return request<ReportConfig>('/activity/analysis/report/config')
 }
 
 export function fetchSubmissions(opts: {
