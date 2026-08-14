@@ -221,7 +221,7 @@ function platformMeta(id: PlatformId): PlatformMeta | null {
   return platforms.value.find((p) => p.id === id) ?? null
 }
 
-/** 账号展示名：优先 displayName（洛古用户名等），空回退 handle（API 主键） */
+/** 账号展示名：优先 displayName（洛谷用户名等），空回退 handle（API 主键） */
 export function accountLabel(account: BoundAccount): string {
   return account.displayName || account.handle
 }

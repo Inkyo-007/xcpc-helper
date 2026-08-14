@@ -19,7 +19,7 @@ class BoundAccountOut(BaseModel):
 
     platform: str
     handle: str
-    displayName: str | None = None  # 展示名（洛古用户名等；空则前端回退 handle）
+    displayName: str | None = None  # 展示名（洛谷用户名等；空则前端回退 handle）
     lastSyncAt: datetime | None = None  # 最近一次成功同步的结束时间
     syncState: SyncStateOut = "idle"
     syncError: str | None = None
@@ -44,7 +44,7 @@ class PlatformsOut(BaseModel):
 class VerifyIn(BaseModel):
     platform: str
     handle: str
-    credentials: dict[str, Any] | None = None  # cookie 授权平台验证需凭据（洛古等）
+    credentials: dict[str, Any] | None = None  # cookie 授权平台验证需凭据（洛谷等）
 
 
 class VerifyOut(BaseModel):
@@ -60,7 +60,7 @@ class BindIn(BaseModel):
     platform: str
     handle: str
     displayName: str | None = None  # 验证回执带回的展示名，随绑定持久化
-    credentials: dict[str, Any] | None = None  # cookie 授权平台必填（洛古等）
+    credentials: dict[str, Any] | None = None  # cookie 授权平台必填（洛谷等）
 
 
 class DayActivityOut(BaseModel):
@@ -113,7 +113,7 @@ class BrowserLoginStatusOut(BaseModel):
     """浏览器登录会话状态（前端轮询；成功后回执同 verify）。"""
 
     state: BrowserLoginStateOut
-    handle: str | None = None  # 成功回执：API 主键（洛古 uid）
+    handle: str | None = None  # 成功回执：API 主键（洛谷 uid）
     displayName: str | None = None  # 成功回执：展示名
     avatar: str | None = None
     error: str | None = None  # state=error 时的诊断信息

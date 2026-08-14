@@ -1,6 +1,6 @@
 # 训练统计聚合（activity）设计
 
-> 状态：已实现（第一期 Codeforces + 第二期 AtCoder）；第三期洛古：进行中
+> 状态：已实现（第一期 Codeforces + 第二期 AtCoder）；第三期洛谷：进行中
 > （设计已定稿：提交统计 + 绑定验证 + cookie 凭据框架 + 多用户组全链路）。
 > 本文档与实际实现同步，是后续多平台适配（LeetCode / 牛客 / QOJ 等）
 > 与新增功能（rating 折线、比赛信息）的规范参考；改设计必须先改本文档再改代码。
@@ -107,8 +107,8 @@ backend/data/user/*/   # 用户组运行数据不入库（每个组一个目录�
 
 - 账号元数据（profile.json）与凭据（secrets.json）**分离存储**：前者可入档，
   后者 gitignore 永不入 git；解绑/换绑/删除用户组时同步清理（store 层保证）；
-- `handle` 为平台内 **API 主键**（洛古为 uid 数字，用户名可改而 uid 稳定），
-  `display_name` 为展示名（洛古用户名），界面一律显示 `display_name ?? handle`；
+- `handle` 为平台内 **API 主键**（洛谷为 uid 数字，用户名可改而 uid 稳定），
+  `display_name` 为展示名（洛谷用户名），界面一律显示 `display_name ?? handle`；
 - sync 引擎按 (platform, handle) 从 secrets.json 加载凭据注入 adapter
   （匿名平台为 None）。
 
@@ -198,7 +198,7 @@ verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**�
   `POST /accounts/verify`，成功回执平台内基本信息）→「确认绑定」→ 自动触发首次同步；
 - 换绑：每平台每用户组只保留一个账号，绑定新账号替换旧账号并删除其本地数据；
 - 解绑：确认后删除该账号本地数据（不可找回）；
-- 凭据平台（洛古，第三期落地）：绑定弹窗提供「一键登录」（后端 Playwright 拉起
+- 凭据平台（洛谷，第三期落地）：绑定弹窗提供「一键登录」（后端 Playwright 拉起
   系统浏览器登录窗口，见 §5.6）与「手动粘贴」两条凭据录入路径；
   `verify`/同步携带 `credentials`；绑定当下即携凭据试拉验证有效性
   （`AuthExpiredError` 在 verify 路径转 400，不放行死凭据）；
@@ -308,8 +308,8 @@ AdapterError                    # 基类
   如洛谷 403 长延迟重试落地时按需传入）；
 - **凭据统一应用**：`Credentials.cookies` 转 Cookie 头、`headers` 与调用方显式请求头
   合并（调用方优先）——adapter 不自行拼 Cookie 头；
-- **传输层例外（洛古）**：洛古 WAF 按 TLS/HTTP 指纹区分客户端（实测：同 IP 同
-  cookie，curl 通过、httpx 必被挑战），故洛古 adapter 不用共享 `HttpFetcher`，
+- **传输层例外（洛谷）**：洛谷 WAF 按 TLS/HTTP 指纹区分客户端（实测：同 IP 同
+  cookie，curl 通过、httpx 必被挑战），故洛谷 adapter 不用共享 `HttpFetcher`，
   改用 `curl_cffi`（浏览器 TLS 指纹伪装）自带会话，限流/退避模式镜像本层实现，
   详见 §5.6。
 
@@ -362,7 +362,7 @@ AdapterError                    # 基类
   依赖 net 层 4xx 抛出的 `HttpStatusError`（`PlatformError` 子类，携带
   `status_code`）——404 转 `UserNotFoundError`，其余维持 `PlatformError`。
 
-### 5.6 洛古适配器（cookie 授权 + 反爬对抗范本，第三期）
+### 5.6 洛谷适配器（cookie 授权 + 反爬对抗范本，第三期）
 
 `adapters/luogu/`，首个 `AuthMode.COOKIE` 平台。以下结论全部来自 2026-08-15
 真实 cookie 实测：
@@ -539,7 +539,7 @@ frontend/src/features/activity/
   （请求序号防竞态，丢弃过期响应）；同步用"触发 + 轮询 `/sync/status` 至 idle"；
 - 平台页签（PlatformTabs）与绑定弹窗平台下拉均由后端 `/platforms` 返回驱动，
   前端不硬编码平台清单；`types.ts` 的 `PlatformId` 随新平台补充联合类型；
-- **凭据平台 UI**（洛古）：绑定弹窗按 `auth === 'cookie'` 展开凭据区——
+- **凭据平台 UI**（洛谷）：绑定弹窗按 `auth === 'cookie'` 展开凭据区——
   「一键登录」（`browserLogin` 可用时，点击后轮询登录会话状态）与手动粘贴
   （整串 Cookie 头 / JSON 均可，前端解析出 `_uid` / `__client_id`）；
   账号展示一律 `displayName ?? handle`；`syncErrorCode === 'auth_expired'` 时
@@ -577,7 +577,7 @@ frontend/src/features/activity/
 已按序完成：设计文档 → 依赖与 gitignore → 数据模型与读写层 → adapters 基座 +
 Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡 → 契约扩展与结构清理
 → AtCoder 适配（net 层状态码错误 + adapter + 录制测试，前端零改动）
-→ 洛古适配（secrets 凭据框架 + curl_cffi 传输层 + browser-login + 前端凭据 UI）
+→ 洛谷适配（secrets 凭据框架 + curl_cffi 传输层 + browser-login + 前端凭据 UI）
 （详见 [../../PROGRESS.md](../../PROGRESS.md)）。
 
 ## 10. 既有决策与陷阱（对话确认，勿随意回退）
@@ -601,11 +601,11 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
   `user_info` 对不存在用户均返回 200，不能用于绑定验证（实测确认，§5.5）；
 - **题目目录失败语义分级**：`problems.json` 失败抛错重试（题名核心）、
   `problem-models.json` 失败 difficulty 留空继续（非关键），不反向混淆（§5.5）；
-- **洛古传输层必须 curl_cffi**：WAF 按 TLS 指纹封 httpx（实测同 IP 同 cookie
+- **洛谷传输层必须 curl_cffi**：WAF 按 TLS 指纹封 httpx（实测同 IP 同 cookie
   curl 通过、httpx 必被挑战）；换回共享 HttpFetcher 会导致同步全灭（§5.6）；
-- **洛古状态码 4=MLE / 5=TLE（与直觉相反）**：映射表以官方 `/_lfe/config/auth`
+- **洛谷状态码 4=MLE / 5=TLE（与直觉相反）**：映射表以官方 `/_lfe/config/auth`
   常量为准，勿凭记忆改写；14（Unaccepted）→ WA 为对话确认口径（§5.6）；
-- **洛古 handle = uid，display_name 分离**：用户名可改、uid 稳定；界面显示
+- **洛谷 handle = uid，display_name 分离**：用户名可改、uid 稳定；界面显示
   一律 `displayName ?? handle`；
 - **browser-login 凭据不经前端**：service 内存暂存 + bind 消费；Playwright 为
   可选依赖组，未安装时降级手动粘贴（§5.6）；

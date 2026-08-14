@@ -1,4 +1,4 @@
-"""洛古一键登录（browser-login）：Playwright 拉起系统浏览器，用户自行登录。
+"""洛谷一键登录（browser-login）：Playwright 拉起系统浏览器，用户自行登录。
 
 设计见 docs/design/activity.md §5.6：
 - 复用系统已装浏览器（channel="chrome" 兜底 "msedge"），不下载浏览器二进制；
@@ -82,7 +82,7 @@ async def capture_credentials(timeout: float = DEFAULT_TIMEOUT) -> Credentials:
                 await asyncio.sleep(POLL_INTERVAL)
             raise TimeoutError("登录等待超时")
         except PlaywrightTimeoutError as exc:
-            raise PlatformError(f"打开洛古登录页失败: {exc}") from exc
+            raise PlatformError(f"打开洛谷登录页失败: {exc}") from exc
         except PlaywrightError as exc:
             # 窗口被关闭等场景 Playwright 抛通用 Error
             if "closed" in str(exc).lower():

@@ -1,6 +1,6 @@
-"""洛古适配器（cookie 授权 + 反爬对抗，第三期；详见 docs/design/activity.md §5.6）。
+"""洛谷适配器（cookie 授权 + 反爬对抗，第三期；详见 docs/design/activity.md §5.6）。
 
-传输层例外：洛古 WAF 按 TLS/HTTP 指纹区分客户端（实测同 IP 同 cookie，
+传输层例外：洛谷 WAF 按 TLS/HTTP 指纹区分客户端（实测同 IP 同 cookie，
 curl 通过、httpx 必被 Spilopelia 挑战），故本 adapter 不用共享
 HttpFetcher，改用 curl_cffi（浏览器 TLS 指纹伪装）的 AsyncSession。
 注册表构造签名不变（入参 fetcher 忽略）；会话按次创建（cookie 罐
@@ -96,7 +96,7 @@ class LuoguAdapter(PlatformAdapter):
             result = self._parse(data, LgUserSearchResult, "用户搜索")
             user = self._exact_match(result.users, handle)
             if user is None:
-                raise UserNotFoundError(f"洛古用户不存在: {handle}")
+                raise UserNotFoundError(f"洛谷用户不存在: {handle}")
             if credentials is not None:
                 # 凭据有效性试拉：绑定当下拦住死凭据（AuthExpiredError → 400）
                 await self._get_json(
@@ -140,7 +140,7 @@ class LuoguAdapter(PlatformAdapter):
         - 绝对护栏：最多 MAX_PAGES 页。
         """
         if credentials is None:
-            raise AuthExpiredError("未配置洛古凭据，请先绑定账号并授权")
+            raise AuthExpiredError("未配置洛谷凭据，请先绑定账号并授权")
         out: list[LgRecordRow] = []
         seen: set[int] = set()
         window_start = int(time.time()) - full_window_days * 86400
@@ -232,17 +232,17 @@ class LuoguAdapter(PlatformAdapter):
                 except RequestException as exc:
                     if attempt >= MAX_RETRIES:
                         raise PlatformError(
-                            f"洛古请求重试 {MAX_RETRIES} 次仍失败: {exc}"
+                            f"洛谷请求重试 {MAX_RETRIES} 次仍失败: {exc}"
                         ) from exc
                     await self._backoff(attempt)
                     continue
                 if resp.status_code in (429, 500, 502, 503, 504):
                     if attempt >= MAX_RETRIES:
-                        raise PlatformError(f"洛古返回 HTTP {resp.status_code}")
+                        raise PlatformError(f"洛谷返回 HTTP {resp.status_code}")
                     await self._backoff(attempt)
                     continue
                 if resp.status_code != 200:
-                    raise PlatformError(f"洛古返回 HTTP {resp.status_code}")
+                    raise PlatformError(f"洛谷返回 HTTP {resp.status_code}")
                 body = resp.text
                 try:
                     data = json.loads(body)
@@ -250,10 +250,10 @@ class LuoguAdapter(PlatformAdapter):
                     # JS 挑战页 / 登录跳页（非 JSON）：重导凭据是共同正确动作
                     if anonymous:
                         raise PlatformError(
-                            "洛古返回非 JSON 响应（可能被反爬拦截）"
+                            "洛谷返回非 JSON 响应（可能被反爬拦截）"
                         ) from None
                     raise AuthExpiredError(
-                        "洛古凭据失效或被反爬拦截，请重新授权"
+                        "洛谷凭据失效或被反爬拦截，请重新授权"
                     ) from None
                 code = data.get("code", 200) if isinstance(data, dict) else 200
                 if code == 200:
@@ -266,9 +266,9 @@ class LuoguAdapter(PlatformAdapter):
                     await asyncio.sleep(RATE_LIMIT_BACKOFF * (2 ** (rate_retries - 1)))
                     continue
                 if code in (401, 403) and not anonymous:
-                    raise AuthExpiredError(f"洛古凭据无效（code={code}），请重新授权")
-                raise PlatformError(f"洛古返回错误 code={code}")
-            raise PlatformError(f"洛古请求重试 {MAX_RETRIES} 次仍失败")
+                    raise AuthExpiredError(f"洛谷凭据无效（code={code}），请重新授权")
+                raise PlatformError(f"洛谷返回错误 code={code}")
+            raise PlatformError(f"洛谷请求重试 {MAX_RETRIES} 次仍失败")
 
     async def _pace(self) -> None:
         """请求前补齐平台建议间隔（镜像 net 层语义，跨会话实例级记账）。"""
@@ -290,7 +290,7 @@ class LuoguAdapter(PlatformAdapter):
         try:
             return model.model_validate(data)
         except ValidationError as exc:
-            raise PlatformError(f"洛古 API {label}格式异常: {exc}") from exc
+            raise PlatformError(f"洛谷 API {label}格式异常: {exc}") from exc
 
     @staticmethod
     def _to_submission(row: LgRecordRow) -> PlatformSubmission:

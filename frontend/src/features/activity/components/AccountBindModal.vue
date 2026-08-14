@@ -4,7 +4,7 @@
  * （新账号替换旧账号及其本地数据，见 store.bindAccount）。
  * 平台下拉由后端平台注册表驱动。
  *
- * cookie 授权平台（洛古等，auth === 'cookie'）额外展开凭据区：
+ * cookie 授权平台（洛谷等，auth === 'cookie'）额外展开凭据区：
  * · 一键登录（browserLogin 可用时）：后端拉起系统浏览器登录窗口，
  *   用户自行登录，本弹窗轮询会话状态，成功后直接给出回执
  *   （凭据由后端暂存，不经前端，确认绑定时消费）；
@@ -66,7 +66,7 @@ const platformLocked = computed(() => props.platform != null)
 /** 当前所选平台是否已有绑定账号：有则本次为换绑 */
 const rebinding = computed(() => boundOn(platform.value) !== null)
 
-/** 当前平台是否 cookie 授权（洛古等） */
+/** 当前平台是否 cookie 授权（洛谷等） */
 const isCookiePlatform = computed(() => platformMeta(platform.value)?.auth === 'cookie')
 /** 当前平台一键登录可用（后端具备浏览器登录能力） */
 const canBrowserLogin = computed(
@@ -186,7 +186,7 @@ function confirm(): void {
   emit('update:show', false)
 }
 
-/** 回执展示名：优先 displayName（洛古用户名），空回退 handle */
+/** 回执展示名：优先 displayName（洛谷用户名），空回退 handle */
 const receiptLabel = computed(() =>
   receipt.value ? (receipt.value.displayName ?? receipt.value.handle) : '',
 )

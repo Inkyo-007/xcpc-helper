@@ -1,6 +1,6 @@
-"""洛古适配器测试：录制 JSON fixture 解析、倒序分页、增量停止、信封语义、反爬分级、凭据。
+"""洛谷适配器测试：录制 JSON fixture 解析、倒序分页、增量停止、信封语义、反爬分级、凭据。
 
-洛古走 curl_cffi 会话（TLS 指纹伪装，见 activity.md §5.6），测试注入
+洛谷走 curl_cffi 会话（TLS 指纹伪装，见 activity.md §5.6），测试注入
 FakeSession 替代真实会话；fixture 为真实响应脱敏（抹除身份字段）。
 """
 

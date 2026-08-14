@@ -11,7 +11,7 @@ export interface AccountCredentials {
 export interface PlatformMeta {
   id: PlatformId
   name: string
-  /** 凭据需求：none 匿名可取 / cookie 需登录授权（洛古等） */
+  /** 凭据需求：none 匿名可取 / cookie 需登录授权（洛谷等） */
   auth: 'none' | 'cookie'
   /** 一键登录可用（cookie 平台且服务端具备浏览器登录能力） */
   browserLogin: boolean
@@ -21,7 +21,7 @@ export interface PlatformMeta {
 export interface BoundAccount {
   platform: PlatformId
   handle: string
-  /** 展示名（洛古用户名等）；空则界面回退显示 handle */
+  /** 展示名（洛谷用户名等）；空则界面回退显示 handle */
   displayName?: string | null
   /** ISO 时间；null 表示从未同步成功 */
   lastSyncAt: string | null

@@ -1,7 +1,7 @@
-"""洛古 API 响应模型。
+"""洛谷 API 响应模型。
 
 外部系统数据第一时间转化为 Pydantic 模型（见 docs/rules/backend.md）。
-洛古信封（`_contentOnly=1` 纯 JSON 模式）：`{code, currentTemplate,
+洛谷信封（`_contentOnly=1` 纯 JSON 模式）：`{code, currentTemplate,
 currentData, ...}`；错误响应同为 `{code: 4xx, currentData: {...}}` 形态，
 错误消息位置不稳定，adapter 对原始体做关键词扫描判语义。
 

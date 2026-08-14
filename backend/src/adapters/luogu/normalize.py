@@ -1,4 +1,4 @@
-"""洛古数据归一化纯函数（无 IO，便于单测）。
+"""洛谷数据归一化纯函数（无 IO，便于单测）。
 
 状态码与语言码表来自官方前端常量端点 /_lfe/config/auth（2026-08-15 实测
 校准），勿凭记忆改写：注意 4=MLE、5=TLE 与直觉相反。
@@ -25,7 +25,7 @@ VERDICT_MAP: dict[int, Verdict] = {
 
 
 def map_verdict(status: int) -> Verdict:
-    """洛古 record.status 数字码 → 统一 Verdict；未知码归 UKE。"""
+    """洛谷 record.status 数字码 → 统一 Verdict；未知码归 UKE。"""
     return VERDICT_MAP.get(status, Verdict.UKE)
 
 
@@ -69,7 +69,7 @@ LANGUAGE_MAP: dict[int, str] = {
 
 
 def map_language(language: int) -> str:
-    """洛古 record.language 数字码 → 语言名；未知码兜底空串。"""
+    """洛谷 record.language 数字码 → 语言名；未知码兜底空串。"""
     return LANGUAGE_MAP.get(language, "")
 
 

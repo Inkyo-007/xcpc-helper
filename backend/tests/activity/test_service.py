@@ -438,7 +438,7 @@ LUOGU_CREDS = Credentials(cookies={"_uid": "100000", "__client_id": "tok"}, head
 
 
 def stub_luogu(service: ActivityService, login_result=None, login_exc=None):
-    """打桩洛古 adapter 的 browser-login 可选契约与同步外呼（防真实网络）。"""
+    """打桩洛谷 adapter 的 browser-login 可选契约与同步外呼（防真实网络）。"""
     adapter = service._adapters["luogu"]
     adapter.browser_login_available = lambda: True
 

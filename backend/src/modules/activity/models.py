@@ -34,8 +34,8 @@ class Submission(BaseModel):
 class Account(BaseModel):
     """已绑定账号；last_synced_at 兼作增量同步游标（数据水位，UTC 秒）。
 
-    handle 为平台内 API 主键（洛古为 uid 数字），display_name 为展示名
-    （洛古用户名等，仅展示用途，可为空则前端回退显示 handle）。
+    handle 为平台内 API 主键（洛谷为 uid 数字），display_name 为展示名
+    （洛谷用户名等，仅展示用途，可为空则前端回退显示 handle）。
     """
 
     platform: str

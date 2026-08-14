@@ -25,7 +25,7 @@ desktop = [
     "pywebview>=5.4",
 ]
 browser-login = [
-    # 洛古等 cookie 平台的一键登录（拉起系统浏览器，不下载浏览器二进制）；
+    # 洛谷等 cookie 平台的一键登录（拉起系统浏览器，不下载浏览器二进制）；
     # 可选依赖：未安装时降级为手动粘贴 cookie
     "playwright>=1.40",
 ]
