@@ -228,8 +228,8 @@ def weak_points(submissions: Iterable[Submission]) -> list[dict[str, object]]:
             )
 
     scored: list[tuple[float, str, dict[str, object]]] = []
-    for tag in tag_attempts:
-        attempt_count = len(tag_attempts[tag])
+    for tag, attempts in tag_attempts.items():
+        attempt_count = len(attempts)
         if attempt_count < 2:
             continue
         solved_keys = tag_solved.get(tag, set())
