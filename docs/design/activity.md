@@ -43,8 +43,8 @@ router / service / modules 主干保持平台无关（不出现 `if platform == 
 - adapter 声明 `capabilities`（提供哪些数据区块、是否需要凭据）与 `auth`；
 - service / sync 按 `capabilities` 决定调用哪些能力方法，缺能力的字段省略并记诊断；
 - router 用同一组端点服务所有平台，绑定/凭据差异由统一 `credentials` 载荷吸收；
-- 前端按后端 `/platforms` 返回的元数据（capabilities/auth）条件渲染，平台页签、
-  绑定弹窗平台下拉均由后端驱动，前端不硬编码平台清单。
+- 前端按后端 `/platforms` 返回的元数据（capabilities/auth/browserLogin）条件渲染，
+  平台页签与绑定弹窗形态（匿名 / cookie 两种方式）均由后端驱动，前端不硬编码平台清单。
 
 ### 2.3 平台优先级（分期）
 
@@ -194,12 +194,16 @@ verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**�
 ### 4.4 空状态与绑定流程
 
 - 未绑定任何账号：整页引导空状态「绑定第一个账号」；
-- 绑定弹窗：平台下拉（后端 capabilities 驱动）→ handle 输入 →「验证」（后端
-  `POST /accounts/verify`，成功回执平台内基本信息）→「确认绑定」→ 自动触发首次同步；
+- 绑定弹窗：顶部提示「你正在绑定 <平台> 账号」（平台由入口锁定，弹窗内不再
+  提供平台切换；空状态入口回落为平台列表首个，换平台可先点平台页签）→
+  handle 输入 →「验证」（后端 `POST /accounts/verify`，成功回执平台内基本信息）
+  →「确认绑定」→ 自动触发首次同步；
 - 换绑：每平台每用户组只保留一个账号，绑定新账号替换旧账号并删除其本地数据；
 - 解绑：确认后删除该账号本地数据（不可找回）；
-- 凭据平台（洛谷，第三期落地）：绑定弹窗提供「一键登录」（后端 Playwright 拉起
-  系统浏览器登录窗口，见 §5.6）与「手动粘贴」两条凭据录入路径；
+- 凭据平台（洛谷，第三期落地）：绑定弹窗提供两条路径——「方式一 · 一键登录」
+  （后端 Playwright 拉起系统浏览器登录窗口，见 §5.6）与「方式二 · 手动输入
+  cookie」（逐字段输入框：`_uid`（即平台 UID，兼作 handle）与 `__client_id`，
+  配「如何获取 cookie？」悬浮引导）；
   `verify`/同步携带 `credentials`；绑定当下即携凭据试拉验证有效性
   （`AuthExpiredError` 在 verify 路径转 400，不放行死凭据）；
   同步中 `AuthExpiredError` → `syncErrorCode: "auth_expired"` → 账号按钮警示态
@@ -414,7 +418,7 @@ AdapterError                    # 基类
   `_uid`/`__client_id`/UA 返回；用户关窗 → canceled，超时 3 分钟 → timeout。
   凭据由 service 暂存（内存，10 分钟 TTL），bind 时消费——**凭据不经前端**。
   Playwright 未安装时 `/platforms` 的 `browserLogin=false`，前端隐藏一键登录
-  按钮，降级手动粘贴（接受整串 Cookie 头，前端解析出两个字段）。
+  按钮，仅保留方式二手动输入。
 
 ### 5.7 新平台接入清单（checklist）
 
@@ -526,7 +530,7 @@ frontend/src/features/activity/
 │  ├─ UserProfileCard.vue      # 信息卡（头像 / ID / 签名就地编辑）
 │  ├─ UserGroupMenu.vue        # 用户组下拉（新建 / 切换，按钮显示组名）
 │  ├─ UserGroupEditModal.vue   # 编辑用户组（重命名 / 删除 / 平台账号绑定管理）
-│  ├─ AccountBindModal.vue     # 绑定 / 换绑 / 凭据录入（cookie 平台：一键登录 + 整串 Cookie 粘贴）
+│  ├─ AccountBindModal.vue     # 绑定 / 换绑（cookie 平台：一键登录 + cookie 逐字段输入）
 │  ├─ SyncBar.vue / SyncOverlay.vue / PlatformTabs.vue
 │  ├─ StatCards.vue / PassBarChart.vue / ActivityHeatmap.vue / SubmissionList.vue
 │  └─ platforms/               # 平台专属组件注册表（后续增量，如 LuoguExtrasCard.vue）
@@ -540,11 +544,12 @@ frontend/src/features/activity/
   **遮罩等待 30s，超时转后台低频轮询**（2s 间隔、不持遮罩、合并状态到 accounts
   使账号按钮实时显示「同步中」），完成后刷新数据；洛谷首次全量需数分钟
   （20 条/页 × 5s 反爬间隔），此机制避免"空数据无提示"假象；
-- 平台页签（PlatformTabs）与绑定弹窗平台下拉均由后端 `/platforms` 返回驱动，
-  前端不硬编码平台清单；`types.ts` 的 `PlatformId` 随新平台补充联合类型；
-- **凭据平台 UI**（洛谷）：绑定弹窗按 `auth === 'cookie'` 展开凭据区——
-  「一键登录」（`browserLogin` 可用时，点击后轮询登录会话状态）与手动粘贴
-  （整串 Cookie 头 / JSON 均可，前端解析出 `_uid` / `__client_id`）；
+- 平台页签（PlatformTabs）由后端 `/platforms` 返回驱动，前端不硬编码平台清单；
+  `types.ts` 的 `PlatformId` 随新平台补充联合类型；
+- **凭据平台 UI**（洛谷）：绑定弹窗按 `auth === 'cookie'` 展开两种方式——
+  「方式一 · 一键登录」（`browserLogin` 可用时，点击后轮询登录会话状态）与
+  「方式二 · 手动输入 cookie」（按平台注册表逐字段输入框：洛谷 `_uid` 兼任
+  handle（即 UID）与 `__client_id`，配「如何获取 cookie？」悬浮引导）；
   账号展示一律 `displayName ?? handle`；`syncErrorCode === 'auth_expired'` 时
   账号按钮警示态「凭据过期」，点击走换绑路径重新授权，成功后自动触发一次同步；
 - 网址状态同步：`?platform=&date=&page=`（缺省不写入），刷新/前进后退/复制链接可恢复。
