@@ -2,6 +2,7 @@
 
 import { request } from '@/shared/api/client'
 import type {
+  AnalysisData,
   BoundAccount,
   DayActivity,
   OverviewTotals,
@@ -81,6 +82,11 @@ export function fetchOverview(scope: PlatformScope = 'all'): Promise<ApiOverview
 export function fetchSkillTree(scope: PlatformScope = 'all'): Promise<SkillTreeData> {
   const platform = scopeParam(scope)
   return request<SkillTreeData>(`/activity/skill-tree${platform ? `?platform=${platform}` : ''}`)
+}
+
+export function fetchAnalysis(scope: PlatformScope = 'all'): Promise<AnalysisData> {
+  const platform = scopeParam(scope)
+  return request<AnalysisData>(`/activity/analysis${platform ? `?platform=${platform}` : ''}`)
 }
 
 export function fetchSubmissions(opts: {
