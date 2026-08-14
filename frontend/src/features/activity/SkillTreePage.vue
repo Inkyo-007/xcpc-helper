@@ -55,7 +55,7 @@ onMounted(async () => {
     <header class="st-head">
       <div class="st-title">
         <h1>技能树</h1>
-        <p>基于 Codeforces 题目标签聚合：节点深浅与大小反映掌握度，悬停查看详情。</p>
+        <p>基于 Codeforces 题目标签聚合：扇区大小反映做题量，颜色深浅反映掌握度，点击领域可下钻。</p>
       </div>
       <NButton quaternary size="small" :loading="loading" @click="refresh">
         <template #icon><RefreshCw :size="14" /></template>

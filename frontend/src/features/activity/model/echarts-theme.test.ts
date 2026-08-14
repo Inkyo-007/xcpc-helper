@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPalette } from '@/features/activity/model/echarts-theme'
+import { buildPalette, domainFill } from '@/features/activity/model/echarts-theme'
 
 const base = {
   hue: 160,
@@ -36,5 +36,30 @@ describe('buildPalette', () => {
     for (const color of p.heatColors.slice(1)) {
       expect(color).toMatch(commaHsla)
     }
+  })
+
+  it('domainHues 生成 12 个不重复、随主题色相旋转的色相', () => {
+    const p = buildPalette({ ...base, dark: false })
+    expect(p.domainHues).toHaveLength(12)
+    expect(new Set(p.domainHues).size).toBe(12)
+    // 首个色相即主题色相本身
+    expect(p.domainHues[0]).toBeCloseTo(160)
+    // 换一个主题色相，整体等距旋转
+    const p2 = buildPalette({ ...base, hue: 200, dark: false })
+    expect(p2.domainHues[0]).toBeCloseTo(200)
+    expect(p2.domainHues[1]).toBeCloseTo((200 + 30) % 360)
+  })
+
+  it('domainFill 明度随掌握度单调递增且遵循逗号 hsl 语法', () => {
+    const commaHsl = /^hsl\(\d+, \d+%, \d+%\)$/
+    const weak = domainFill(160, 0, false)
+    const strong = domainFill(160, 1, false)
+    expect(weak).toMatch(commaHsl)
+    expect(strong).toMatch(commaHsl)
+    // 掌握度 1 比 0 更亮、更饱和
+    const lOf = (c: string) => Number(c.match(/(\d+)%\)$/)![1])
+    expect(lOf(strong)).toBeGreaterThan(lOf(weak))
+    // 明暗主题亮度不同
+    expect(domainFill(160, 0.5, false)).not.toBe(domainFill(160, 0.5, true))
   })
 })

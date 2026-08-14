@@ -1,13 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import type { SkillTreeData } from '@/features/activity/types'
+import { buildPalette } from '@/features/activity/model/echarts-theme'
 import {
-  buildSkillTreeLayout,
-  domainAngles,
-  domainRadius,
-  rootRadius,
-  skillAngles,
-  skillRadius,
+  buildDomainLegend,
+  buildSunburstData,
+  buildSunburstOption,
 } from '@/features/activity/model/skill-tree'
+import type { SkillTreeData } from '@/features/activity/types'
+
+const palette = buildPalette({
+  hue: 160,
+  dark: false,
+  text: '#23211d',
+  faint: '#a09a8e',
+  surface: '#fdfdfc',
+  surface2: '#efede8',
+  border: '#e2dfd8',
+})
 
 function sampleData(): SkillTreeData {
   return {
@@ -36,74 +44,68 @@ function sampleData(): SkillTreeData {
   }
 }
 
-describe('domainAngles', () => {
-  it('起始于正上方（-π/2）并覆盖整圆', () => {
-    const a = domainAngles(4)
-    expect(a[0]).toBeCloseTo(-Math.PI / 2)
-    expect(a.length).toBe(4)
-    // 相邻角度差一致
-    const step = a[1] - a[0]
-    for (let i = 1; i < a.length; i++) expect(a[i] - a[i - 1]).toBeCloseTo(step)
+describe('buildSunburstData', () => {
+  const data = sampleData()
+  const [root] = buildSunburstData(data, palette)
+
+  it('返回单根，根值取总计', () => {
+    expect(root.name).toBe('技能树')
+    expect(root.depth).toBe(0)
+    expect(root.value).toBe(data.totals.acCount)
+    expect(root.proficiency).toBe(data.totals.proficiency)
   })
 
-  it('空域返回空数组', () => {
-    expect(domainAngles(0)).toEqual([])
-  })
-})
+  it('域与技能层级对齐输入，且携带展示元数据', () => {
+    expect(root.children).toHaveLength(2)
+    const [math, dp] = root.children!
+    expect(math.name).toBe('数学')
+    expect(math.value).toBe(2)
+    expect(math.depth).toBe(1)
+    expect(math.children).toHaveLength(2)
 
-describe('skillAngles', () => {
-  it('单个技能落在域角度上', () => {
-    expect(skillAngles(0, 1, 1)).toEqual([0])
+    const [mathBase, numberTheory] = math.children!
+    expect(mathBase.domainKey).toBe('math')
+    expect(mathBase.domainName).toBe('数学')
+    expect(mathBase.tag).toBe('math')
+    expect(mathBase.depth).toBe(2)
+    expect(numberTheory.value).toBe(1)
+
+    expect(dp.children).toHaveLength(1)
   })
 
-  it('多个技能以域角度为中心对称铺开', () => {
-    const a = skillAngles(0, 3, 1)
-    expect(a).toHaveLength(3)
-    expect(a[1]).toBeCloseTo(0) // 中间技能对准域中心
-    expect(a[0]).toBeLessThan(0)
-    expect(a[2]).toBeGreaterThan(0)
-    // 对称
-    expect(a[0] + a[2]).toBeCloseTo(0)
-  })
-})
-
-describe('node radius', () => {
-  it('半径随掌握度单调递增', () => {
-    expect(rootRadius(1)).toBeGreaterThan(rootRadius(0))
-    expect(domainRadius(1)).toBeGreaterThan(domainRadius(0))
-    expect(skillRadius(1)).toBeGreaterThan(skillRadius(0))
+  it('每个节点都有颜色，且不同域色相不同', () => {
+    expect(root.itemStyle.color).toBeTruthy()
+    const colors = root.children!.map((d) => d.itemStyle.color)
+    expect(new Set(colors).size).toBe(2)
   })
 })
 
-describe('buildSkillTreeLayout', () => {
-  const size = 800
-  const layout = buildSkillTreeLayout(sampleData(), size)
+describe('buildDomainLegend', () => {
+  it('按域顺序生成图例条目，颜色与域色相一致', () => {
+    const data = sampleData()
+    const legend = buildDomainLegend(data, palette)
+    expect(legend).toHaveLength(2)
+    expect(legend.map((l) => l.name)).toEqual(['数学', '动态规划'])
+    expect(legend[0].color).toBeTruthy()
+    expect(legend[0].acCount).toBe(2)
+    // 图例身份色取掌握度 1 的满强度色，与域节点的弱化色不同
+    const [mathDomain] = buildSunburstData(data, palette)[0].children!
+    expect(legend[0].color).not.toBe(mathDomain.itemStyle.color)
+  })
+})
 
-  it('根节点居中', () => {
-    expect(layout.root.pos).toEqual({ x: size / 2, y: size / 2 })
+describe('buildSunburstOption', () => {
+  const option = buildSunburstOption(sampleData(), palette) as {
+    series: { type: string; data: unknown[]; nodeClick: string; levels: unknown[] }[]
+  }
+
+  it('输出 sunburst 单系列并携带下钻交互', () => {
+    expect(option.series).toHaveLength(1)
+    expect(option.series[0].type).toBe('sunburst')
+    expect(option.series[0].nodeClick).toBe('rootToNode')
   })
 
-  it('域与技能节点数对齐输入', () => {
-    expect(layout.domains).toHaveLength(2)
-    expect(layout.skills).toHaveLength(3)
-  })
-
-  it('域节点落在域环半径附近', () => {
-    for (const d of layout.domains) {
-      const dx = d.pos.x - layout.center.x
-      const dy = d.pos.y - layout.center.y
-      expect(Math.hypot(dx, dy)).toBeCloseTo(size * 0.3, 0)
-    }
-  })
-
-  it('技能节点落在技能环半径附近并关联所属域', () => {
-    for (const s of layout.skills) {
-      const dx = s.pos.x - layout.center.x
-      const dy = s.pos.y - layout.center.y
-      expect(Math.hypot(dx, dy)).toBeCloseTo(size * 0.47, 0)
-      expect(['math', 'dp']).toContain(s.domainKey)
-    }
-    const mathSkills = layout.skills.filter((s) => s.domainKey === 'math')
-    expect(mathSkills).toHaveLength(2)
+  it('三级 levels 对应根 / 域 / 技能', () => {
+    expect(option.series[0].levels).toHaveLength(3)
   })
 })

@@ -1,13 +1,13 @@
-/** ECharts 按需注册：只打包柱状图所需模块（热力图已改为 DOM 网格，
- * 见 components/ActivityHeatmap.vue 与 model/heatmap-grid.ts）。
+/** ECharts 按需注册：只打包本功能所需模块（柱状图 + 技能树旭日图；
+ * 热力图已改为 DOM 网格，见 components/ActivityHeatmap.vue 与 model/heatmap-grid.ts）。
  */
 
-import { BarChart } from 'echarts/charts'
+import { BarChart, SunburstChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import * as echarts from 'echarts/core'
 import { SVGRenderer } from 'echarts/renderers'
 
-echarts.use([BarChart, GridComponent, TooltipComponent, SVGRenderer])
+echarts.use([BarChart, SunburstChart, GridComponent, TooltipComponent, SVGRenderer])
 
 export { echarts }
 export type { EChartsCoreOption } from 'echarts/core'
