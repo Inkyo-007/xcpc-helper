@@ -170,3 +170,63 @@ class SkillTreeTotalsOut(BaseModel):
 class SkillTreeOut(BaseModel):
     domains: list[SkillDomainOut]
     totals: SkillTreeTotalsOut
+
+
+# ===== 训练分析 =====
+
+
+class DifficultyBandOut(BaseModel):
+    """难度分档统计（label/min/max 对应 DIFFICULTY_BANDS）。"""
+
+    label: str
+    min: int | None
+    max: int | None
+    solvedCount: int  # 去重 AC 题数
+    attemptCount: int  # 去重尝试题数（任意 verdict）
+    submissionCount: int  # 该档提交总数
+    passRate: float  # solvedCount / attemptCount（无尝试为 0）
+
+
+class VerdictCountOut(BaseModel):
+    verdict: Verdict
+    count: int
+    share: float  # count / total（total 为 0 时为 0）
+
+
+class WeekActivityOut(BaseModel):
+    weekStart: str  # 该周周一 YYYY-MM-DD（本地时区）
+    solved: int  # 去重 AC 题数
+    attempts: int  # 提交总数
+    activeDays: int  # 有提交的不同本地日期数
+
+
+class HourActivityOut(BaseModel):
+    hour: int  # 0..23
+    count: int  # 该小时提交数
+
+
+class RhythmOut(BaseModel):
+    weeks: list[WeekActivityOut]  # 近 12 周（含本周），升序，末尾为本周期
+    hours: list[HourActivityOut]  # 0..23 共 24 项
+
+
+class WeakPointOut(BaseModel):
+    """技能薄弱点（一个 CF 标签；口径与技能树一致）。"""
+
+    key: str  # 原 CF 标签
+    name: str  # 中文名（未命中映射时为原标签）
+    domainKey: str
+    domainName: str
+    solvedCount: int  # 去重 AC 题数
+    attemptCount: int  # 去重尝试题数（任意 verdict）
+    passRate: float  # solvedCount / attemptCount
+    proficiency: float  # 掌握度 0..1（复用 skill_tree.proficiency）
+    maxDifficulty: int | None = None  # AC 题最高原始难度
+    suggestion: str  # 规则化训练建议
+
+
+class AnalysisOut(BaseModel):
+    difficulty: list[DifficultyBandOut]
+    verdicts: list[VerdictCountOut]
+    rhythm: RhythmOut
+    weakPoints: list[WeakPointOut]

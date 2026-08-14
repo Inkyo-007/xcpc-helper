@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from modules.activity.schemas import (
+    AnalysisOut,
     BindIn,
     BoundAccountOut,
     GroupCreateIn,
@@ -109,6 +110,14 @@ async def get_skill_tree(
     platform: Annotated[str | None, Query()] = None,
 ) -> SkillTreeOut:
     return service.skill_tree(platform)
+
+
+@router.get("/analysis", response_model=AnalysisOut)
+async def get_analysis(
+    service: ServiceDep,
+    platform: Annotated[str | None, Query()] = None,
+) -> AnalysisOut:
+    return service.analysis(platform)
 
 
 @router.get("/submissions", response_model=SubmissionsOut)

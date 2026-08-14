@@ -131,7 +131,7 @@ TAG_NAME: dict[str, str] = {
 _SATURATION = 3.0
 
 
-def _weight(difficulty: int | str | None) -> float:
+def difficulty_weight(difficulty: int | str | None) -> float:
     """题目难度 → 掌握度权重（未知/非数值给基础权重 0.5，CF rating 线性缩放）。"""
     if difficulty is None or isinstance(difficulty, str):
         return 0.5
@@ -172,7 +172,7 @@ def _node(
     ac: dict[tuple[str, str], tuple[set[str], int | None]],
 ) -> dict[str, object]:
     """由问题 key 集合计算节点的 acCount / proficiency / maxDifficulty。"""
-    weights = [_weight(ac[k][1]) for k in keys]
+    weights = [difficulty_weight(ac[k][1]) for k in keys]
     difficulties = [ac[k][1] for k in keys if ac[k][1] is not None]
     return {
         "proficiency": proficiency(weights),
