@@ -1,6 +1,6 @@
 # 训练分析（analysis）设计
 
-> 状态：设计中。
+> 状态：已实现（四维聚合：难度分布 / verdict 分布 / 训练节奏与活跃度 / 薄弱点检测；可配置在线 LLM 分析报告，OpenAI 兼容，未配置或失败时规则化降级）。
 > 本功能是「训练统计（activity）」的增量：在数据总览与技能树之外，新增**多维度诊断**与**可配置在线 LLM 分析报告**，
 > 复用 activity 提交数据与用户组隔离，不新建功能域、不新建存储。
 
@@ -182,7 +182,7 @@ frontend/src/features/activity/
   `POST /api/activity/analysis/report`（未配置时返回 rule 报告）、`/api/activity/analysis/report/config` 正常；
 - 手动走查：绑定 CF 账号 → 同步 → 分析页四图渲染 → 薄弱点与技能树口径一致 → 生成 AI/规则报告 → 明暗主题跟随。
 
-## 9. 实施顺序
+## 9. 实施顺序（已完成）
 
 1. `docs: 添加训练分析（四维聚合 + LLM 报告）设计文档`
 2. `feat(后端): 实现四维训练分析聚合纯函数与 API 端点`
