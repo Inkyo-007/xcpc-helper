@@ -1,7 +1,7 @@
 # 训练统计聚合（activity）设计
 
 > 状态：已实现（第一期 Codeforces + 第二期 AtCoder：提交统计 + 绑定验证 + 多用户组全链路）。
-> 本文档与实际实现同步，是后续多平台适配（AtCoder / LeetCode / 洛谷 / 牛客 / QOJ 等）
+> 本文档与实际实现同步，是后续多平台适配（LeetCode / 洛谷 / 牛客 / QOJ 等）
 > 与新增功能（rating 折线、比赛信息）的规范参考；改设计必须先改本文档再改代码。
 > 需求背景见 [../cache/requirement.md](../cache/requirement.md)，
 > 平台接口调研见 [../cache/platform-api-research.md](../cache/platform-api-research.md)。
@@ -487,6 +487,7 @@ frontend/src/features/activity/
 
 已按序完成：设计文档 → 依赖与 gitignore → 数据模型与读写层 → adapters 基座 +
 Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡 → 契约扩展与结构清理
+→ AtCoder 适配（net 层状态码错误 + adapter + 录制测试，前端零改动）
 （详见 [../../PROGRESS.md](../../PROGRESS.md)）。
 
 ## 10. 既有决策与陷阱（对话确认，勿随意回退）
