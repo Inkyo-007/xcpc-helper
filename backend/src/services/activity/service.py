@@ -15,6 +15,8 @@ from datetime import datetime, tzinfo
 
 from adapters import REGISTRY, HttpFetcher
 from adapters.base import (
+    AuthExpiredError,
+    AuthMode,
     Capability,
     Credentials,
     PlatformAdapter,
@@ -201,6 +203,7 @@ class ActivityService:
         return BoundAccountOut(
             platform=account.platform,
             handle=account.handle,
+            displayName=account.display_name,
             lastSyncAt=last_sync_at,
             syncState=status.state.value,
             syncError=status.error,
@@ -221,23 +224,42 @@ class ActivityService:
             if payload.credentials
             else None
         )
+        # cookie 授权平台：验证即需凭据（存在性校验 + 凭据有效性试拉）
+        if adapter.auth == AuthMode.COOKIE and credentials is None:
+            raise BadRequestError(f"平台 {payload.platform} 需要登录凭据（cookie）")
         try:
             info = await adapter.verify(handle, credentials)
         except UserNotFoundError as exc:
             raise BadRequestError(str(exc)) from exc
+        except AuthExpiredError as exc:
+            # 凭据在绑定当下即无效：转 400 引导重新录入，不放行死凭据
+            raise BadRequestError(str(exc)) from exc
         except PlatformError as exc:
             raise BadGatewayError(f"平台暂时不可用：{exc}") from exc
-        return VerifyOut(platform=payload.platform, handle=info.handle, avatar=info.avatar)
+        return VerifyOut(
+            platform=payload.platform,
+            handle=info.handle,
+            displayName=info.display_name,
+            avatar=info.avatar,
+        )
 
     # ===== 绑定 / 解绑 =====
 
     async def bind(self, payload: BindIn) -> BoundAccountOut:
-        self._adapter(payload.platform)
+        adapter = self._adapter(payload.platform)
         handle = payload.handle.strip()
         if not handle:
             raise BadRequestError("请输入平台用户名")
+        credentials = (
+            Credentials.model_validate(payload.credentials)
+            if payload.credentials
+            else None
+        )
+        # cookie 授权平台必须携带凭据（洛古等），绑定即持久化到 secrets.json
+        if adapter.auth == AuthMode.COOKIE and credentials is None:
+            raise BadRequestError(f"平台 {payload.platform} 需要登录凭据（cookie）")
         store = self._store()
-        # 换绑：每个平台每用户组只保留一个账号，旧账号连同本地数据删除
+        # 换绑：每个平台每用户组只保留一个账号，旧账号连同本地数据与凭据删除
         profile = store.load_profile()
         for acc in profile.accounts:
             if acc.platform == payload.platform:
@@ -246,8 +268,14 @@ class ActivityService:
                     self._current_group, acc.platform, acc.handle
                 )
                 break
-        account = Account(platform=payload.platform, handle=handle)
+        account = Account(
+            platform=payload.platform,
+            handle=handle,
+            display_name=(payload.displayName or "").strip() or None,
+        )
         store.save_account(account)
+        if credentials is not None:
+            store.save_account_secrets(payload.platform, handle, credentials)
         # 首次同步后台异步执行，前端轮询 /sync/status
         asyncio.create_task(self._safe_sync(payload.platform, handle))
         return self._account_out(account)

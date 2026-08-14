@@ -66,9 +66,14 @@ class PlatformSubmission(BaseModel):
 
 
 class UserInfo(BaseModel):
-    """绑定验证回执（第一期仅 handle；avatar 备用字段）。"""
+    """绑定验证回执（handle 为平台内 API 主键，display_name 为展示名）。
+
+    洛古等平台 API 主键（uid 数字）与展示名（用户名）分离；
+    无分离需求的平台不填 display_name，前端回退显示 handle。
+    """
 
     handle: str
+    display_name: str | None = None
     avatar: str | None = None
 
 

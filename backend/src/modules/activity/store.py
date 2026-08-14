@@ -19,11 +19,19 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from adapters.base import Credentials
 from common.validation import validate_name
 from core.exceptions import ConflictError, NotFoundError
-from modules.activity.models import DEFAULT_USER_ID, Account, Profile, Submission
+from modules.activity.models import (
+    DEFAULT_USER_ID,
+    Account,
+    Profile,
+    Secrets,
+    Submission,
+)
 
 PROFILE_FILE = "profile.json"
+SECRETS_FILE = "secrets.json"  # 凭据（gitignore，仅存本机）
 SUBMISSIONS_DIR = Path("activity") / "submissions"
 
 # 格式样例目录（入 git 的 example 样例，不作为用户组参与管理）
@@ -144,7 +152,7 @@ class UserStore:
             self.save_profile(profile)
 
     def remove_account(self, platform: str, handle: str) -> None:
-        """从档案移除账号并删除其提交数据（解绑）。"""
+        """从档案移除账号并删除其提交数据与凭据（解绑）。"""
         with self._lock:
             profile = self.load_profile()
             profile.accounts = [
@@ -154,6 +162,57 @@ class UserStore:
             ]
             self.save_profile(profile)
             self._submissions_file(platform, handle).unlink(missing_ok=True)
+            self.remove_account_secrets(platform, handle)
+
+    # ===== secrets（凭据，gitignore 仅存本机） =====
+
+    def load_secrets(self) -> Secrets:
+        """读取 secrets.json；不存在或损坏返回空凭据集（不阻断）。"""
+        secrets_file = self._dir / SECRETS_FILE
+        if not secrets_file.is_file():
+            return Secrets()
+        try:
+            raw = json.loads(secrets_file.read_text(encoding="utf-8"))
+            return Secrets.model_validate(raw)
+        except (OSError, json.JSONDecodeError, ValidationError):
+            return Secrets()
+
+    def get_account_credentials(
+        self, platform: str, handle: str
+    ) -> Credentials | None:
+        """读取单个账号凭据（同步用）；无则 None。"""
+        return self.load_secrets().platforms.get(platform, {}).get(handle)
+
+    def save_account_secrets(
+        self, platform: str, handle: str, credentials: Credentials
+    ) -> None:
+        """写入单个账号凭据（绑定/换绑/凭据刷新），原子写。"""
+        handle = validate_name(handle, "账号")
+        with self._lock:
+            secrets = self.load_secrets()
+            secrets.platforms.setdefault(platform, {})[handle] = credentials
+            self._save_secrets(secrets)
+
+    def remove_account_secrets(self, platform: str, handle: str) -> None:
+        """删除单个账号凭据（解绑/换绑清理）；不存在为空操作。"""
+        with self._lock:
+            secrets = self.load_secrets()
+            handles = secrets.platforms.get(platform)
+            if not handles or handle not in handles:
+                return
+            handles.pop(handle)
+            if not handles:
+                secrets.platforms.pop(platform)
+            self._save_secrets(secrets)
+
+    def _save_secrets(self, secrets: Secrets) -> None:
+        self._dir.mkdir(parents=True, exist_ok=True)
+        text = json.dumps(
+            secrets.model_dump(mode="json"),
+            ensure_ascii=False,
+            indent=2,
+        )
+        _atomic_write(self._dir / SECRETS_FILE, text)
 
     # ===== submissions =====
 

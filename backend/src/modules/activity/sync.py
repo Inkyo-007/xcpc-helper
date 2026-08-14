@@ -133,9 +133,12 @@ class SyncEngine:
         if account is None:
             raise NotFoundError(f"账号未绑定: {platform}/{handle}")
         since = account.last_synced_at
+        # cookie 授权平台：从 secrets.json 加载凭据（匿名平台为 None）
+        credentials = store.get_account_credentials(platform, handle)
         raw = await adapter.fetch_submissions(
             handle,
             since=since,
+            credentials=credentials,
             full_window_days=self._full_window_days,
             full_min_rows=self._full_min_rows,
         )
@@ -148,7 +151,12 @@ class SyncEngine:
         new_cursor = max((s.submitted_at for s in submissions), default=0)
         if new_cursor > (since or 0):
             store.save_account(
-                Account(platform=platform, handle=handle, last_synced_at=new_cursor)
+                Account(
+                    platform=platform,
+                    handle=handle,
+                    last_synced_at=new_cursor,
+                    display_name=account.display_name,  # 游标推进不丢展示名
+                )
             )
         self._status[(user_id, platform, handle)] = SyncStatus(
             platform=platform,

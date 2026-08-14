@@ -2,6 +2,7 @@
 
 import pytest
 
+from adapters.base import Credentials
 from core.exceptions import BadRequestError, ConflictError, NotFoundError
 from modules.activity.models import Account, Submission, Verdict
 from modules.activity.store import (
@@ -203,3 +204,43 @@ def test_chinese_group_name_allowed(tmp_path):
     name = create_group(root, "算法训练·秋")
     assert name == "算法训练·秋"
     assert (root / name).is_dir()
+
+
+# ===== secrets（凭据） =====
+
+
+def test_secrets_roundtrip(tmp_path):
+    """凭据写入/读取往返；不同平台与账号隔离。"""
+    store = make_store(tmp_path)
+    cred = Credentials(cookies={"_uid": "1", "__client_id": "abc"}, headers={})
+    store.save_account_secrets("luogu", "100", cred)
+    loaded = store.get_account_credentials("luogu", "100")
+    assert loaded is not None
+    assert loaded.cookies["__client_id"] == "abc"
+    assert store.get_account_credentials("luogu", "200") is None
+    assert store.get_account_credentials("codeforces", "demo") is None
+
+
+def test_secrets_corrupt_falls_back_to_empty(tmp_path):
+    """secrets.json 损坏按空凭据集处理（不阻断）。"""
+    store = make_store(tmp_path)
+    store.save_account_secrets("luogu", "100", Credentials(cookies={"_uid": "1"}))
+    (tmp_path / "user" / "default" / "secrets.json").write_text("not json", encoding="utf-8")
+    assert store.get_account_credentials("luogu", "100") is None
+
+
+def test_remove_account_cleans_secrets(tmp_path):
+    """解绑/换绑（remove_account）同步清理该账号凭据。"""
+    store = make_store(tmp_path)
+    store.save_account(Account(platform="luogu", handle="100"))
+    store.save_account_secrets("luogu", "100", Credentials(cookies={"_uid": "1"}))
+    store.remove_account("luogu", "100")
+    assert store.get_account_credentials("luogu", "100") is None
+
+
+def test_remove_account_secrets_idempotent(tmp_path):
+    """删除不存在的凭据为空操作；同平台其他账号凭据不受影响。"""
+    store = make_store(tmp_path)
+    store.save_account_secrets("luogu", "100", Credentials(cookies={"_uid": "1"}))
+    store.remove_account_secrets("luogu", "999")
+    assert store.get_account_credentials("luogu", "100") is not None

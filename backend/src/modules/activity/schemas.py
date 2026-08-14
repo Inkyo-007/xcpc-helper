@@ -19,6 +19,7 @@ class BoundAccountOut(BaseModel):
 
     platform: str
     handle: str
+    displayName: str | None = None  # 展示名（洛古用户名等；空则前端回退 handle）
     lastSyncAt: datetime | None = None  # 最近一次成功同步的结束时间
     syncState: SyncStateOut = "idle"
     syncError: str | None = None
@@ -42,7 +43,7 @@ class PlatformsOut(BaseModel):
 class VerifyIn(BaseModel):
     platform: str
     handle: str
-    credentials: dict[str, Any] | None = None  # 预留（cookie 授权平台验证需凭据）
+    credentials: dict[str, Any] | None = None  # cookie 授权平台验证需凭据（洛古等）
 
 
 class VerifyOut(BaseModel):
@@ -50,13 +51,15 @@ class VerifyOut(BaseModel):
 
     platform: str
     handle: str
+    displayName: str | None = None  # 展示名（与 API 主键分离；空回退 handle）
     avatar: str | None = None
 
 
 class BindIn(BaseModel):
     platform: str
     handle: str
-    credentials: dict[str, Any] | None = None  # 预留（cookie 授权平台；第一期恒为空）
+    displayName: str | None = None  # 验证回执带回的展示名，随绑定持久化
+    credentials: dict[str, Any] | None = None  # cookie 授权平台必填（洛古等）
 
 
 class DayActivityOut(BaseModel):

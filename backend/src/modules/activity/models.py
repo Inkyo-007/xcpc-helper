@@ -10,7 +10,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from adapters.base import Verdict
+from adapters.base import Credentials, Verdict
 
 # 第一期固定用户组（服务层与 API 不暴露用户组管理，存储层带维度）
 DEFAULT_USER_ID = "default"
@@ -32,11 +32,26 @@ class Submission(BaseModel):
 
 
 class Account(BaseModel):
-    """已绑定账号；last_synced_at 兼作增量同步游标（数据水位，UTC 秒）。"""
+    """已绑定账号；last_synced_at 兼作增量同步游标（数据水位，UTC 秒）。
+
+    handle 为平台内 API 主键（洛古为 uid 数字），display_name 为展示名
+    （洛古用户名等，仅展示用途，可为空则前端回退显示 handle）。
+    """
 
     platform: str
     handle: str
     last_synced_at: int | None = None  # null = 从未同步成功
+    display_name: str | None = None  # 展示名（与 API 主键分离）
+
+
+class Secrets(BaseModel):
+    """账号凭据（secrets.json，gitignore 仅存本机）：platform → handle → 凭据。
+
+    与 profile.json 分离存储：账号元数据可入档，凭据永不入 git；
+    解绑/换绑/删除用户组时同步清理。
+    """
+
+    platforms: dict[str, dict[str, Credentials]] = Field(default_factory=dict)
 
 
 class Profile(BaseModel):

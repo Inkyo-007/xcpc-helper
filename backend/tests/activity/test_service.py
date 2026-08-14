@@ -162,6 +162,18 @@ async def test_bind_triggers_first_sync(service: ActivityService):
     assert overview.daily[-1].submissions == 2
 
 
+async def test_bind_persists_display_name(service: ActivityService):
+    """绑定携带展示名：随账号持久化并在 platforms/同步状态透出。"""
+    out = await service.bind(
+        BindIn(platform="codeforces", handle="demo", displayName="演示账号")
+    )
+    assert out.displayName == "演示账号"
+    await wait_sync_done(service)
+    meta = next(p for p in service.platforms().platforms if p.id == "codeforces")
+    assert meta.account is not None
+    assert meta.account.displayName == "演示账号"
+
+
 async def test_bind_rebind_replaces_account(service: ActivityService):
     await service.bind(BindIn(platform="codeforces", handle="demo"))
     await wait_sync_done(service)
