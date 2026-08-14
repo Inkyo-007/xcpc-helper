@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from adapters.base import Credentials, PlatformError
+from adapters.base import Credentials, HttpStatusError, PlatformError
 from adapters.net import HttpFetcher
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -159,6 +159,21 @@ async def test_4xx_not_retried():
         with pytest.raises(PlatformError):
             await fetcher.get_json("https://example.com/api", platform="p", min_interval=0)
         assert calls == 1
+    finally:
+        await fetcher.aclose()
+
+
+async def test_4xx_carries_status_code():
+    """4xx 抛 HttpStatusError 并携带 status_code，供 adapter 区分 404 等语义。"""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, text="not found")
+
+    fetcher = make_fetcher(handler)
+    try:
+        with pytest.raises(HttpStatusError) as exc_info:
+            await fetcher.get_json("https://example.com/api", platform="p", min_interval=0)
+        assert exc_info.value.status_code == 404
     finally:
         await fetcher.aclose()
 

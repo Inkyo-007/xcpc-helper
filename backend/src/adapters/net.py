@@ -4,7 +4,8 @@
 串行（同一平台请求之间保证 min_interval 间隔），不同平台互不阻塞。
 重试为手写指数退避（不引新库），统一在 request() 内处理：
 
-- 传输异常 / 429 / 5xx 重试，4xx 直接抛 PlatformError；
+- 传输异常 / 429 / 5xx 重试，4xx 抛 HttpStatusError（PlatformError 子类，
+  携带 status_code，供 adapter 区分 404 用户不存在等语义）；
 - should_retry 钩子供 adapter 声明"业务信封重试"（如 CF 以 200 返回的
   FAILED 信封，需解析 JSON 判定），由本层统一退避重试；
 - 退避基准与平台限流间隔联动：backoff = max(base_backoff, min_interval) × 2^n，
@@ -25,7 +26,7 @@ from typing import Any
 
 import httpx
 
-from adapters.base import Credentials, PlatformError
+from adapters.base import Credentials, HttpStatusError, PlatformError
 
 logger = logging.getLogger("xcpc.adapters.net")
 
@@ -105,8 +106,9 @@ class HttpFetcher:
                     await self._backoff(attempt, min_interval, backoff_base)
                     continue
                 if resp.status_code >= 400:
-                    raise PlatformError(
-                        f"平台返回 HTTP {resp.status_code}: {resp.text[:200]}"
+                    raise HttpStatusError(
+                        resp.status_code,
+                        f"平台返回 HTTP {resp.status_code}: {resp.text[:200]}",
                     )
                 if should_retry is not None and self._retryable_envelope(
                     resp, should_retry

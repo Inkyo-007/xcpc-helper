@@ -114,6 +114,18 @@ class PlatformError(AdapterError):
     """平台接口故障（限流 / 格式异常 / 网络等），sync 转该账号诊断（不阻断其他账号）。"""
 
 
+class HttpStatusError(PlatformError):
+    """平台返回 4xx 等不可重试 HTTP 状态码（net 层抛出）。
+
+    携带 status_code，供 adapter 区分语义：如 AtCoder 用户主页 404 表示
+    用户不存在（转 UserNotFoundError），其余 4xx 维持平台故障处置。
+    """
+
+    def __init__(self, status_code: int, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class AuthExpiredError(AdapterError):
     """平台凭据失效（cookie 过期等），需引导用户重新授权（与平台故障处置路径不同）。"""
 
