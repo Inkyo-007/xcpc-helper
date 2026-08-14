@@ -19,11 +19,13 @@ from adapters.base import (
     Verdict,
 )
 from adapters.codeforces import CodeforcesAdapter
+from adapters.luogu import LuoguAdapter
 from adapters.net import HttpFetcher
 
 REGISTRY: dict[str, type[PlatformAdapter]] = {
     CodeforcesAdapter.platform_id: CodeforcesAdapter,
     AtCoderAdapter.platform_id: AtCoderAdapter,
+    LuoguAdapter.platform_id: LuoguAdapter,
 }
 
 __all__ = [
@@ -36,6 +38,7 @@ __all__ = [
     "Credentials",
     "HttpFetcher",
     "HttpStatusError",
+    "LuoguAdapter",
     "PlatformAdapter",
     "PlatformError",
     "PlatformSubmission",

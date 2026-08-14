@@ -83,7 +83,7 @@ async def service(tmp_path):
 
 async def test_platforms_empty(service: ActivityService):
     out = service.platforms()
-    assert [p.id for p in out.platforms] == ["codeforces", "atcoder"]
+    assert [p.id for p in out.platforms] == ["codeforces", "atcoder", "luogu"]
     meta = out.platforms[0]
     assert meta.name == "Codeforces"
     assert "submissions" in [c.value for c in meta.capabilities]
@@ -123,7 +123,7 @@ async def test_verify_user_not_found(tmp_path):
 
 async def test_verify_unsupported_platform(service: ActivityService):
     with pytest.raises(BadRequestError):
-        await service.verify(VerifyIn(platform="luogu", handle="demo"))
+        await service.verify(VerifyIn(platform="unknown-platform", handle="demo"))
 
 
 async def test_verify_platform_failure_is_bad_gateway(tmp_path):
@@ -205,7 +205,7 @@ async def test_overview_platform_filter_and_invalid(service: ActivityService):
     assert out.totals.totalSubmissions == 4
 
     with pytest.raises(BadRequestError):
-        service.overview("luogu")
+        service.overview("unknown-platform")
 
 
 async def test_submissions_recent_and_by_date(service: ActivityService):
@@ -278,7 +278,7 @@ async def test_sync_and_status(service: ActivityService):
 
 async def test_sync_unsupported_platform(service: ActivityService):
     with pytest.raises(BadRequestError):
-        await service.sync("luogu")
+        await service.sync("unknown-platform")
 
 
 # ===== 用户组管理 =====
