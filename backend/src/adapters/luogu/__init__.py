@@ -175,6 +175,29 @@ class LuoguAdapter(PlatformAdapter):
                     break
         return [self._to_submission(r) for r in out]
 
+    # ===== 一键登录（browser-login，可选依赖 Playwright） =====
+
+    def browser_login_available(self) -> bool:
+        """一键登录是否可用（Playwright 可选依赖已安装）。"""
+        from adapters.luogu import login as login_mod
+
+        return login_mod.playwright_available()
+
+    async def run_browser_login(
+        self, timeout: float
+    ) -> tuple[Credentials, UserInfo]:
+        """拉起系统浏览器登录窗口，返回抓取的凭据与验证回执。
+
+        登录成功（__client_id 出现）后立即用凭据完成验证（存在性 +
+        有效性），失败语义与 verify 相同；用户关窗 / 超时分别抛
+        LoginCancelledError / asyncio.TimeoutError。
+        """
+        from adapters.luogu import login as login_mod
+
+        credentials = await login_mod.capture_credentials(timeout)
+        info = await self.verify(credentials.cookies.get("_uid", ""), credentials)
+        return credentials, info
+
     # ===== 内部：外呼 =====
 
     async def _get_json(

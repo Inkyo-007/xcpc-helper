@@ -11,12 +11,14 @@ adapter 只允许被本服务与 modules/activity/sync.py 触碰。
 
 import asyncio
 import logging
+import time
 from datetime import datetime, tzinfo
 
 from adapters import REGISTRY, HttpFetcher
 from adapters.base import (
     AuthExpiredError,
     AuthMode,
+    BrowserLoginCancelledError,
     Capability,
     Credentials,
     PlatformAdapter,
@@ -24,13 +26,19 @@ from adapters.base import (
     UserNotFoundError,
 )
 from core.config import Settings, get_settings
-from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
+from core.exceptions import (
+    BadGatewayError,
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+)
 from modules.activity import aggregate
 from modules.activity import store as activity_store
 from modules.activity.models import DEFAULT_USER_ID, Account, Submission
 from modules.activity.schemas import (
     BindIn,
     BoundAccountOut,
+    BrowserLoginStatusOut,
     DayActivityOut,
     GroupCreateIn,
     GroupOut,
@@ -56,6 +64,10 @@ logger = logging.getLogger("xcpc.service.activity")
 RECENT_LIMIT = 200
 # 信息卡头像 data URL 长度上限（512px JPEG 约 40-80KB，base64 后留足余量）
 AVATAR_MAX_CHARS = 500_000
+# browser-login 抓取到的凭据暂存 TTL（bind 消费，凭据不经前端）
+PENDING_CREDENTIALS_TTL = 600.0
+# browser-login 用户登录操作超时（秒）
+BROWSER_LOGIN_TIMEOUT = 180.0
 
 
 class ActivityService:
@@ -81,6 +93,9 @@ class ActivityService:
             activity_store.create_group(settings.user_data_dir, DEFAULT_USER_ID)
         # 当前用户组（内存态；单机本地应用，前端切组时切换）
         self._current_group = DEFAULT_USER_ID
+        # browser-login 会话状态（按平台互斥）与待消费凭据暂存（内存态，凭据不经前端）
+        self._browser_logins: dict[str, BrowserLoginStatusOut] = {}
+        self._pending_credentials: dict[tuple[str, str], tuple[Credentials, float]] = {}
 
     async def aclose(self) -> None:
         await self._fetcher.aclose()
@@ -187,10 +202,19 @@ class ActivityService:
                     name=adapter.name,
                     capabilities=sorted(adapter.capabilities, key=lambda c: c.value),
                     auth=adapter.auth.value,
+                    browserLogin=self._browser_login_available(adapter),
                     account=self._account_out(account) if account else None,
                 )
             )
         return PlatformsOut(platforms=metas)
+
+    @staticmethod
+    def _browser_login_available(adapter: PlatformAdapter) -> bool:
+        """一键登录可用 = cookie 平台 + adapter 实现可选契约 + Playwright 已安装。"""
+        if adapter.auth != AuthMode.COOKIE:
+            return False
+        probe = getattr(adapter, "browser_login_available", None)
+        return bool(probe and probe())
 
     def _account_out(self, account: Account) -> BoundAccountOut:
         status = self._engine.status_of(
@@ -243,6 +267,82 @@ class ActivityService:
             avatar=info.avatar,
         )
 
+    # ===== 浏览器一键登录（cookie 平台） =====
+
+    async def start_browser_login(self, platform: str) -> None:
+        """启动浏览器登录会话（202 立即返回，前端轮询 status）。
+
+        会话按平台互斥；凭据抓取成功后由 adapter 完成验证并暂存
+        （PENDING_CREDENTIALS_TTL），bind 时消费——凭据不经前端。
+        """
+        adapter = self._adapter(platform)
+        if adapter.auth != AuthMode.COOKIE:
+            raise BadRequestError(f"平台 {platform} 无需浏览器登录")
+        runner = getattr(adapter, "run_browser_login", None)
+        if runner is None:
+            raise BadRequestError(f"平台 {platform} 不支持浏览器登录")
+        if not self._browser_login_available(adapter):
+            raise BadRequestError(
+                "一键登录不可用（未安装 browser-login 依赖），请改用手动粘贴 cookie"
+            )
+        current = self._browser_logins.get(platform)
+        if current is not None and current.state == "waiting":
+            raise ConflictError("已有进行中的登录会话，请先完成或关闭登录窗口")
+        self._browser_logins[platform] = BrowserLoginStatusOut(state="waiting")
+        asyncio.create_task(self._run_browser_login(platform, adapter))
+
+    def browser_login_status(self, platform: str) -> BrowserLoginStatusOut:
+        """查询登录会话状态（无会话时返回 error 引导重新发起）。"""
+        self._adapter(platform)
+        return self._browser_logins.get(
+            platform,
+            BrowserLoginStatusOut(state="error", error="无进行中的登录会话"),
+        )
+
+    async def _run_browser_login(self, platform: str, adapter: PlatformAdapter) -> None:
+        try:
+            credentials, info = await adapter.run_browser_login(  # type: ignore[attr-defined]
+                timeout=BROWSER_LOGIN_TIMEOUT
+            )
+            key = (platform, info.handle)
+            self._pending_credentials[key] = (
+                credentials,
+                time.monotonic() + PENDING_CREDENTIALS_TTL,
+            )
+            self._browser_logins[platform] = BrowserLoginStatusOut(
+                state="success",
+                handle=info.handle,
+                displayName=info.display_name,
+                avatar=info.avatar,
+            )
+        except BrowserLoginCancelledError:
+            self._browser_logins[platform] = BrowserLoginStatusOut(state="canceled")
+        except TimeoutError:
+            self._browser_logins[platform] = BrowserLoginStatusOut(state="timeout")
+        except PlatformError as exc:
+            logger.warning("浏览器登录失败 [%s] %s", platform, exc)
+            self._browser_logins[platform] = BrowserLoginStatusOut(
+                state="error", error=str(exc)
+            )
+        except Exception as exc:  # 兜底降级，不让后台任务悬空
+            logger.exception("浏览器登录意外异常 [%s]", platform)
+            self._browser_logins[platform] = BrowserLoginStatusOut(
+                state="error", error=str(exc)
+            )
+
+    def _take_pending_credentials(
+        self, platform: str, handle: str
+    ) -> Credentials | None:
+        """消费 browser-login 暂存凭据（一次性；过期即弃）。"""
+        key = (platform, handle)
+        entry = self._pending_credentials.pop(key, None)
+        if entry is None:
+            return None
+        credentials, expires_at = entry
+        if time.monotonic() > expires_at:
+            return None
+        return credentials
+
     # ===== 绑定 / 解绑 =====
 
     async def bind(self, payload: BindIn) -> BoundAccountOut:
@@ -255,9 +355,13 @@ class ActivityService:
             if payload.credentials
             else None
         )
-        # cookie 授权平台必须携带凭据（洛古等），绑定即持久化到 secrets.json
+        # cookie 授权平台：显式凭据优先，否则消费 browser-login 暂存凭据
         if adapter.auth == AuthMode.COOKIE and credentials is None:
-            raise BadRequestError(f"平台 {payload.platform} 需要登录凭据（cookie）")
+            credentials = self._take_pending_credentials(payload.platform, handle)
+        if adapter.auth == AuthMode.COOKIE and credentials is None:
+            raise BadRequestError(
+                f"平台 {payload.platform} 需要登录凭据（一键登录或粘贴 cookie）"
+            )
         store = self._store()
         # 换绑：每个平台每用户组只保留一个账号，旧账号连同本地数据与凭据删除
         profile = store.load_profile()

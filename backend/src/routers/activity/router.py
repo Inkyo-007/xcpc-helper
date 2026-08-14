@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from modules.activity.schemas import (
     BindIn,
     BoundAccountOut,
+    BrowserLoginStatusOut,
     GroupCreateIn,
     GroupOut,
     GroupRenameIn,
@@ -92,6 +93,25 @@ async def unbind_account(
     platform: str, handle: str, service: ServiceDep
 ) -> None:
     service.unbind(platform, handle)
+
+
+# ===== 浏览器一键登录（cookie 平台） =====
+
+
+@router.post("/platforms/{platform}/browser-login", status_code=202)
+async def start_browser_login(platform: str, service: ServiceDep) -> None:
+    # 立即返回；登录会话后台执行，前端轮询 browser-login/status
+    await service.start_browser_login(platform)
+
+
+@router.get(
+    "/platforms/{platform}/browser-login/status",
+    response_model=BrowserLoginStatusOut,
+)
+async def get_browser_login_status(
+    platform: str, service: ServiceDep
+) -> BrowserLoginStatusOut:
+    return service.browser_login_status(platform)
 
 
 @router.get("/overview", response_model=OverviewOut)

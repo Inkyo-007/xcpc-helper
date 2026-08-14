@@ -33,6 +33,7 @@ class PlatformMetaOut(BaseModel):
     name: str
     capabilities: list[Capability]
     auth: str
+    browserLogin: bool = False  # 一键登录可用（cookie 平台 + 服务端具备 Playwright）
     account: BoundAccountOut | None = None  # 该平台当前绑定账号（未绑定为 null）
 
 
@@ -101,6 +102,21 @@ class SubmissionsOut(BaseModel):
 
 class SyncIn(BaseModel):
     platform: str | None = None  # 为空则同步全部账号
+
+
+# ===== 浏览器一键登录（cookie 平台） =====
+
+BrowserLoginStateOut = Literal["waiting", "success", "canceled", "timeout", "error"]
+
+
+class BrowserLoginStatusOut(BaseModel):
+    """浏览器登录会话状态（前端轮询；成功后回执同 verify）。"""
+
+    state: BrowserLoginStateOut
+    handle: str | None = None  # 成功回执：API 主键（洛古 uid）
+    displayName: str | None = None  # 成功回执：展示名
+    avatar: str | None = None
+    error: str | None = None  # state=error 时的诊断信息
 
 
 # ===== 用户组与信息卡 =====

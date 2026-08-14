@@ -9,9 +9,15 @@ from pathlib import Path
 import httpx
 import pytest
 
+from adapters.base import BrowserLoginCancelledError, Credentials, UserInfo
 from adapters.net import HttpFetcher
 from core.config import Settings
-from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
+from core.exceptions import (
+    BadGatewayError,
+    BadRequestError,
+    ConflictError,
+    NotFoundError,
+)
 from modules.activity.schemas import (
     BindIn,
     GroupCreateIn,
@@ -424,3 +430,105 @@ async def wait_sync_done(service: ActivityService, timeout: float = 3.0):
                 return statuses
         await asyncio.sleep(0.02)
     raise AssertionError("同步未在超时内完成")
+
+
+# ===== 浏览器一键登录（browser-login） =====
+
+LUOGU_CREDS = Credentials(cookies={"_uid": "100000", "__client_id": "tok"}, headers={})
+
+
+def stub_luogu(service: ActivityService, login_result=None, login_exc=None):
+    """打桩洛古 adapter 的 browser-login 可选契约与同步外呼（防真实网络）。"""
+    adapter = service._adapters["luogu"]
+    adapter.browser_login_available = lambda: True
+
+    async def fake_login(timeout: float):
+        if login_exc is not None:
+            raise login_exc
+        return login_result
+
+    adapter.run_browser_login = fake_login
+
+    async def no_network_fetch(handle, *, since, credentials, **kwargs):
+        return []
+
+    adapter.fetch_submissions = no_network_fetch
+    return adapter
+
+
+async def wait_login_state(service: ActivityService, state: str, timeout: float = 3.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        status = service.browser_login_status("luogu")
+        if status.state == state:
+            return status
+        await asyncio.sleep(0.02)
+    raise AssertionError(f"登录会话未进入 {state}")
+
+
+async def test_browser_login_success_and_bind_consumes_stash(service: ActivityService):
+    """一键登录成功：回执透出 + 凭据暂存，bind 无显式凭据时消费暂存并落 secrets。"""
+    stub_luogu(
+        service,
+        login_result=(LUOGU_CREDS, UserInfo(handle="100000", display_name="demo_user")),
+    )
+    await service.start_browser_login("luogu")
+    status = await wait_login_state(service, "success")
+    assert status.handle == "100000"
+    assert status.displayName == "demo_user"
+
+    out = await service.bind(BindIn(platform="luogu", handle="100000", displayName="demo_user"))
+    assert out.displayName == "demo_user"
+    # 凭据已落 secrets.json（sync 将使用）
+    stored = service._store().get_account_credentials("luogu", "100000")
+    assert stored is not None
+    assert stored.cookies["__client_id"] == "tok"
+    await wait_sync_done(service)
+
+
+async def test_browser_login_bind_without_stash_rejected(service: ActivityService):
+    """cookie 平台绑定：无显式凭据且无暂存 → 400。"""
+    stub_luogu(service)
+    with pytest.raises(BadRequestError):
+        await service.bind(BindIn(platform="luogu", handle="100000"))
+
+
+async def test_browser_login_rejects_anonymous_platform(service: ActivityService):
+    """匿名平台（CF）无需浏览器登录 → 400。"""
+    with pytest.raises(BadRequestError):
+        await service.start_browser_login("codeforces")
+
+
+async def test_browser_login_conflict_while_waiting(service: ActivityService):
+    """同平台登录会话互斥：waiting 中重复启动 → 409。"""
+    adapter = service._adapters["luogu"]
+    adapter.browser_login_available = lambda: True
+    gate = asyncio.Event()
+
+    async def blocking_login(timeout: float):
+        await gate.wait()
+        raise BrowserLoginCancelledError("测试收尾取消")
+
+    adapter.run_browser_login = blocking_login
+    await service.start_browser_login("luogu")
+    with pytest.raises(ConflictError):
+        await service.start_browser_login("luogu")
+    gate.set()
+    await wait_login_state(service, "canceled")
+
+
+async def test_browser_login_canceled(service: ActivityService):
+    """用户关闭登录窗口 → canceled。"""
+    stub_luogu(service, login_exc=BrowserLoginCancelledError("登录窗口已关闭"))
+    await service.start_browser_login("luogu")
+    status = await wait_login_state(service, "canceled")
+    assert status.state == "canceled"
+
+
+async def test_browser_login_unavailable_without_playwright(service: ActivityService):
+    """未安装 Playwright（测试环境默认不装 browser-login 组）→ 400 且
+    /platforms 的 browserLogin=false（前端据此隐藏一键登录按钮）。"""
+    meta = next(p for p in service.platforms().platforms if p.id == "luogu")
+    assert meta.browserLogin is False
+    with pytest.raises(BadRequestError):
+        await service.start_browser_login("luogu")

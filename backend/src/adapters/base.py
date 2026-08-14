@@ -139,6 +139,15 @@ class CapabilityNotSupportedError(AdapterError):
     """平台未声明对应能力却调用了该方法（契约违约，正常路径不触发）。"""
 
 
+class BrowserLoginCancelledError(AdapterError):
+    """浏览器一键登录被用户取消（关闭登录窗口）。
+
+    browser-login 可选契约（run_browser_login）的通用信号：取消 / 超时
+    （asyncio.TimeoutError）/ 故障（PlatformError）三分，service 据此
+    映射登录会话状态，不引入平台专有异常。
+    """
+
+
 class PlatformAdapter:
     """平台适配器协议。
 
