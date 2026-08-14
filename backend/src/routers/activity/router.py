@@ -18,6 +18,7 @@ from modules.activity.schemas import (
     PlatformsOut,
     ProfileOut,
     ProfileUpdateIn,
+    SkillTreeOut,
     SubmissionsOut,
     SyncIn,
     VerifyIn,
@@ -100,6 +101,14 @@ async def get_overview(
     platform: Annotated[str | None, Query()] = None,
 ) -> OverviewOut:
     return service.overview(platform)
+
+
+@router.get("/skill-tree", response_model=SkillTreeOut)
+async def get_skill_tree(
+    service: ServiceDep,
+    platform: Annotated[str | None, Query()] = None,
+) -> SkillTreeOut:
+    return service.skill_tree(platform)
 
 
 @router.get("/submissions", response_model=SubmissionsOut)

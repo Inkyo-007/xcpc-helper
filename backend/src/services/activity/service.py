@@ -23,7 +23,7 @@ from adapters.base import (
 )
 from core.config import Settings, get_settings
 from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
-from modules.activity import aggregate
+from modules.activity import aggregate, skill_tree
 from modules.activity import store as activity_store
 from modules.activity.models import DEFAULT_USER_ID, Account, Submission
 from modules.activity.schemas import (
@@ -40,6 +40,7 @@ from modules.activity.schemas import (
     PlatformsOut,
     ProfileOut,
     ProfileUpdateIn,
+    SkillTreeOut,
     SubmissionOut,
     SubmissionsOut,
     VerifyIn,
@@ -300,6 +301,13 @@ class ActivityService:
                 )
             ],
         )
+
+    def skill_tree(self, platform: str | None) -> SkillTreeOut:
+        """当前用户组 AC 题聚合的技能树（可按平台过滤）。"""
+        if platform is not None:
+            self._adapter(platform)
+        submissions = self._submissions(platform)
+        return SkillTreeOut(**skill_tree.build_skill_tree(submissions))
 
     def submissions(
         self, *, date: str | None, platform: str | None

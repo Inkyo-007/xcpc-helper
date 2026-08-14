@@ -132,3 +132,41 @@ class ProfileUpdateIn(BaseModel):
     id: str | None = None
     signature: str | None = None
     avatar: str | None = None
+
+
+# ===== 技能树 =====
+
+
+class SkillOut(BaseModel):
+    """技能节点（一个 CF 标签）。"""
+
+    key: str  # 原 CF 标签
+    name: str  # 中文名（未命中映射时为原标签）
+    tag: str  # 原 CF 标签（与 key 一致，语义冗余供前端直接展示）
+    proficiency: float  # 掌握度 0..1
+    acCount: int  # 去重后的 AC 题数
+    maxDifficulty: int | None = None  # 最高原始难度（CF rating）
+
+
+class SkillDomainOut(BaseModel):
+    """技能域节点。"""
+
+    key: str
+    name: str
+    proficiency: float
+    acCount: int
+    maxDifficulty: int | None = None
+    skills: list[SkillOut]
+
+
+class SkillTreeTotalsOut(BaseModel):
+    """技能树总计（根节点展示）。"""
+
+    acCount: int
+    proficiency: float
+    maxDifficulty: int | None = None
+
+
+class SkillTreeOut(BaseModel):
+    domains: list[SkillDomainOut]
+    totals: SkillTreeTotalsOut
