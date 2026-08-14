@@ -68,6 +68,10 @@ uv run uvicorn --app-dir src main:app --host 127.0.0.1 --port 8000
 
 浏览器访问 <http://127.0.0.1:8000> 即可使用。`backend/content/` 下的模板变更会被自动监听并重建索引。
 
+洛古等 cookie 平台的「一键登录」需要可选依赖组 `browser-login`（Playwright，复用系统
+Chrome/Edge，不下载浏览器二进制）：`uv sync --group browser-login`；未安装时绑定弹窗
+自动降级为手动粘贴 cookie，其余功能不受影响。
+
 ### 方式二：桌面应用
 
 ```bash
