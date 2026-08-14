@@ -19,6 +19,9 @@ from modules.activity.schemas import (
     PlatformsOut,
     ProfileOut,
     ProfileUpdateIn,
+    ReportConfigOut,
+    ReportIn,
+    ReportOut,
     SkillTreeOut,
     SubmissionsOut,
     SyncIn,
@@ -118,6 +121,19 @@ async def get_analysis(
     platform: Annotated[str | None, Query()] = None,
 ) -> AnalysisOut:
     return service.analysis(platform)
+
+
+@router.get("/analysis/report/config", response_model=ReportConfigOut)
+async def get_report_config(service: ServiceDep) -> ReportConfigOut:
+    return service.report_config()
+
+
+@router.post("/analysis/report", response_model=ReportOut)
+async def generate_report(
+    service: ServiceDep,
+    payload: ReportIn | None = None,
+) -> ReportOut:
+    return await service.report(payload.platform if payload else None)
 
 
 @router.get("/submissions", response_model=SubmissionsOut)

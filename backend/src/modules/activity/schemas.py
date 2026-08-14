@@ -230,3 +230,26 @@ class AnalysisOut(BaseModel):
     verdicts: list[VerdictCountOut]
     rhythm: RhythmOut
     weakPoints: list[WeakPointOut]
+
+
+class ReportOut(BaseModel):
+    """训练分析报告（LLM 生成或规则化降级）。"""
+
+    content: str  # Markdown 正文
+    source: Literal["llm", "rule"]
+    model: str | None = None  # source=llm 时的模型名
+    note: str | None = None  # 降级说明（source=rule 时说明原因）
+
+
+class ReportConfigOut(BaseModel):
+    """LLM 报告配置状态（不泄露 api_key，供前端提示「未配置」）。"""
+
+    configured: bool
+    model: str
+    baseUrl: str
+
+
+class ReportIn(BaseModel):
+    """生成报告请求体（platform 可选，缺省汇总当前组全部账号）。"""
+
+    platform: str | None = None

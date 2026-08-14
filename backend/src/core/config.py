@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     # 全量同步至少拉取的条数：窗口内不足时拉满该数（为 all-time 总量留缓冲）
     activity_full_min_rows: int = 5000
 
+    # 训练统计：在线 LLM 分析报告（OpenAI 兼容，可换任意兼容服务）。
+    # api_key 为空 = 未配置，走规则化降级报告（离线零依赖）。
+    llm_base_url: str = "https://api.deepseek.com/v1"
+    llm_api_key: str = ""
+    llm_model: str = "deepseek-chat"
+    llm_timeout_seconds: float = 60.0
+    llm_max_tokens: int = 2048
+
     # 是否监听 content/ 变更并自动重建索引
     watch_enabled: bool = True
     # 文件变更后的去抖时间（秒），避免频繁重建

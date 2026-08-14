@@ -23,7 +23,7 @@ from adapters.base import (
 )
 from core.config import Settings, get_settings
 from core.exceptions import BadGatewayError, BadRequestError, NotFoundError
-from modules.activity import aggregate, analysis, skill_tree
+from modules.activity import aggregate, analysis, report, skill_tree
 from modules.activity import store as activity_store
 from modules.activity.models import DEFAULT_USER_ID, Account, Submission
 from modules.activity.schemas import (
@@ -41,6 +41,8 @@ from modules.activity.schemas import (
     PlatformsOut,
     ProfileOut,
     ProfileUpdateIn,
+    ReportConfigOut,
+    ReportOut,
     SkillTreeOut,
     SubmissionOut,
     SubmissionsOut,
@@ -48,6 +50,7 @@ from modules.activity.schemas import (
     VerifyOut,
 )
 from modules.activity.sync import SyncEngine
+from services.activity.llm import LlmClient, LlmError
 
 logger = logging.getLogger("xcpc.service.activity")
 
@@ -62,11 +65,26 @@ class ActivityService:
     """训练统计服务。读写均作用于 data/user/<userid>/ 文件事实来源。"""
 
     def __init__(
-        self, settings: Settings, fetcher: HttpFetcher | None = None
+        self,
+        settings: Settings,
+        fetcher: HttpFetcher | None = None,
+        llm_client: LlmClient | None = None,
     ) -> None:
         self._settings = settings
         # 测试可注入 MockTransport 的 fetcher，避免真实外呼
         self._fetcher = fetcher or HttpFetcher()
+        # 测试可注入假 LLM 客户端；否则按 settings 构造（api_key 空时仅报告时走降级）
+        self._llm = (
+            llm_client
+            if llm_client is not None
+            else LlmClient(
+                base_url=settings.llm_base_url,
+                api_key=settings.llm_api_key,
+                model=settings.llm_model,
+                timeout=settings.llm_timeout_seconds,
+                max_tokens=settings.llm_max_tokens,
+            )
+        )
         self._adapters: dict[str, PlatformAdapter] = {
             pid: cls(self._fetcher) for pid, cls in REGISTRY.items()
         }
@@ -84,6 +102,8 @@ class ActivityService:
 
     async def aclose(self) -> None:
         await self._fetcher.aclose()
+        if isinstance(self._llm, LlmClient):
+            await self._llm.aclose()
 
     def _adapter(self, platform: str) -> PlatformAdapter:
         adapter = self._adapters.get(platform)
@@ -317,6 +337,43 @@ class ActivityService:
         submissions = self._submissions(platform)
         tz = datetime.now().astimezone().tzinfo
         return AnalysisOut(**analysis.build_analysis(submissions, tz=tz))
+
+    def report_config(self) -> ReportConfigOut:
+        """LLM 报告配置状态（不泄露 api_key）。"""
+        return ReportConfigOut(
+            configured=bool(self._settings.llm_api_key),
+            model=self._settings.llm_model,
+            baseUrl=self._settings.llm_base_url,
+        )
+
+    async def report(self, platform: str | None) -> ReportOut:
+        """生成分析报告：有 LLM 配置走 LLM，否则（或失败时）规则化降级。"""
+        if platform is not None:
+            self._adapter(platform)
+        submissions = self._submissions(platform)
+        tz = datetime.now().astimezone().tzinfo
+        analysis_data = analysis.build_analysis(submissions, tz=tz)
+        overview_data = aggregate.overview_stats(submissions, tz=tz)
+        if not self._settings.llm_api_key:
+            return ReportOut(
+                content=report.build_rule_report(analysis_data, overview_data),
+                source="rule",
+                note="未配置 LLM API Key（XCPC_LLM_API_KEY），已生成规则化报告",
+            )
+        try:
+            content = await self._llm.complete(
+                report.build_prompt(analysis_data, overview_data)
+            )
+        except LlmError as exc:
+            logger.warning("LLM 报告失败，降级规则化: %s", exc)
+            return ReportOut(
+                content=report.build_rule_report(analysis_data, overview_data),
+                source="rule",
+                note=f"LLM 调用失败，已降级规则化报告：{exc}",
+            )
+        return ReportOut(
+            content=content, source="llm", model=self._settings.llm_model
+        )
 
     def submissions(
         self, *, date: str | None, platform: str | None
