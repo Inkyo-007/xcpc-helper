@@ -36,6 +36,8 @@ const platformAccount = computed<BoundAccount | null>(() => {
 const authExpired = computed(
   () => platformAccount.value?.syncErrorCode === 'auth_expired',
 )
+/** 该平台账号同步中（首次全量可能数分钟）：按钮显示进行态 */
+const accountSyncing = computed(() => platformAccount.value?.syncState === 'running')
 
 /* ---------- 同步全部平台确认 ---------- */
 
@@ -92,14 +94,15 @@ function confirmSyncAll(): void {
           size="small"
           :type="authExpired ? 'warning' : 'primary'"
           secondary
+          :loading="accountSyncing"
           @click="emit('bind', platformAccount.platform)"
         >
-          <template #icon>
+          <template v-if="!accountSyncing" #icon>
             <TriangleAlert v-if="authExpired" :size="14" />
             <Link2 v-else :size="14" />
           </template>
           <span class="bound-handle mono">
-            {{ authExpired ? '凭据过期' : accountLabel(platformAccount) }}
+            {{ accountSyncing ? '同步中' : authExpired ? '凭据过期' : accountLabel(platformAccount) }}
           </span>
         </NButton>
         <NButton v-else size="small" dashed @click="emit('bind', activePlatform as PlatformId)">
@@ -108,11 +111,13 @@ function confirmSyncAll(): void {
         </NButton>
       </template>
       {{
-        authExpired
-          ? `登录凭据已过期（${accountLabel(platformAccount!)}），点击重新授权`
-          : platformAccount
-            ? '点击换绑账号'
-            : '点击绑定账号'
+        accountSyncing
+          ? `正在同步 ${accountLabel(platformAccount!)} 的数据，可能需要几分钟`
+          : authExpired
+            ? `登录凭据已过期（${accountLabel(platformAccount!)}），点击重新授权`
+            : platformAccount
+              ? '点击换绑账号'
+              : '点击绑定账号'
       }}
     </NTooltip>
     <NModal

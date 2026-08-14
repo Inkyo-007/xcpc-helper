@@ -155,8 +155,17 @@ async function onBind(
 ): Promise<void> {
   const rebinding = boundOn(platform) !== null
   try {
-    await bindAccount(platform, handle, opts)
-    message.success(rebinding ? '换绑成功，已重新同步' : '绑定成功，已完成首次同步')
+    const finished = await bindAccount(platform, handle, opts)
+    if (finished) {
+      message.success(rebinding ? '换绑成功，已重新同步' : '绑定成功，已完成首次同步')
+    } else {
+      // 首次同步仍在后台进行（洛古全量约数分钟），状态在账号区实时可见
+      message.success(
+        rebinding
+          ? '换绑成功，正在后台同步数据'
+          : '绑定成功，首次同步进行中（数据量较大时可能需要几分钟）',
+      )
+    }
   } catch (e) {
     message.error(e instanceof Error ? e.message : '绑定失败，请稍后重试')
   }

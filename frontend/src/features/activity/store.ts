@@ -109,14 +109,51 @@ async function refreshAll(): Promise<void> {
   await Promise.all([refreshAccounts(), refreshOverview(), refreshSubmissions()])
 }
 
-/** 轮询同步状态直到全部账号不再同步中（失败亦视为结束） */
-async function pollUntilIdle(timeoutMs = 30_000): Promise<void> {
+/** 轮询同步状态直到全部账号不再同步中（失败亦视为结束）。
+ * 返回 true = 已全部结束；false = 超时仍在跑（洛古首次全量需数分钟）。 */
+async function pollUntilIdle(timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const statuses = await api.fetchSyncStatus()
-    if (statuses.every((s) => s.syncState !== 'running')) return
+    if (statuses.every((s) => s.syncState !== 'running')) return true
     await new Promise((r) => setTimeout(r, 300))
   }
+  return false
+}
+
+/** 把 /sync/status 的运行态合并进 accounts（同步中/错误实时可见） */
+function mergeSyncStatuses(statuses: BoundAccount[]): void {
+  for (const s of statuses) {
+    const acc = accounts.value.find(
+      (a) => a.platform === s.platform && a.handle === s.handle,
+    )
+    if (acc) Object.assign(acc, s)
+    else accounts.value.push(s)
+  }
+}
+
+/** 后台低频轮询（不持遮罩）：同步结束后刷新数据并呈现最终状态。
+ * 用于首次全量同步超过遮罩等待时长的场景（洛古约数分钟）——
+ * 避免"数据为空且无提示"被误判为失败。 */
+let bgPolling = false
+function pollInBackground(): void {
+  if (bgPolling) return
+  bgPolling = true
+  void (async () => {
+    try {
+      while (true) {
+        await new Promise((r) => setTimeout(r, 2000))
+        const statuses = await api.fetchSyncStatus()
+        mergeSyncStatuses(statuses)
+        if (statuses.every((s) => s.syncState !== 'running')) break
+      }
+      await refreshAll()
+    } catch {
+      /* 后端不可达时静默结束，下次操作再拉 */
+    } finally {
+      bgPolling = false
+    }
+  })()
 }
 
 /* ---------- 视图状态（网址恢复由 ActivityPage 驱动） ---------- */
@@ -163,15 +200,16 @@ function setListPage(page: number): void {
 
 /* ---------- 动作 ---------- */
 
-/** 立即同步全部账号（或当前平台视图的账号），完成后刷新数据 */
+/** 立即同步全部账号（或当前平台视图的账号），完成后刷新数据。
+ * 遮罩等待 30s；超时仍在跑则转后台轮询（完成后再刷新），不卡页面。 */
 async function syncNow(): Promise<void> {
   if (syncing.value) return
   syncing.value = true
   busy.value = true
   try {
     await api.triggerSync(activePlatform.value === 'all' ? undefined : activePlatform.value)
-    await pollUntilIdle()
-    await refreshAll()
+    if (await pollUntilIdle()) await refreshAll()
+    else pollInBackground()
   } finally {
     syncing.value = false
     busy.value = false
@@ -179,17 +217,22 @@ async function syncNow(): Promise<void> {
 }
 
 /** 绑定（或换绑）账号：后端自动触发首次同步，等待完成后刷新数据；
- * cookie 平台携带凭据（手动粘贴）或留空（消费一键登录暂存凭据） */
+ * cookie 平台携带凭据（手动粘贴）或留空（消费一键登录暂存凭据）。
+ * 返回 true = 首次同步已完成；false = 仍在后台进行（转后台轮询）。 */
 async function bindAccount(
   platform: PlatformId,
   handle: string,
   opts: { displayName?: string | null; credentials?: AccountCredentials } = {},
-): Promise<void> {
+): Promise<boolean> {
   busy.value = true
   try {
     await api.bindAccount(platform, handle, opts)
-    await pollUntilIdle()
-    await refreshAll()
+    if (await pollUntilIdle()) {
+      await refreshAll()
+      return true
+    }
+    pollInBackground()
+    return false
   } finally {
     busy.value = false
   }
