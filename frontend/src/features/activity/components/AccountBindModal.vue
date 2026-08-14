@@ -172,7 +172,8 @@ async function browserLogin(): Promise<void> {
           avatar: status.avatar,
         }
         receiptFromLogin.value = true
-        handle.value = status.handle
+        // 注意：不要回填 handle 输入框——watcher 会把程序化赋值误判为
+        // 用户改动而清空回执（曾致"登录成功却无反馈、无法绑定"）
         return
       }
       if (status.state === 'canceled') {
