@@ -46,7 +46,10 @@ export const NAV_GROUPS: NavGroup[] = [
     id: 'activity',
     label: '训练统计',
     icon: 'chart',
-    children: [{ id: 'act-overview', label: '数据总览', to: '/activity/overview' }],
+    children: [
+      { id: 'act-overview', label: '数据总览', to: '/activity/overview' },
+      { id: 'act-skill', label: '技能树', to: '/activity/skill-tree' },
+    ],
   },
   {
     id: 'settings',

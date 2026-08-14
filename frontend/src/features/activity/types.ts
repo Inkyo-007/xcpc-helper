@@ -61,3 +61,37 @@ export interface RecentSubmission extends SubmissionEntry {
   /** YYYY-MM-DD（本地时区） */
   date: string
 }
+
+/* ---------- 技能树 ---------- */
+
+/** 技能节点（一个 CF 标签） */
+export interface SkillNode {
+  key: string
+  name: string
+  tag: string
+  /** 掌握度 0~1 */
+  proficiency: number
+  acCount: number
+  maxDifficulty: number | null
+}
+
+/** 技能域节点 */
+export interface SkillDomain {
+  key: string
+  name: string
+  proficiency: number
+  acCount: number
+  maxDifficulty: number | null
+  skills: SkillNode[]
+}
+
+export interface SkillTreeTotals {
+  acCount: number
+  proficiency: number
+  maxDifficulty: number | null
+}
+
+export interface SkillTreeData {
+  domains: SkillDomain[]
+  totals: SkillTreeTotals
+}

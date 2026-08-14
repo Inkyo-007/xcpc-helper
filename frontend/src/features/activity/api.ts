@@ -7,6 +7,7 @@ import type {
   OverviewTotals,
   PlatformId,
   PlatformMeta,
+  SkillTreeData,
   SubmissionEntry,
 } from '@/features/activity/types'
 import type { PlatformScope } from '@/features/activity/store'
@@ -75,6 +76,11 @@ export function unbindAccount(platform: string, handle: string): Promise<void> {
 export function fetchOverview(scope: PlatformScope = 'all'): Promise<ApiOverviewResponse> {
   const platform = scopeParam(scope)
   return request<ApiOverviewResponse>(`/activity/overview${platform ? `?platform=${platform}` : ''}`)
+}
+
+export function fetchSkillTree(scope: PlatformScope = 'all'): Promise<SkillTreeData> {
+  const platform = scopeParam(scope)
+  return request<SkillTreeData>(`/activity/skill-tree${platform ? `?platform=${platform}` : ''}`)
 }
 
 export function fetchSubmissions(opts: {

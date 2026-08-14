@@ -34,6 +34,11 @@ export const router = createRouter({
       meta: { group: '训练统计', sub: '数据总览' },
     },
     {
+      path: '/activity/skill-tree',
+      component: () => import('@/features/activity/SkillTreePage.vue'),
+      meta: { group: '训练统计', sub: '技能树' },
+    },
+    {
       path: '/contest/stress',
       component: () => import('@/app/PlaceholderPage.vue'),
       meta: {
