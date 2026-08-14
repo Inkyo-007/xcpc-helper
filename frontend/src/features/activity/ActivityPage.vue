@@ -205,7 +205,7 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
 
         <section class="act-panel">
           <header class="panel-head">
-            <span class="panel-title">训练热力</span>
+            <span class="card-title">训练热力</span>
             <span class="panel-hint">
               <MousePointerClick :size="12" />
               点击格子查看当日明细，再次点击取消
@@ -227,13 +227,13 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
         <div class="act-charts">
           <section class="act-panel">
             <header class="panel-head">
-              <span class="panel-title">近 7 天通过</span>
+              <span class="card-title">近 7 天通过</span>
             </header>
             <PassBarChart :data="weeklyBars" />
           </section>
           <section class="act-panel">
             <header class="panel-head">
-              <span class="panel-title">近 12 个月通过</span>
+              <span class="card-title">近 12 个月通过</span>
             </header>
             <PassBarChart :data="monthlyBars" />
           </section>
@@ -330,13 +330,6 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
   align-items: center;
   gap: 10px;
   margin-bottom: 6px;
-}
-
-.panel-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  letter-spacing: 0.02em;
 }
 
 .panel-hint {

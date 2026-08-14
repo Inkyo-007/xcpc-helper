@@ -6,7 +6,7 @@
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChartNoAxesCombined, RefreshCw } from 'lucide-vue-next'
+import { ChartNoAxesCombined, RefreshCw, TriangleAlert } from 'lucide-vue-next'
 import { NButton, NSpin } from 'naive-ui'
 import SkillTree from '@/features/activity/components/SkillTree.vue'
 import * as api from '@/features/activity/api'
@@ -68,7 +68,11 @@ onMounted(async () => {
     </section>
 
     <section v-else-if="failed" class="st-panel st-center">
-      <p class="st-hint">技能树加载失败，请确认后端服务已启动。</p>
+      <div class="empty-icon">
+        <TriangleAlert :size="26" />
+      </div>
+      <h2 class="st-empty-title">技能树加载失败</h2>
+      <p class="st-hint">请确认后端服务已启动、账号已绑定并完成同步，然后重试。</p>
       <NButton size="small" @click="refresh">
         <template #icon><RefreshCw :size="14" /></template>
         重试
