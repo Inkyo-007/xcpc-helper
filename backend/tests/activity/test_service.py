@@ -526,8 +526,10 @@ async def test_browser_login_canceled(service: ActivityService):
 
 
 async def test_browser_login_unavailable_without_playwright(service: ActivityService):
-    """未安装 Playwright（测试环境默认不装 browser-login 组）→ 400 且
-    /platforms 的 browserLogin=false（前端据此隐藏一键登录按钮）。"""
+    """Playwright 不可用（探测打桩为 False）→ 400 且 /platforms 的
+    browserLogin=false（前端据此隐藏一键登录按钮）。"""
+    adapter = service._adapters["luogu"]
+    adapter.browser_login_available = lambda: False  # 不依赖环境真实安装状态
     meta = next(p for p in service.platforms().platforms if p.id == "luogu")
     assert meta.browserLogin is False
     with pytest.raises(BadRequestError):

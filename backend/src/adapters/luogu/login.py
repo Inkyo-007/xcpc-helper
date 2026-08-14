@@ -4,8 +4,10 @@
 - 复用系统已装浏览器（channel="chrome" 兜底 "msedge"），不下载浏览器二进制；
 - 临时独立 profile（launch() 默认临时用户目录）：不碰用户日常浏览器数据，
   登录态随窗口关闭即焚；
-- 用户在真实浏览器里自行完成登录（图形验证码/二级密码等自然通过），
-  应用只轮询该受控上下文的 cookie 罐，检测到 __client_id 即抓取；
+- 用户在真实浏览器里自行完成登录（图形验证码/两步验证码/二级密码等自然通过），
+  应用轮询受控上下文的 cookie 罐：__client_id 出现只是候选信号（匿名与
+  两步验证中间态也携带），再经鉴权探针（record/list 返回 code==200 的
+  JSON）确认完整登录态才抓取；
 - Playwright 为可选依赖（dependency group browser-login），惰性导入，
   未安装时由 service 层降级为手动粘贴路径。
 
@@ -22,6 +24,8 @@ logger = logging.getLogger("xcpc.adapters.luogu.login")
 
 LOGIN_URL = "https://www.luogu.com.cn/auth/login"
 COOKIE_URL = "https://www.luogu.com.cn"
+# 鉴权探针端点：仅完整登录态可访问（匿名/两步验证中间态跳登录页）
+AUTH_PROBE_URL = "https://www.luogu.com.cn/record/list?_contentOnly=1"
 # 登录成功判定所需的 cookie 名（_uid = 用户 id，__client_id = 会话令牌）
 REQUIRED_COOKIES = ("_uid", "__client_id")
 
@@ -38,6 +42,23 @@ def playwright_available() -> bool:
 
 # 用户关窗信号（通用契约，见 base.BrowserLoginCancelledError）
 LoginCancelledError = BrowserLoginCancelledError
+
+
+async def _session_authed(context) -> bool:
+    """鉴权探针：用浏览器上下文请求登录态接口，确认会话完整登录。
+
+    record/list 在未完整登录（匿名 / 两步验证码中间态）时跳登录页
+    （非 JSON 或信封 code != 200），完整登录才返回 code==200 的 JSON。
+    探针失败（网络波动等）按未登录处理——下一轮轮询重试，不误判成功。
+    """
+    try:
+        resp = await context.request.get(AUTH_PROBE_URL, timeout=10_000)
+        if resp.status != 200:
+            return False
+        data = await resp.json()
+    except Exception:  # noqa: BLE001 - 探针失败视同未登录，轮询继续
+        return False
+    return isinstance(data, dict) and data.get("code") == 200
 
 
 async def capture_credentials(timeout: float = DEFAULT_TIMEOUT) -> Credentials:
@@ -69,14 +90,21 @@ async def capture_credentials(timeout: float = DEFAULT_TIMEOUT) -> Credentials:
             ua = await page.evaluate("navigator.userAgent")
             await page.goto(LOGIN_URL)
             deadline = time.monotonic() + timeout
+            last_probe = 0.0
             while time.monotonic() < deadline:
                 cookies = await context.cookies(COOKIE_URL)
                 jar = {c["name"]: c["value"] for c in cookies}
-                if all(k in jar for k in REQUIRED_COOKIES):
-                    return Credentials(
-                        cookies={k: jar[k] for k in REQUIRED_COOKIES},
-                        headers={"User-Agent": ua},
-                    )
+                # cookie 出现只是候选信号：匿名会话与两步验证码中间态
+                # 也会携带 __client_id，必须再经鉴权探针确认完整登录态
+                cookies_ready = all(k in jar for k in REQUIRED_COOKIES)
+                probe_due = time.monotonic() - last_probe >= 3.0
+                if cookies_ready and probe_due:
+                    last_probe = time.monotonic()
+                    if await _session_authed(context):
+                        return Credentials(
+                            cookies={k: jar[k] for k in REQUIRED_COOKIES},
+                            headers={"User-Agent": ua},
+                        )
                 if page.is_closed():
                     raise LoginCancelledError("登录窗口已关闭")
                 await asyncio.sleep(POLL_INTERVAL)

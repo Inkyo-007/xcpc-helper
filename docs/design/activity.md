@@ -414,11 +414,14 @@ AdapterError                    # 基类
 - **一键登录（browser-login）**：`adapters/luogu/login.py` 用 Playwright
   （可选依赖组 `browser-login`）拉起**系统 Chrome/Edge** 独立窗口（临时 profile，
   `channel="chrome"` 兜底 `msedge`，不下载浏览器二进制），用户自行完成登录
-  （图形验证码/二级密码等均由用户自然处理），检测到 `__client_id` 出现即抓取
-  `_uid`/`__client_id`/UA 返回；用户关窗 → canceled，超时 3 分钟 → timeout。
-  凭据由 service 暂存（内存，10 分钟 TTL），bind 时消费——**凭据不经前端**。
-  Playwright 未安装时 `/platforms` 的 `browserLogin=false`，前端隐藏一键登录
-  按钮，仅保留方式二手动输入。
+  （图形验证码/**两步验证码**/二级密码等均由用户自然处理）；登录完成判定为
+  双重确认——cookie 罐出现 `_uid`/`__client_id` 只是候选信号（匿名与两步验证
+  中间态也携带 `__client_id`），再经**鉴权探针**（浏览器上下文请求
+  `record/list?_contentOnly=1` 返回 `code==200` 的 JSON，节流到至多 3s 一次）
+  确认完整登录态才抓取 cookie 与 UA 返回；用户关窗 → canceled，超时 3 分钟 →
+  timeout。凭据由 service 暂存（内存，10 分钟 TTL），bind 时消费——
+  **凭据不经前端**。Playwright 未安装时 `/platforms` 的 `browserLogin=false`，
+  前端隐藏一键登录按钮，仅保留方式二手动输入。
 
 ### 5.7 新平台接入清单（checklist）
 
@@ -622,4 +625,9 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
 - **同步"拉完才落盘"**：sync 引擎在全部页拉取完成后才 merge_submissions，
   洛谷首次全量（数千条 × 5s 间隔）期间读取端看到的是旧数据/空数据——
   属预期行为，前端靠"遮罩 30s + 后台轮询 + 账号按钮同步中"呈现进行态
-  （曾因此出现"绑定成功但无数据无提示"的误报，勿回退该机制）。
+  （曾因此出现"绑定成功但无数据无提示"的误报，勿回退该机制）；
+- **匿名/两步验证中间态也携带 `__client_id`**：一键登录的完成判定必须
+  cookie 出现 + 鉴权探针双重确认，只看 cookie 会在两步验证码账号上提前
+  关窗抓走半成品会话（§5.6）；
+- **一键登录成功不回填 handle 输入框**：绑定弹窗的 watcher 会把程序化赋值
+  误判为用户改动而清空回执（曾致"登录成功却无反馈、无法绑定"）。
