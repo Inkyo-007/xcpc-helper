@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 同步区：新鲜度 + 立即同步 + 编辑用户组入口（仅汇总视图）+ 右侧账号入口。
- * 汇总视图为用户组下拉菜单；平台视图为该平台绑定账号的 ID（未绑定则
- * 显示「未绑定账号」），点击进入绑定 / 换绑。
+ * 汇总视图为用户组下拉菜单；平台视图为该平台绑定账号的展示名（未绑定则
+ * 显示「未绑定账号」），已绑定点击打开账号管理弹窗（换绑 / 解绑）。
  * 立即同步的范围随视图：汇总视图同步全部平台（点击先弹确认，说明
  * 可能较慢），平台视图只同步该平台（直接触发）。 */
 
@@ -23,6 +23,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   sync: []
   bind: [platform: PlatformId]
+  manage: [account: BoundAccount]
   'edit-group': []
 }>()
 
@@ -95,7 +96,7 @@ function confirmSyncAll(): void {
           :type="authExpired ? 'warning' : 'primary'"
           secondary
           :loading="accountSyncing"
-          @click="emit('bind', platformAccount.platform)"
+          @click="emit('manage', platformAccount)"
         >
           <template v-if="!accountSyncing" #icon>
             <TriangleAlert v-if="authExpired" :size="14" />
@@ -114,9 +115,9 @@ function confirmSyncAll(): void {
         accountSyncing
           ? `正在同步 ${accountLabel(platformAccount!)} 的数据，可能需要几分钟`
           : authExpired
-            ? `登录凭据已过期（${accountLabel(platformAccount!)}），点击重新授权`
+            ? `登录凭据已过期（${accountLabel(platformAccount!)}），点击管理并重新授权`
             : platformAccount
-              ? '点击换绑账号'
+              ? '账号管理（换绑 / 解绑）'
               : '点击绑定账号'
       }}
     </NTooltip>

@@ -30,9 +30,13 @@ const selectedDate = ref<string | null>(null)
 const recentPage = ref(1)
 /** 当日明细列表的分页页码（从 1 起；与近期提交各自独立，切换日期时重置） */
 const dayPage = ref(1)
-/** 任一账号同步中（驱动同步按钮转圈 / 平台页签角标 / 平台视图进度面板；
- * 同步为纯后台属性，不再有全局遮罩） */
-const syncing = computed(() => accounts.value.some((a) => a.syncState === 'running'))
+/** 任一账号同步中或刚触发（驱动同步按钮转圈 / 平台页签角标 / 平台视图进度面板；
+ * 同步为纯后台属性，不再有全局遮罩）。syncFiring 覆盖"刚点击、首轮状态尚未
+ * 合并"的窗口期，让快速完成的同步也有即时反馈。 */
+const syncFiring = ref(false)
+const syncing = computed(
+  () => syncFiring.value || accounts.value.some((a) => a.syncState === 'running'),
+)
 const initialized = ref(false)
 
 const overviewData = ref<api.ApiOverviewResponse | null>(null)
@@ -120,21 +124,29 @@ function mergeSyncStatuses(statuses: BoundAccount[]): void {
   }
 }
 
-/** 后台低频轮询：状态（含 syncProgress）实时合并到 accounts，账号按钮 /
- * 平台页签角标 / 平台视图进度面板即时反映；全部完成后刷新数据。 */
+/** 轮询同步状态（首 tick 较快 300ms，让快速完成的同步也呈现进行态），
+ * 实时合并到 accounts，全部完成后刷新数据并返回最终状态列表。 */
+async function watchSyncUntilIdle(): Promise<BoundAccount[]> {
+  let statuses: BoundAccount[] = []
+  await new Promise((r) => setTimeout(r, 300))
+  while (true) {
+    statuses = await api.fetchSyncStatus()
+    mergeSyncStatuses(statuses)
+    if (statuses.every((s) => s.syncState !== 'running')) break
+    await new Promise((r) => setTimeout(r, 2000))
+  }
+  await refreshAll()
+  return statuses
+}
+
+/** 后台低频轮询（fire-and-forget，用于绑定后/发现在途同步等非手动场景） */
 let bgPolling = false
 function pollInBackground(): void {
   if (bgPolling) return
   bgPolling = true
   void (async () => {
     try {
-      while (true) {
-        await new Promise((r) => setTimeout(r, 2000))
-        const statuses = await api.fetchSyncStatus()
-        mergeSyncStatuses(statuses)
-        if (statuses.every((s) => s.syncState !== 'running')) break
-      }
-      await refreshAll()
+      await watchSyncUntilIdle()
     } catch {
       /* 后端不可达时静默结束，下次操作再拉 */
     } finally {
@@ -189,11 +201,22 @@ function setListPage(page: number): void {
 
 /* ---------- 动作 ---------- */
 
-/** 立即同步全部账号（或当前平台视图的账号）：后台执行，轮询至完成后刷新。
+/** 立即同步全部账号（或当前平台视图的账号）：即时进入进行态并轮询至完成，
+ * 返回本次同步范围内仍处于错误状态的账号列表（供调用方给出完成/警告提示）。
  * 引擎按账号串行去重，重复触发安全。 */
-async function syncNow(): Promise<void> {
-  await api.triggerSync(activePlatform.value === 'all' ? undefined : activePlatform.value)
-  pollInBackground()
+async function syncNow(): Promise<BoundAccount[]> {
+  if (syncFiring.value) return []
+  syncFiring.value = true
+  try {
+    await api.triggerSync(activePlatform.value === 'all' ? undefined : activePlatform.value)
+    const statuses = await watchSyncUntilIdle()
+    const scope = activePlatform.value
+    return statuses.filter(
+      (s) => (scope === 'all' || s.platform === scope) && s.syncState === 'error',
+    )
+  } finally {
+    syncFiring.value = false
+  }
 }
 
 /** 绑定（或换绑）账号：后端自动触发首次同步（后台执行，进度实时可见）；
@@ -239,13 +262,21 @@ export function accountLabel(account: BoundAccount): string {
   return account.displayName || account.handle
 }
 
+/** 「xx 前同步」标签：按视图区分衡量时间——平台视图取该平台账号的最近
+ * 同步时间（各平台同步时刻可能不同，不可混用）；汇总视图取全部账号的
+ * 最近一次同步时间。 */
 const lastSyncLabel = computed(() => {
-  const times = accounts.value
+  const relevant =
+    activePlatform.value === 'all'
+      ? accounts.value
+      : accounts.value.filter((a) => a.platform === activePlatform.value)
+  const times = relevant
     .map((a) => a.lastSyncAt)
     .filter((t): t is string => t !== null)
     .sort()
   if (times.length === 0) return '尚未同步'
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(times[0])) / 60000))
+  const latest = times[times.length - 1] // ISO 升序，取最近一次同步
+  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(latest)) / 60000))
   if (minutes < 1) return '刚刚同步'
   if (minutes < 60) return `${minutes} 分钟前同步`
   const hours = Math.floor(minutes / 60)

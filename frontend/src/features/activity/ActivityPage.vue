@@ -4,7 +4,7 @@
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChartColumn, MousePointerClick, Plus } from 'lucide-vue-next'
+import { ChartColumn, Link2, MousePointerClick, Plus } from 'lucide-vue-next'
 import { NButton, useMessage } from 'naive-ui'
 import AccountBindModal from '@/features/activity/components/AccountBindModal.vue'
 import ActivityHeatmap from '@/features/activity/components/ActivityHeatmap.vue'
@@ -20,7 +20,7 @@ import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
 import { parseDate, toDateStr } from '@/features/activity/model/dates'
 import { pageCount } from '@/features/activity/model/pagination'
 import { useActivity, type PlatformScope } from '@/features/activity/store'
-import type { AccountCredentials, PlatformId } from '@/features/activity/types'
+import type { AccountCredentials, BoundAccount, PlatformId } from '@/features/activity/types'
 
 const {
   accounts,
@@ -52,6 +52,9 @@ const showBind = ref(false)
 const bindPreset = ref<PlatformId | null>(null)
 /** 编辑用户组弹窗（重命名 / 删除 / 换绑账号） */
 const showGroupEdit = ref(false)
+/** 账号管理弹窗（换绑 / 解绑）及其目标账号 */
+const showAccountManage = ref(false)
+const managingAccount = ref<BoundAccount | null>(null)
 
 const weeklyBars = computed(() => weeklySolved(mergedDaily.value))
 const monthlyBars = computed(() => monthlySolved(mergedDaily.value))
@@ -62,6 +65,13 @@ const activeAccount = computed(() =>
 )
 /** 平台视图且该平台同步中：右栏替换为进度面板（不影响其他视图与功能） */
 const platformSyncing = computed(() => activeAccount.value?.syncState === 'running')
+/** 平台视图且该平台未绑定（已有其他账号在用时）：右栏显示未绑定引导而非全零统计 */
+const platformUnbound = computed(
+  () =>
+    activePlatform.value !== 'all' &&
+    accounts.value.length > 0 &&
+    activeAccount.value === null,
+)
 
 /* ---------- 网址状态同步：?platform=<平台>&date=<日期>&page=<页码> ----------
  * all、无选中日期与第 1 页为缺省值，不出现在网址中；切换平台重置日期
@@ -183,6 +193,29 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
     message.error(e instanceof Error ? e.message : '解绑失败，请稍后重试')
   }
 }
+
+/** 打开账号管理弹窗（平台视图账号按钮） */
+function openAccountManage(account: BoundAccount): void {
+  managingAccount.value = account
+  showAccountManage.value = true
+}
+
+/** 手动同步：即时进行态 + 完成/失败提示（快速或无新增同步也有明确反馈） */
+async function onSync(): Promise<void> {
+  try {
+    const errors = await syncNow()
+    if (errors.length > 0) {
+      const first = errors[0]
+      message.warning(
+        `${platformName(first.platform)} 同步失败：${first.syncError ?? '未知错误'}`,
+      )
+    } else {
+      message.success('同步完成')
+    }
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : '同步失败，请稍后重试')
+  }
+}
 </script>
 
 <template>
@@ -197,8 +230,9 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
         :syncing="syncing"
         :accounts="accounts"
         :active-platform="activePlatform"
-        @sync="syncNow"
+        @sync="onSync"
         @bind="openBind"
+        @manage="openAccountManage"
         @edit-group="showGroupEdit = true"
       />
     </div>
@@ -224,6 +258,25 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
             :progress="activeAccount?.syncProgress"
             :account="activeAccount ? accountLabel(activeAccount) : undefined"
           />
+        </section>
+      </div>
+      <div v-else-if="platformUnbound" class="act-main">
+        <section class="act-panel act-syncing">
+          <div class="unbound-panel">
+            <Link2 :size="22" class="unbound-icon" />
+            <p class="unbound-title">
+              还未绑定 <b>{{ platformName(activePlatform as PlatformId) }}</b> 账号
+            </p>
+            <p class="unbound-hint">绑定并同步后，这里会展示该平台的训练统计</p>
+            <NButton
+              size="small"
+              type="primary"
+              secondary
+              @click="openBind(activePlatform as PlatformId)"
+            >
+              绑定账号
+            </NButton>
+          </div>
         </section>
       </div>
       <div v-else class="act-main">
@@ -280,6 +333,12 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
     </div>
 
     <AccountBindModal v-model:show="showBind" :platform="bindPreset" @bind="onBind" />
+    <AccountManageModal
+      v-model:show="showAccountManage"
+      :account="managingAccount"
+      @bind="openBind"
+      @unbind="onUnbind"
+    />
     <UserGroupEditModal
       v-model:show="showGroupEdit"
       :accounts="accounts"
@@ -341,6 +400,35 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.unbound-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 0;
+}
+
+.unbound-icon {
+  color: var(--faint);
+  margin-bottom: 4px;
+}
+
+.unbound-title {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.unbound-title b {
+  color: var(--accent-strong);
+}
+
+.unbound-hint {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  color: var(--faint);
 }
 
 .act-charts {
