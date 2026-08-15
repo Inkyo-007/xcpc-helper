@@ -125,7 +125,7 @@ class LuoguAdapter(PlatformAdapter):
     # ===== 提交拉取 =====
 
     def normalize_verdict(self, verdict: Verdict) -> Verdict:
-        """存量迁移：洛古列表口径只有 AC/CE/Unaccepted（14），历史落盘的
+        """存量迁移：洛谷列表口径只有 AC/CE/Unaccepted（14），历史落盘的
         WA 全部是 14 的旧口径（14→WA），读取时幂等转换为 UNAC。"""
         if verdict is Verdict.WA:
             return Verdict.UNAC

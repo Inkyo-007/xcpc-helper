@@ -128,16 +128,16 @@ PlatformSubmission {
   problem_name
   problem_url     # 平台内题目外链（CF 按 contestId 位数区分：四位数主题库 /contest/，六位数 gym /gym/）
   difficulty      # 原始难度值，不做跨平台归一（int | str：CF 分数 / LC 档位 / 洛谷难度）
-  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中）/ UNAC（未通过但细分未知，洛古列表口径）
+  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中）/ UNAC（未通过但细分未知，洛谷列表口径）
   submitted_at    # UTC 秒级时间戳
   language
 }
 ```
 
-- **UNAC 语义**：洛古记录列表只区分 AC / CE / Unaccepted（官方常量 `filterable`
+- **UNAC 语义**：洛谷记录列表只区分 AC / CE / Unaccepted（官方常量 `filterable`
   佐证：仅 2/12/14 可筛选），WA/TLE/MLE/RE 细分只在记录详情的测试点信息里。
   为不误导（把 TLE 显示成 WA），14 归一为 UNAC（未通过、细分未知）；
-  **存量洛古数据的历史 WA 在读取时经 adapter 钩子幂等迁移为 UNAC**
+  **存量洛谷数据的历史 WA 在读取时经 adapter 钩子幂等迁移为 UNAC**
   （`normalize_verdict`，对齐 5f7ffeb8 的 normalize_url 先例），无需重新同步。
 
 ### 3.3 游标与去重
