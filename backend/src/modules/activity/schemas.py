@@ -24,6 +24,7 @@ class BoundAccountOut(BaseModel):
     syncState: SyncStateOut = "idle"
     syncError: str | None = None
     syncErrorCode: str | None = None  # 结构化错误码（如 auth_expired），前端分处置路径
+    syncProgress: float | None = None  # 同步进度 0~1（None = 总量未知，前端显示不定态）
 
 
 class PlatformMetaOut(BaseModel):

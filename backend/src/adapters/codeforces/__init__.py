@@ -17,6 +17,7 @@ from adapters.base import (
     PlatformAdapter,
     PlatformError,
     PlatformSubmission,
+    ProgressCallback,
     UserInfo,
     UserNotFoundError,
 )
@@ -82,8 +83,12 @@ class CodeforcesAdapter(PlatformAdapter):
         credentials: Credentials | None = None,
         full_window_days: int,
         full_min_rows: int,
+        progress_cb: ProgressCallback | None = None,
     ) -> list[PlatformSubmission]:
         """按页拉取提交（返回按时间倒序）。
+
+        CF user.status 无总量字段，不上报进度（progress_cb 为契约参数，
+        本平台忽略，前端显示不定态）。
 
         - 增量（since 非空）：只取游标之后的提交，遇旧即停；停止条件为
           ts < since，游标当秒的提交会重复拉取，由 store 层按

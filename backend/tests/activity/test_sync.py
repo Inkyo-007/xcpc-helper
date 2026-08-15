@@ -43,6 +43,7 @@ class FakeAdapter(PlatformAdapter):
         credentials: Credentials | None = None,
         full_window_days: int,
         full_min_rows: int,
+        progress_cb=None,
     ) -> list[PlatformSubmission]:
         self.calls.append(since)
         if self.fail_with is not None:
@@ -114,6 +115,26 @@ async def test_no_new_submissions_keeps_cursor(tmp_path):
     assert adapter.calls == [2000]
     assert store.load_profile().accounts[0].last_synced_at == 2000  # 游标不变
     assert engine.status_of(USER, "codeforces", "demo").state is SyncState.IDLE
+
+
+async def test_sync_progress_reported_and_cleared(tmp_path):
+    """adapter 经 progress_cb 上报进度：running 状态可见 0~1，完成后清空。"""
+    engine, store = make_engine(tmp_path, FakeAdapter())
+    store.save_account(Account(platform="codeforces", handle="demo"))
+    mid: dict[str, float | None] = {}
+
+    class ProgressAdapter(FakeAdapter):
+        async def fetch_submissions(self, handle, *, since, progress_cb=None, **kw):
+            if progress_cb is not None:
+                progress_cb(1, 2)
+                mid["value"] = engine.status_of(USER, "codeforces", "demo").progress
+            return []
+
+    engine._adapters["codeforces"] = ProgressAdapter()
+    status = await engine.sync_account(USER, "codeforces", "demo")
+
+    assert mid["value"] == 0.5  # 同步中进度
+    assert status.progress is None  # 完成后清空（idle 不带进度）
 
 
 async def test_failure_degrades_to_diagnostic(tmp_path):

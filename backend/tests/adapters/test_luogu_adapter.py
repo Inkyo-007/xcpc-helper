@@ -191,11 +191,11 @@ async def test_fetch_maps_real_fixture_fields():
     assert first.difficulty == 0
     assert first.verdict is Verdict.AC
     assert first.language == "C++20"
-    # 比赛内提交拼 contestId；status 14（Unaccepted）→ WA
+    # 比赛内提交拼 contestId；status 14（Unaccepted）→ UNAC（细分未知）
     second = items[1]
     assert second.problem_url == "https://www.luogu.com.cn/problem/P16967?contestId=330287"
     assert second.difficulty == 6
-    assert items[2].verdict is Verdict.WA
+    assert items[2].verdict is Verdict.UNAC
 
 
 async def test_fetch_paginates_until_short_page():
@@ -371,7 +371,7 @@ def test_verdict_mapping():
     """官方常量表校准（/_lfe/config/auth）：注意 4=MLE、5=TLE 与直觉相反。"""
     assert map_verdict(12) is Verdict.AC
     assert map_verdict(6) is Verdict.WA
-    assert map_verdict(14) is Verdict.WA  # Unaccepted（对话确认口径）
+    assert map_verdict(14) is Verdict.UNAC  # Unaccepted（列表口径无细分）
     assert map_verdict(2) is Verdict.CE
     assert map_verdict(7) is Verdict.RE
     assert map_verdict(5) is Verdict.TLE
@@ -399,3 +399,55 @@ def test_problem_url():
         == "https://www.luogu.com.cn/problem/P16967?contestId=330287"
     )
     assert problem_url("", None) == "https://www.luogu.com.cn"
+
+
+def test_normalize_verdict_migrates_legacy_wa():
+    """存量迁移：历史落盘的 WA（旧口径 14→WA）读取时幂等转 UNAC。"""
+    adapter = make_adapter(lambda url, params: FakeResponse(200, envelope([])))
+    assert adapter.normalize_verdict(Verdict.WA) is Verdict.UNAC
+    assert adapter.normalize_verdict(Verdict.UNAC) is Verdict.UNAC  # 幂等
+    assert adapter.normalize_verdict(Verdict.AC) is Verdict.AC  # 其余不动
+
+
+async def test_fetch_reports_progress_with_total_on_full_sync():
+    """全量同步逐页上报进度：fetched 累计、total 取首页信封 count。"""
+    now = int(time.time())
+    pages = {
+        1: [row(i, now - i * 60) for i in range(1, 21)],
+        2: [row(21, now - 1300)],
+    }
+
+    def handler(url, params):
+        return FakeResponse(200, envelope(pages.get(int(params["page"]), [])))
+
+    adapter = make_adapter(handler)
+    calls: list[tuple[int, int | None]] = []
+    await adapter.fetch_submissions(
+        "100000",
+        since=None,
+        credentials=CREDS,
+        full_window_days=FULL_WINDOW_DAYS,
+        full_min_rows=1,
+        progress_cb=lambda fetched, total: calls.append((fetched, total)),
+    )
+    assert calls == [(20, 9999), (21, 9999)]  # envelope() 固定 count=9999
+
+
+async def test_fetch_no_progress_on_incremental():
+    """增量同步总量不可知，不上报进度。"""
+    since = now_minus(1)
+
+    def handler(url, params):
+        return FakeResponse(200, envelope([row(1, since + 60)]))
+
+    adapter = make_adapter(handler)
+    calls: list[tuple[int, int | None]] = []
+    await adapter.fetch_submissions(
+        "100000",
+        since=since,
+        credentials=CREDS,
+        full_window_days=FULL_WINDOW_DAYS,
+        full_min_rows=FULL_MIN_ROWS,
+        progress_cb=lambda fetched, total: calls.append((fetched, total)),
+    )
+    assert calls == []

@@ -34,8 +34,10 @@ from adapters.base import (
     PlatformAdapter,
     PlatformError,
     PlatformSubmission,
+    ProgressCallback,
     UserInfo,
     UserNotFoundError,
+    Verdict,
 )
 from adapters.luogu.api_models import (
     LgRecordListEnvelope,
@@ -122,6 +124,13 @@ class LuoguAdapter(PlatformAdapter):
 
     # ===== 提交拉取 =====
 
+    def normalize_verdict(self, verdict: Verdict) -> Verdict:
+        """存量迁移：洛古列表口径只有 AC/CE/Unaccepted（14），历史落盘的
+        WA 全部是 14 的旧口径（14→WA），读取时幂等转换为 UNAC。"""
+        if verdict is Verdict.WA:
+            return Verdict.UNAC
+        return verdict
+
     async def fetch_submissions(
         self,
         handle: str,
@@ -130,13 +139,15 @@ class LuoguAdapter(PlatformAdapter):
         credentials: Credentials | None = None,
         full_window_days: int,
         full_min_rows: int,
+        progress_cb: ProgressCallback | None = None,
     ) -> list[PlatformSubmission]:
         """倒序回扫分页拉取（返回按时间倒序，语义对齐 CF 适配器）。
 
         - 增量（since 非空）：遇 ts < since 即停；游标当秒提交重复拉取，
           由 store 层按 submission_id 去重吸收；
         - 全量（since 为空）：拉到覆盖 full_window_days 窗口为止，窗口内
-          不足 full_min_rows 条时继续拉满；
+          不足 full_min_rows 条时继续拉满；首页信封 records.count 即
+          全站总条数，经 progress_cb 逐页上报真实进度百分比；
         - 绝对护栏：最多 MAX_PAGES 页。
         """
         if credentials is None:
@@ -163,6 +174,9 @@ class LuoguAdapter(PlatformAdapter):
                     if row.id not in seen:
                         seen.add(row.id)
                         out.append(row)
+                # 进度上报：仅全量（总量 = 首页信封 count；增量子集总量不可知）
+                if progress_cb is not None and since is None and page_data is not None:
+                    progress_cb(len(out), page_data.count)
                 last_ts = rows[-1].submitTime
                 # 全量停止条件：已越过窗口起点且累计条数达标；或末页（不满 perPage）
                 if (

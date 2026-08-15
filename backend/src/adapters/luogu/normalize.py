@@ -8,7 +8,8 @@ from adapters.base import Verdict
 
 # record.status → 统一 Verdict：
 # 0/1 Waiting/Judging → JG（评测中，对齐 CF 的 SUBMITTED/TESTING）；
-# 14 Unaccepted → WA（对话确认口径：比赛中未通过本质即未通过评测）；
+# 14 Unaccepted → UNAC（列表口径结构性无细分——filterable 仅 2/12/14 可筛，
+# WA/TLE/MLE/RE 只在记录详情测试点信息中，逐条拉取成本不可接受）；
 # 11 UKE、21/22/23 Hack 系列与未知码 → UKE。
 VERDICT_MAP: dict[int, Verdict] = {
     0: Verdict.JG,
@@ -20,7 +21,7 @@ VERDICT_MAP: dict[int, Verdict] = {
     6: Verdict.WA,
     7: Verdict.RE,
     12: Verdict.AC,
-    14: Verdict.WA,
+    14: Verdict.UNAC,
 }
 
 

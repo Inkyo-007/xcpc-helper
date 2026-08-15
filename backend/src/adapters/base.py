@@ -14,15 +14,21 @@ capabilities 声明的方法，不被迫写空壳；正常路径由 service 按 
 决定调用，触发默认抛错即编程错误，直接暴露。
 """
 
+from collections.abc import Callable
 from enum import Enum
 
 from pydantic import BaseModel, Field
+
+# 同步进度回调：fetched 已拉取条数，total 总量（None = 总量未知）
+ProgressCallback = Callable[[int, int | None], None]
 
 
 class Verdict(str, Enum):
     """判题结果（平台无关，由 adapter 完成归一化）。
 
-    JG 表示评测中（如 Codeforces 的 SUBMITTED / TESTING）。
+    JG 表示评测中（如 Codeforces 的 SUBMITTED / TESTING）；
+    UNAC 表示未通过但细分未知（洛谷记录列表口径只有 AC/CE/Unaccepted，
+    WA/TLE/MLE/RE 细分只在记录详情中，见 activity.md §3.2）。
     """
 
     AC = "AC"
@@ -34,6 +40,7 @@ class Verdict(str, Enum):
     OLE = "OLE"
     UKE = "UKE"
     JG = "JG"
+    UNAC = "UNAC"
 
 
 class Capability(str, Enum):
@@ -176,15 +183,27 @@ class PlatformAdapter:
         credentials: Credentials | None = None,
         full_window_days: int,
         full_min_rows: int,
+        progress_cb: ProgressCallback | None = None,
     ) -> list[PlatformSubmission]:
         """拉取提交：since 为 UTC 秒级游标（None 表示全量）。
 
         增量语义由各平台自行解释（CF 按时间过滤、AtCoder 透传 from_second）。
         full_window_days / full_min_rows 为同步策略（来自上层配置，
         如热力图窗口），由调用方传入，adapter 不内置产品策略。
-        失败抛 PlatformError。仅具备 SUBMISSIONS 能力时实现。
+        progress_cb(fetched, total) 为可选进度回调：总量可知的平台
+        （如洛谷 records.count）逐页上报驱动前端进度百分比；总量未知
+        的平台不上报（前端显示不定态）。失败抛 PlatformError。
+        仅具备 SUBMISSIONS 能力时实现。
         """
         raise CapabilityNotSupportedError(f"{self.platform_id} 不支持提交明细")
+
+    def normalize_verdict(self, verdict: Verdict) -> Verdict:
+        """历史数据读取时的 verdict 规范化钩子（存量迁移用）；默认恒等。
+
+        平台口径演进后（如洛古 14 从 WA 改为 UNAC），已落盘的旧值经此
+        幂等转换为当前口径，无需重新同步。实现方应保证幂等（新值原样返回）。
+        """
+        return verdict
 
     async def fetch_rating_history(
         self, handle: str, credentials: Credentials | None = None

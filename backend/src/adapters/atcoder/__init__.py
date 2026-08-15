@@ -29,6 +29,7 @@ from adapters.base import (
     PlatformAdapter,
     PlatformError,
     PlatformSubmission,
+    ProgressCallback,
     UserInfo,
     UserNotFoundError,
 )
@@ -90,8 +91,12 @@ class AtCoderAdapter(PlatformAdapter):
         credentials: Credentials | None = None,
         full_window_days: int,
         full_min_rows: int,
+        progress_cb: ProgressCallback | None = None,
     ) -> list[PlatformSubmission]:
         """升序翻页拉取提交（返回按时间升序）。
+
+        kenkoooo 无总量字段，不上报进度（progress_cb 为契约参数，
+        本平台忽略，前端显示不定态）。
 
         - 增量（since 非空）：from_second = since（含边界，游标当秒的提交
           重复拉取，由 store 层按 submission_id 去重吸收）；

@@ -117,6 +117,7 @@ class SyncEngine:
         )
 
     async def _run_sync(self, user_id: str, platform: str, handle: str) -> None:
+        key = (user_id, platform, handle)
         adapter = self._adapters.get(platform)
         if adapter is None:
             raise NotFoundError(f"不支持的平台: {platform}")
@@ -135,12 +136,20 @@ class SyncEngine:
         since = account.last_synced_at
         # cookie 授权平台：从 secrets.json 加载凭据（匿名平台为 None）
         credentials = store.get_account_credentials(platform, handle)
+
+        def _on_progress(fetched: int, total: int | None) -> None:
+            """adapter 进度回调：更新 running 状态的进度（0~1，封顶防漂移）。"""
+            st = self._status.get(key)
+            if st is not None and st.state == SyncState.RUNNING:
+                st.progress = min(fetched / total, 1.0) if total else None
+
         raw = await adapter.fetch_submissions(
             handle,
             since=since,
             credentials=credentials,
             full_window_days=self._full_window_days,
             full_min_rows=self._full_min_rows,
+            progress_cb=_on_progress,
         )
         submissions = [
             Submission(platform=platform, handle=handle, **item.model_dump())

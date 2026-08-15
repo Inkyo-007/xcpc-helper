@@ -84,3 +84,4 @@ class SyncStatus(BaseModel):
     last_synced_at: datetime | None = None  # 最近一次同步结束时间（本地时区）
     error: str | None = None
     error_code: str | None = None  # 结构化错误码（如 auth_expired，供前端分处置路径）
+    progress: float | None = None  # 同步进度 0~1（总量可知的平台上报；None = 不定态）
