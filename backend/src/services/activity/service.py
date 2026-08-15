@@ -416,11 +416,6 @@ class ActivityService:
                     acc.platform,
                     acc.handle,
                 )
-            # 存量 verdict 口径迁移（如洛谷历史 WA → UNAC），读取时幂等转换
-            adapter = self._adapters.get(acc.platform)
-            if adapter is not None:
-                for s in items:
-                    s.verdict = adapter.normalize_verdict(s.verdict)
             out.extend(items)
         return out
 

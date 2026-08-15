@@ -401,14 +401,6 @@ def test_problem_url():
     assert problem_url("", None) == "https://www.luogu.com.cn"
 
 
-def test_normalize_verdict_migrates_legacy_wa():
-    """存量迁移：历史落盘的 WA（旧口径 14→WA）读取时幂等转 UNAC。"""
-    adapter = make_adapter(lambda url, params: FakeResponse(200, envelope([])))
-    assert adapter.normalize_verdict(Verdict.WA) is Verdict.UNAC
-    assert adapter.normalize_verdict(Verdict.UNAC) is Verdict.UNAC  # 幂等
-    assert adapter.normalize_verdict(Verdict.AC) is Verdict.AC  # 其余不动
-
-
 async def test_fetch_reports_progress_with_total_on_full_sync():
     """全量同步逐页上报进度：fetched 累计、total 取首页信封 count。"""
     now = int(time.time())

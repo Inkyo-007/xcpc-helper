@@ -137,8 +137,7 @@ PlatformSubmission {
 - **UNAC 语义**：洛谷记录列表只区分 AC / CE / Unaccepted（官方常量 `filterable`
   佐证：仅 2/12/14 可筛选），WA/TLE/MLE/RE 细分只在记录详情的测试点信息里。
   为不误导（把 TLE 显示成 WA），14 归一为 UNAC（未通过、细分未知）；
-  **存量洛谷数据的历史 WA 在读取时经 adapter 钩子幂等迁移为 UNAC**
-  （`normalize_verdict`，对齐 5f7ffeb8 的 normalize_url 先例），无需重新同步。
+  **存量历史 WA（旧口径落盘）不做迁移**，重新同步即被新口径覆盖（对话确认）。
 
 ### 3.3 游标与去重
 
@@ -192,7 +191,7 @@ ID 不改变组名，重命名组不改变信息卡。
    hover 上浮 + tooltip，点击选中联动左栏明细。
 6. **右栏 · 柱状图行**：近 7 天通过（日粒度）/ 近 12 个月通过（月粒度），ECharts。
 
-verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**、**UNAC 橙**
+verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**、**UNAC 同 WA 红**
 （未通过但细分未知），TLE/MLE/OLE/UKE 深蓝。
 
 ### 4.3 统计口径
@@ -306,8 +305,8 @@ AdapterError                    # 基类
 | `fetch_rating_history(handle, credentials=None) -> list[RatingPoint]` | rating 历史（后续增量） | RATING |
 | `fetch_contests() -> list[ContestInfo]` | 比赛信息（平台级，无 handle，未来 contest 功能消费） | CONTESTS |
 
-**数据迁移钩子**：`normalize_url(url)`（5f7ffeb8 先例）与 `normalize_verdict(verdict)`
-——历史数据读取时经钩子幂等转换为当前口径（默认恒等），平台规则演进无需重新同步。
+**数据迁移钩子**：`normalize_url(url)`（5f7ffeb8 先例）——历史数据读取时经钩子
+幂等转换为当前口径（默认恒等），平台规则演进无需重新同步。
 
 ### 5.3 外呼公共层（net.py）
 
@@ -422,7 +421,7 @@ AdapterError                    # 基类
     详情测试点信息中，逐条拉取成本不可接受——对话确认不做详情级适配）、
     `2→CE`、`7→RE`、`5→TLE`、`4→MLE`（**注意 4/5 与直觉相反**）、`3→OLE`、
     `0/1→JG`（等待/评测中）、`11`（UKE）/`21/22/23`（Hack 系列）/未知码 → `UKE`；
-    存量历史 WA（此前 14→WA 口径落盘）读取时经 `normalize_verdict` 幂等转 UNAC；
+    存量历史 WA（此前 14→WA 口径落盘）不做迁移，重新同步即被新口径覆盖；
   - **language 数字码**：同一常量表的 `CodeLanguage` 内置映射（如 27=C++20、
     7=Python 3），未知码兜底空串；
   - **进度上报**：全量同步时首页信封 `records.count` 即全站总条数，
@@ -639,7 +638,7 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
 - **洛谷状态码 4=MLE / 5=TLE（与直觉相反）**：映射表以官方 `/_lfe/config/auth`
   常量为准，勿凭记忆改写；14（Unaccepted）→ UNAC（列表口径结构性无细分，
   `filterable` 仅 2/12/14 可筛；细分须逐条拉记录详情，成本不可接受，对话确认
-  不做详情级适配），存量 WA 读取时经 `normalize_verdict` 幂等迁移（§3.2/§5.6）；
+  不做详情级适配），存量 WA 不做迁移、重新同步即覆盖（§3.2/§5.6）；
 - **洛谷 handle = uid，display_name 分离**：用户名可改、uid 稳定；界面显示
   一律 `displayName ?? handle`；
 - **browser-login 凭据不经前端**：service 内存暂存 + bind 消费；Playwright 为

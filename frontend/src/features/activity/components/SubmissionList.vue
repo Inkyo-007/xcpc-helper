@@ -65,8 +65,8 @@ const rows = computed<Row[]>(() => {
   }))
 })
 
-/** verdict 徽章固定配色：AC 绿 / WA 红 / CE 黄 / RE 紫 / JG 浅蓝 /
- * UNAC 橙（未通过但细分未知）/ 资源超限与未知深蓝 */
+/** verdict 徽章固定配色：AC 绿 / WA 与 UNAC 红（UNAC = 未通过但细分未知，
+ * 洛谷列表口径）/ CE 黄 / RE 紫 / JG 浅蓝 / 资源超限与未知深蓝 */
 const VERDICT_CLASS: Record<Verdict, string> = {
   AC: 'v-ac',
   WA: 'v-wa',
@@ -77,7 +77,7 @@ const VERDICT_CLASS: Record<Verdict, string> = {
   MLE: 'v-limit',
   OLE: 'v-limit',
   UKE: 'v-limit',
-  UNAC: 'v-uac',
+  UNAC: 'v-wa',
 }
 
 function openProblem(row: Row): void {
@@ -257,12 +257,6 @@ function openProblem(row: Row): void {
 .v-jg {
   color: #2b8fc8;
   background: hsl(199 68% 55% / 0.15);
-}
-
-/* 未通过但细分未知（洛谷 Unaccepted）：橙 */
-.v-uac {
-  color: #d97706;
-  background: hsl(32 90% 48% / 0.15);
 }
 
 .v-limit {

@@ -197,14 +197,6 @@ class PlatformAdapter:
         """
         raise CapabilityNotSupportedError(f"{self.platform_id} 不支持提交明细")
 
-    def normalize_verdict(self, verdict: Verdict) -> Verdict:
-        """历史数据读取时的 verdict 规范化钩子（存量迁移用）；默认恒等。
-
-        平台口径演进后（如洛谷 14 从 WA 改为 UNAC），已落盘的旧值经此
-        幂等转换为当前口径，无需重新同步。实现方应保证幂等（新值原样返回）。
-        """
-        return verdict
-
     async def fetch_rating_history(
         self, handle: str, credentials: Credentials | None = None
     ) -> list[RatingPoint]:
