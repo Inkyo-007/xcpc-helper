@@ -340,6 +340,43 @@ async def test_create_switch_rename_delete_group(tmp_path):
         await svc.aclose()
 
 
+async def test_restart_does_not_recreate_deleted_default(tmp_path):
+    """重启不再重建被删除/重命名的 default：仅一个组都不存在时才创建 default；
+    已有组时当前组回落到现存首个组。"""
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler()), base_backoff=0.01
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        svc.create_group(GroupCreateIn(name="我的组"))  # 新建并自动切换为当前组
+        svc.delete_group("default")  # 删除 default（当前组已是"我的组"）
+    finally:
+        await svc.aclose()
+
+    # 模拟重启（新服务实例，同一数据目录）
+    svc2 = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        groups = svc2.groups().groups
+        assert [g.name for g in groups] == ["我的组"]  # default 未被重建
+        assert next(g for g in groups if g.current).name == "我的组"
+    finally:
+        await svc2.aclose()
+
+
+async def test_first_run_creates_default(tmp_path):
+    """真正的首次运行（无任何用户组）才自动创建 default。"""
+    fetcher = HttpFetcher(
+        transport=httpx.MockTransport(make_handler()), base_backoff=0.01
+    )
+    svc = ActivityService(Settings(user_data_dir=tmp_path / "user"), fetcher)
+    try:
+        groups = svc.groups().groups
+        assert [g.name for g in groups] == ["default"]
+        assert groups[0].current
+    finally:
+        await svc.aclose()
+
+
 async def test_group_data_isolated(tmp_path):
     """不同用户组的账号绑定与训练数据互相隔离。"""
     rows = [cf_row(1, sys_today_ts(0, 10), "OK", "A")]

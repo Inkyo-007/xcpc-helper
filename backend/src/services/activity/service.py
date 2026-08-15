@@ -88,11 +88,17 @@ class ActivityService:
             full_window_days=settings.activity_window_days,
             full_min_rows=settings.activity_full_min_rows,
         )
-        # 确保默认用户组目录存在（惰性初始化，幂等）
-        if DEFAULT_USER_ID not in activity_store.list_groups(settings.user_data_dir):
+        # 用户组初始化：仅在"一个组都不存在"时（真正的首次运行）创建 default；
+        # 已有组时（default 被删除/重命名）不再重建，当前组回落到 default
+        # 或现存首个组（目录即组，见 store.list_groups）
+        groups = activity_store.list_groups(settings.user_data_dir)
+        if not groups:
             activity_store.create_group(settings.user_data_dir, DEFAULT_USER_ID)
+            groups = [DEFAULT_USER_ID]
         # 当前用户组（内存态；单机本地应用，前端切组时切换）
-        self._current_group = DEFAULT_USER_ID
+        self._current_group = (
+            DEFAULT_USER_ID if DEFAULT_USER_ID in groups else groups[0]
+        )
         # browser-login 会话状态（按平台互斥）与待消费凭据暂存（内存态，凭据不经前端）
         self._browser_logins: dict[str, BrowserLoginStatusOut] = {}
         self._pending_credentials: dict[tuple[str, str], tuple[Credentials, float]] = {}
