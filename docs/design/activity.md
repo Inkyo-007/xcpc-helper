@@ -128,11 +128,17 @@ PlatformSubmission {
   problem_name
   problem_url     # 平台内题目外链（CF 按 contestId 位数区分：四位数主题库 /contest/，六位数 gym /gym/）
   difficulty      # 原始难度值，不做跨平台归一（int | str：CF 分数 / LC 档位 / 洛谷难度）
-  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中，CF 的 SUBMITTED / TESTING）
+  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中）/ UNAC（未通过但细分未知，洛古列表口径）
   submitted_at    # UTC 秒级时间戳
   language
 }
 ```
+
+- **UNAC 语义**：洛古记录列表只区分 AC / CE / Unaccepted（官方常量 `filterable`
+  佐证：仅 2/12/14 可筛选），WA/TLE/MLE/RE 细分只在记录详情的测试点信息里。
+  为不误导（把 TLE 显示成 WA），14 归一为 UNAC（未通过、细分未知）；
+  **存量洛古数据的历史 WA 在读取时经 adapter 钩子幂等迁移为 UNAC**
+  （`normalize_verdict`，对齐 5f7ffeb8 的 normalize_url 先例），无需重新同步。
 
 ### 3.3 游标与去重
 
@@ -167,10 +173,14 @@ ID 不改变组名，重命名组不改变信息卡。
 
 ### 4.2 页面区块
 
-1. **工具条**（通栏）：左侧平台分段切换器；右侧同步区——上次同步时间、
+1. **工具条**（通栏）：左侧平台分段切换器（**平台同步中时其页签文本右上角显示
+   黄色圆点角标**，不进入该平台页也可知悉）；右侧同步区——上次同步时间、
    「立即同步」（汇总视图点击先确认"同步全部平台"，平台视图只同步该平台）、
    「编辑用户组」（仅汇总视图）与账号入口（汇总视图为用户组下拉；平台视图为该平台
    绑定账号按钮，未绑定显示虚线「未绑定账号」）。
+   **同步为纯后台属性，无全局遮罩**：平台视图下该平台同步中时，右栏替换为
+   同步进行态面板（进度环 + 百分比，总量未知的平台仅显示不定态环），
+   其他平台视图与模板库等其他功能互不干扰。
 2. **左栏 · 用户信息卡**：头像（本地上传，前端裁剪 512px 方形 data URL，存后端）、
    主标签 ID、副标签签名；就地编辑，防抖提交后端。
 3. **左栏 · 近期提交**：跨平台合并的最后 200 条提交（后端取历史倒序前 200，
@@ -182,7 +192,8 @@ ID 不改变组名，重命名组不改变信息卡。
    hover 上浮 + tooltip，点击选中联动左栏明细。
 6. **右栏 · 柱状图行**：近 7 天通过（日粒度）/ 近 12 个月通过（月粒度），ECharts。
 
-verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**，TLE/MLE/OLE/UKE 深蓝。
+verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**、**UNAC 橙**
+（未通过但细分未知），TLE/MLE/OLE/UKE 深蓝。
 
 ### 4.3 统计口径
 
@@ -291,9 +302,12 @@ AdapterError                    # 基类
 | 方法 | 说明 | 能力 |
 | --- | --- | --- |
 | `verify(handle, credentials=None) -> UserInfo` | 绑定验证 | USER_INFO |
-| `fetch_submissions(handle, *, since, credentials=None, full_window_days, full_min_rows) -> list[PlatformSubmission]` | 提交明细；`since` 为 UTC 秒游标（None 全量），增量语义平台自解释；`full_window_days`/`full_min_rows` 为上层同步策略（见 §6.3），adapter 不内置 | SUBMISSIONS |
+| `fetch_submissions(handle, *, since, credentials=None, full_window_days, full_min_rows, progress_cb=None) -> list[PlatformSubmission]` | 提交明细；`since` 为 UTC 秒游标（None 全量），增量语义平台自解释；`full_window_days`/`full_min_rows` 为上层同步策略（见 §6.3），adapter 不内置；`progress_cb(fetched, total)` 为可选进度回调（total 可知的平台上报，驱动前端进度百分比；未知则不报，前端显示不定态） | SUBMISSIONS |
 | `fetch_rating_history(handle, credentials=None) -> list[RatingPoint]` | rating 历史（后续增量） | RATING |
 | `fetch_contests() -> list[ContestInfo]` | 比赛信息（平台级，无 handle，未来 contest 功能消费） | CONTESTS |
+
+**数据迁移钩子**：`normalize_url(url)`（5f7ffeb8 先例）与 `normalize_verdict(verdict)`
+——历史数据读取时经钩子幂等转换为当前口径（默认恒等），平台规则演进无需重新同步。
 
 ### 5.3 外呼公共层（net.py）
 
@@ -404,11 +418,15 @@ AdapterError                    # 基类
     拼 `?contestId={cid}`（clist 格式）；contest 内提交计入统计（对齐 CF gym）；
   - `difficulty` = record 内嵌 0-7 原始档（int，不归一）；
   - **verdict 映射**（数字 status 码，官方 `/_lfe/config/auth` 常量表实测校准）：
-    `12→AC`、`6→WA`、`14→WA`（Unaccepted，对话确认）、`2→CE`、`7→RE`、
-    `5→TLE`、`4→MLE`（**注意 4/5 与直觉相反**）、`3→OLE`、`0/1→JG`
-    （等待/评测中）、`11`（UKE）/`21/22/23`（Hack 系列）/未知码 → `UKE`；
+    `12→AC`、`6→WA`、`14→UNAC`（Unaccepted：列表口径无细分，细分只在记录
+    详情测试点信息中，逐条拉取成本不可接受——对话确认不做详情级适配）、
+    `2→CE`、`7→RE`、`5→TLE`、`4→MLE`（**注意 4/5 与直觉相反**）、`3→OLE`、
+    `0/1→JG`（等待/评测中）、`11`（UKE）/`21/22/23`（Hack 系列）/未知码 → `UKE`；
+    存量历史 WA（此前 14→WA 口径落盘）读取时经 `normalize_verdict` 幂等转 UNAC；
   - **language 数字码**：同一常量表的 `CodeLanguage` 内置映射（如 27=C++20、
-    7=Python 3），未知码兜底空串。
+    7=Python 3），未知码兜底空串；
+  - **进度上报**：全量同步时首页信封 `records.count` 即全站总条数，
+    `progress_cb(fetched, total)` 逐页上报真实百分比；增量同步总量不可知，不上报。
 - **二级密码不影响**：二级密码只保护账号安全类敏感操作，登录态读提交记录
   不触发（对话确认设计假设，架构上有 auth_expired 降级兜底）。
 - **一键登录（browser-login）**：`adapters/luogu/login.py` 用 Playwright
@@ -514,7 +532,7 @@ backend/src/
 | GET | `/api/activity/overview?platform=` | 概览：all-time 总量 + streak + 近 370 天日序列；缺省为汇总 |
 | GET | `/api/activity/submissions?date=&platform=` | 带 `date` 为当日明细；不带 `date` 为最后 200 条近期提交（倒序）；平台过滤可选 |
 | POST | `/api/activity/sync` | 触发同步 `{platform?}`，空为全部账号；立即返回（202） |
-| GET | `/api/activity/sync/status` | 各账号同步状态（idle/running/error + 上次结果 + errorCode），前端轮询 |
+| GET | `/api/activity/sync/status` | 各账号同步状态（idle/running/error + 上次结果 + errorCode + syncProgress 0~1 可空），前端轮询 |
 
 错误响应统一由全局异常处理器结构化（`{error: {code, message, detail}}`）。
 
@@ -534,7 +552,8 @@ frontend/src/features/activity/
 │  ├─ UserGroupMenu.vue        # 用户组下拉（新建 / 切换，按钮显示组名）
 │  ├─ UserGroupEditModal.vue   # 编辑用户组（重命名 / 删除 / 平台账号绑定管理）
 │  ├─ AccountBindModal.vue     # 绑定 / 换绑（cookie 平台：一键登录 + cookie 逐字段输入）
-│  ├─ SyncBar.vue / SyncOverlay.vue / PlatformTabs.vue
+│  ├─ SyncBar.vue / PlatformTabs.vue（同步中平台黄点角标）
+│  ├─ SyncProgressPanel.vue    # 平台视图右栏同步进行态（进度环 + 百分比 / 不定态）
 │  ├─ StatCards.vue / PassBarChart.vue / ActivityHeatmap.vue / SubmissionList.vue
 │  └─ platforms/               # 平台专属组件注册表（后续增量，如 LuoguExtrasCard.vue）
 ```
@@ -543,10 +562,13 @@ frontend/src/features/activity/
 
 - `store.ts`：账号/平台/日序列/提交数据全部来自后端当前组 API；`watch(currentKey)`
   切组后重置视图并重拉数据；`watch([activePlatform, selectedDate])` 联动重拉
-  （请求序号防竞态，丢弃过期响应）；同步用"触发 + 轮询 `/sync/status` 至 idle"——
-  **遮罩等待 30s，超时转后台低频轮询**（2s 间隔、不持遮罩、合并状态到 accounts
-  使账号按钮实时显示「同步中」），完成后刷新数据；洛谷首次全量需数分钟
-  （20 条/页 × 5s 反爬间隔），此机制避免"空数据无提示"假象；
+  （请求序号防竞态，丢弃过期响应）；**同步为纯后台属性，无全局遮罩**：触发后
+  立即转后台低频轮询 `/sync/status`（2s 间隔，状态含 syncProgress 实时合并到
+  accounts——账号按钮与平台页签角标即时反映），全部完成后刷新数据；
+  页面初始化时若发现账号仍在同步（刷新/重开页面），自动接入后台轮询；
+  洛谷首次全量需数分钟（20 条/页 × 5s 反爬间隔），平台视图右栏显示
+  SyncProgressPanel（有总量显示百分比进度环，否则不定态环），期间可自由
+  切换平台页签与使用模板库等其他功能；
 - 平台页签（PlatformTabs）由后端 `/platforms` 返回驱动，前端不硬编码平台清单；
   `types.ts` 的 `PlatformId` 随新平台补充联合类型；
 - **凭据平台 UI**（洛谷）：绑定弹窗按 `auth === 'cookie'` 展开两种方式——
@@ -615,7 +637,9 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
 - **洛谷传输层必须 curl_cffi**：WAF 按 TLS 指纹封 httpx（实测同 IP 同 cookie
   curl 通过、httpx 必被挑战）；换回共享 HttpFetcher 会导致同步全灭（§5.6）；
 - **洛谷状态码 4=MLE / 5=TLE（与直觉相反）**：映射表以官方 `/_lfe/config/auth`
-  常量为准，勿凭记忆改写；14（Unaccepted）→ WA 为对话确认口径（§5.6）；
+  常量为准，勿凭记忆改写；14（Unaccepted）→ UNAC（列表口径结构性无细分，
+  `filterable` 仅 2/12/14 可筛；细分须逐条拉记录详情，成本不可接受，对话确认
+  不做详情级适配），存量 WA 读取时经 `normalize_verdict` 幂等迁移（§3.2/§5.6）；
 - **洛谷 handle = uid，display_name 分离**：用户名可改、uid 稳定；界面显示
   一律 `displayName ?? handle`；
 - **browser-login 凭据不经前端**：service 内存暂存 + bind 消费；Playwright 为
@@ -624,8 +648,13 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
   会话罐吸收即可；若未来失效应答频繁再考虑回写 secrets.json；
 - **同步"拉完才落盘"**：sync 引擎在全部页拉取完成后才 merge_submissions，
   洛谷首次全量（数千条 × 5s 间隔）期间读取端看到的是旧数据/空数据——
-  属预期行为，前端靠"遮罩 30s + 后台轮询 + 账号按钮同步中"呈现进行态
-  （曾因此出现"绑定成功但无数据无提示"的误报，勿回退该机制）；
+  属预期行为，前端靠"后台轮询 + 账号按钮/页签角标/平台视图进度面板"
+  呈现进行态（曾因此出现"绑定成功但无数据无提示"的误报，勿回退该机制；
+  按页落盘 + 断点续传为已排期的后续改造）；
+- **同步进度为可选契约**：`progress_cb(fetched, total)` 只有总量可知的平台
+  （洛谷 records.count）上报；总量未知的平台不报，前端必须兼容不定态；
+- **同步无全局遮罩**：同步是后台属性，进行态只落在账号按钮 / 平台页签
+  黄点角标 / 平台视图右栏进度面板，不得阻塞其他功能（对话确认）。
 - **匿名/两步验证中间态也携带 `__client_id`**：一键登录的完成判定必须
   cookie 出现 + 鉴权探针双重确认，只看 cookie 会在两步验证码账号上提前
   关窗抓走半成品会话（§5.6）；
