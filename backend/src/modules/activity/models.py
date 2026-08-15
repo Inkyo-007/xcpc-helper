@@ -36,12 +36,18 @@ class Account(BaseModel):
 
     handle 为平台内 API 主键（洛谷为 uid 数字），display_name 为展示名
     （洛谷用户名等，仅展示用途，可为空则前端回退显示 handle）。
+
+    注意区分两个时间：last_synced_at 是**数据水位**（已拉取数据新到
+    哪个时刻，用于增量游标），last_sync_ok_at 是**最近一次同步成功的
+    真实时刻**（用于"xx 前同步"展示）——混用会让重启后/同步中的
+    标签显示成数据水龄（如 71 天前最后一次提交被显示为 71 天前同步）。
     """
 
     platform: str
     handle: str
     last_synced_at: int | None = None  # null = 从未同步成功
     display_name: str | None = None  # 展示名（与 API 主键分离）
+    last_sync_ok_at: int | None = None  # 最近一次同步成功时刻（UTC 秒；与游标分离）
 
 
 class Secrets(BaseModel):

@@ -221,9 +221,11 @@ class ActivityService:
             self._current_group, account.platform, account.handle
         )
         last_sync_at = status.last_synced_at
-        if last_sync_at is None and account.last_synced_at:
-            # 重启后内存状态缺失：以档案游标（最近成功同步的数据水位）近似展示
-            last_sync_at = datetime.fromtimestamp(account.last_synced_at).astimezone()
+        if last_sync_at is None and account.last_sync_ok_at:
+            # 内存状态缺失（重启后/同步中）：回退到档案记录的最近同步成功时刻。
+            # 不可用游标 last_synced_at——那是数据水位（数据新到哪），
+            # 会显示成数据水龄（如"71 天前同步"的假象）。
+            last_sync_at = datetime.fromtimestamp(account.last_sync_ok_at).astimezone()
         return BoundAccountOut(
             platform=account.platform,
             handle=account.handle,

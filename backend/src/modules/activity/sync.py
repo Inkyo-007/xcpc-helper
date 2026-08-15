@@ -10,6 +10,7 @@ adapter 拉取 → 领域转换（补 platform / handle）→ store 去重合并
 
 import asyncio
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -156,17 +157,19 @@ class SyncEngine:
             for item in raw
         ]
         store.merge_submissions(platform, handle, submissions)
-        # 游标推进：取最大值防倒退；无新提交时保持原游标（空账号不落 0 游标）
+        # 游标推进：取最大值防倒退；无新提交时保持原游标（空账号不落 0 游标）。
+        # 同步成功时刻（last_sync_ok_at）每次成功都记录——它与数据水位游标
+        # 是两种时间（游标 = 数据新到哪，不是何时同步的），供"xx 前同步"展示。
         new_cursor = max((s.submitted_at for s in submissions), default=0)
-        if new_cursor > (since or 0):
-            store.save_account(
-                Account(
-                    platform=platform,
-                    handle=handle,
-                    last_synced_at=new_cursor,
-                    display_name=account.display_name,  # 游标推进不丢展示名
-                )
+        store.save_account(
+            Account(
+                platform=platform,
+                handle=handle,
+                last_synced_at=max(new_cursor, since or 0) or None,
+                display_name=account.display_name,  # 游标推进不丢展示名
+                last_sync_ok_at=int(time.time()),
             )
+        )
         self._status[(user_id, platform, handle)] = SyncStatus(
             platform=platform,
             handle=handle,

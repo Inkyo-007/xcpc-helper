@@ -1,5 +1,7 @@
 """同步引擎测试：游标推进、去重合并、失败隔离、未绑定防护。"""
 
+import time
+
 import pytest
 
 from adapters.base import (
@@ -110,11 +112,37 @@ async def test_no_new_submissions_keeps_cursor(tmp_path):
         Account(platform="codeforces", handle="demo", last_synced_at=2000)
     )
 
+    before = int(time.time())
     await engine.sync_account(USER, "codeforces", "demo")
 
     assert adapter.calls == [2000]
-    assert store.load_profile().accounts[0].last_synced_at == 2000  # 游标不变
+    account = store.load_profile().accounts[0]
+    assert account.last_synced_at == 2000  # 游标不变
+    # 无新提交也记录本次同步成功时刻（与数据水位游标分离）
+    assert account.last_sync_ok_at is not None
+    assert account.last_sync_ok_at >= before
     assert engine.status_of(USER, "codeforces", "demo").state is SyncState.IDLE
+
+
+async def test_sync_records_ok_time_and_failure_keeps_old(tmp_path):
+    """同步成功写入 last_sync_ok_at；失败保留旧值（供"xx 前同步"回退展示）。"""
+    adapter = FakeAdapter(pages=[[item("1", 1000)]])
+    engine, store = make_engine(tmp_path, adapter)
+    store.save_account(Account(platform="codeforces", handle="demo"))
+
+    before = int(time.time())
+    await engine.sync_account(USER, "codeforces", "demo")
+    account = store.load_profile().accounts[0]
+    assert account.last_synced_at == 1000  # 游标 = 数据水位
+    assert account.last_sync_ok_at is not None
+    assert account.last_sync_ok_at >= before  # 同步时刻 = 真实时间
+
+    adapter.fail_with = PlatformError("平台故障")
+    await engine.sync_account(USER, "codeforces", "demo")
+    account = store.load_profile().accounts[0]
+    assert account.last_sync_ok_at is not None
+    assert account.last_sync_ok_at >= before  # 失败不覆盖上次成功时刻
+    assert account.last_sync_ok_at < int(time.time()) + 2
 
 
 async def test_sync_progress_reported_and_cleared(tmp_path):
