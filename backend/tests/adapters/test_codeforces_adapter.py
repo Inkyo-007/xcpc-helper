@@ -68,6 +68,20 @@ async def test_verify_ok():
     try:
         info = await adapter.verify("ToUrIsT")
         assert info.handle == "tourist"
+        assert info.avatar == "https://userpic.codeforces.org/no-title.jpg"
+    finally:
+        await fetcher.aclose()
+
+
+async def test_verify_falls_back_to_avatar_when_title_photo_missing():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        data = copy.deepcopy(INFO_OK)
+        data["result"][0].pop("titlePhoto", None)
+        return ok_json(data)
+
+    adapter, fetcher = make_adapter(handler)
+    try:
+        info = await adapter.verify("tourist")
         assert info.avatar == "https://userpic.codeforces.org/no-avatar.jpg"
     finally:
         await fetcher.aclose()

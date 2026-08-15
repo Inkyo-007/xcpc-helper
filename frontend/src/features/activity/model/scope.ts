@@ -18,17 +18,11 @@ export function hasAccountForScope(
   return scope === 'all' ? accounts.length > 0 : findPlatformAccount(accounts, scope) !== null
 }
 
-/** 旧数据没有该字段；只有明确为 true 才视为已完成资料回填。 */
-export function needsUserInfoRefresh(
-  accounts: readonly { userInfoReady?: boolean }[],
-): boolean {
-  return accounts.some((account) => account.userInfoReady !== true)
-}
-
-/** 用户自定义头像优先；未设置时单平台视图回退平台头像。 */
+/** 汇总视图使用用户组头像；单平台视图使用当前账号头像。 */
 export function resolveProfileAvatar(
   profileAvatar: string | null | undefined,
-  platformAvatar: string | null | undefined,
+  account: Pick<BoundAccount, 'avatar'> | null,
 ): string | null {
-  return profileAvatar || platformAvatar || null
+  if (account) return account.avatar || null
+  return profileAvatar || null
 }

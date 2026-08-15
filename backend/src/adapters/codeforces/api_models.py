@@ -14,7 +14,7 @@ PlatformError（平台格式异常，不阻断其他账号）。
 增量拉取会把它当作"旧于游标"提前终止，静默丢弃后续新提交。
 """
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class CfEnvelope[T](BaseModel):
@@ -29,7 +29,10 @@ class CfUserInfo(BaseModel):
     """user.info 单个用户（仅解析第一期需要的字段，多余字段忽略）。"""
 
     handle: str
-    avatar: str | None = None
+    avatar: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("titlePhoto", "avatar"),
+    )
 
 
 class CfProblem(BaseModel):

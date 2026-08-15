@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from modules.activity.schemas import (
+    AccountAvatarUpdateIn,
     BindIn,
     BoundAccountOut,
     BrowserLoginStatusOut,
@@ -88,9 +89,17 @@ async def bind_account(payload: BindIn, service: ServiceDep) -> BoundAccountOut:
     return await service.bind(payload)
 
 
-@router.post("/accounts/refresh-info", status_code=204)
-async def refresh_account_info(service: ServiceDep) -> None:
-    await service.refresh_account_info()
+@router.patch(
+    "/accounts/{platform}/{handle}/avatar",
+    response_model=BoundAccountOut,
+)
+async def update_account_avatar(
+    platform: str,
+    handle: str,
+    payload: AccountAvatarUpdateIn,
+    service: ServiceDep,
+) -> BoundAccountOut:
+    return service.update_account_avatar(platform, handle, payload)
 
 
 @router.delete("/accounts/{platform}/{handle}", status_code=204)

@@ -6,10 +6,7 @@
 
 import { computed, ref, watch } from 'vue'
 import * as api from '@/features/activity/api'
-import {
-  findPlatformAccount,
-  needsUserInfoRefresh,
-} from '@/features/activity/model/scope'
+import { findPlatformAccount } from '@/features/activity/model/scope'
 import { useUserGroups } from '@/features/activity/profile'
 import type {
   AccountCredentials,
@@ -64,8 +61,6 @@ const recentEntries = computed<RecentSubmission[]>(() => recentItems.value)
 let overviewReq = 0
 let submissionsReq = 0
 let accountsReq = 0
-/** 每个用户组在当前页面会话最多尝试一次旧账号资料回填，失败也不自动重试。 */
-const userInfoRefreshAttempted = new Set<string>()
 
 async function refreshOverview(): Promise<void> {
   const req = ++overviewReq
@@ -124,38 +119,8 @@ async function fetchAccountsForGroup(groupKey: string): Promise<BoundAccount[] |
   }
 }
 
-function refreshLegacyUserInfoInBackground(
-  groupKey: string,
-  currentAccounts: readonly BoundAccount[],
-): void {
-  if (
-    !groupKey ||
-    userInfoRefreshAttempted.has(groupKey) ||
-    !needsUserInfoRefresh(currentAccounts)
-  ) {
-    return
-  }
-
-  // 调用前即标记，保证接口失败或回填结果仍不完整时也不会形成自动重试循环。
-  userInfoRefreshAttempted.add(groupKey)
-  void (async () => {
-    try {
-      await api.refreshAccountInfo()
-      if (currentKey.value !== groupKey) return
-      await fetchAccountsForGroup(groupKey)
-    } catch {
-      /* 兼容回填不影响首次渲染；本页面会话不再自动重试。 */
-    }
-  })()
-}
-
 async function refreshAccounts(): Promise<void> {
-  const groupKey = currentKey.value
-  const currentAccounts = await fetchAccountsForGroup(groupKey)
-  if (currentAccounts !== null) {
-    // 先展示现有账号，再在后台补齐旧数据的平台头像和规范展示名。
-    refreshLegacyUserInfoInBackground(groupKey, currentAccounts)
-  }
+  await fetchAccountsForGroup(currentKey.value)
 }
 
 async function refreshAll(): Promise<void> {
@@ -311,6 +276,18 @@ async function unbindAccount(platform: PlatformId, handle: string): Promise<void
   await refreshAll()
 }
 
+async function updateAccountAvatar(
+  platform: PlatformId,
+  handle: string,
+  avatar: string,
+): Promise<void> {
+  const updated = await api.updateAccountAvatar(platform, handle, avatar)
+  const account = accounts.value.find(
+    (item) => item.platform === platform && item.handle === handle,
+  )
+  if (account) Object.assign(account, updated)
+}
+
 /** 当前平台绑定的账号（每平台至多一个） */
 function boundOn(platform: PlatformId): BoundAccount | null {
   return findPlatformAccount(accounts.value, platform)
@@ -394,6 +371,7 @@ export function useActivity() {
     syncNow,
     bindAccount,
     unbindAccount,
+    updateAccountAvatar,
     boundOn,
     isBound,
     platformName,

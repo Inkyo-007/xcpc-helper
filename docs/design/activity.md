@@ -34,9 +34,9 @@
 - **用户组 = data/user/<user_id>/ 目录**：多用户组真实隔离（账号绑定、训练数据、
   信息卡），组名即目录名（支持中文），见 §3.1 与 §4.1。
 - **信息卡与组名分离**：信息卡（ID / 签名 / 头像）存组内 `profile.json`，编辑互不影响。
-- **用户组资料与平台身份分层**：汇总视图主名称使用用户组 ID，单平台视图主名称
-  使用 verify 归一后的 canonical handle / display_name；头像与签名在所有视图均保持
-  可编辑，平台 avatar 仅在用户未设自定义头像时作为单平台视图的回退。
+- **用户组资料与平台身份分层**：汇总视图主名称与头像使用用户组 ID / `Profile.avatar`；
+  单平台视图主名称使用 verify 归一后的 canonical handle / display_name，头像使用该账号的
+  `Account.avatar`。签名属于用户组并在所有视图可编辑；上传平台头像只修改当前 Account。
 
 ### 2.2 平台差异适配模式：公共内核 + 平台扩展
 
@@ -95,8 +95,8 @@ backend/data/user/*/   # 用户组运行数据不入库（每个组一个目录�
   "signature": "签名",
   "avatar": "data:image/jpeg;base64,...",   // 头像 data URL 或 null
   "accounts": [
-    { "platform": "codeforces", "handle": "tourist", "avatar": "https://...", "user_info_refreshed_at": 1755..., "last_synced_at": 1755... },
-    { "platform": "luogu", "handle": "1085065", "display_name": "用户名", "avatar": "https://...", "user_info_refreshed_at": 1755..., ... }
+    { "platform": "codeforces", "handle": "tourist", "avatar": "https://...", "last_synced_at": 1755... },
+    { "platform": "luogu", "handle": "1085065", "display_name": "用户名", "avatar": "https://...", ... }
   ]
 }
 ```
@@ -112,22 +112,15 @@ backend/data/user/*/   # 用户组运行数据不入库（每个组一个目录�
   后者 gitignore 永不入 git；解绑/换绑/删除用户组时同步清理（store 层保证）；
 - `handle` 为平台验证接口返回的 **canonical API 主键**，不得保存用户验证前的原始输入
   （Codeforces / AtCoder 保留平台规范大小写；洛谷为 uid 数字，用户名可改而 uid 稳定）；
-  `display_name` 为展示名（如洛谷用户名；旧 CF / AtCoder 兼容回填时也承载 canonical
-  大小写），`avatar` 为验证时的平台账号头像 URL 快照；单平台信息卡的
-  主名称显示 `display_name ?? handle`，平台头像仅作为用户自定义头像的回退；
-- `user_info_refreshed_at` 为可选 UTC 秒级时间戳：新绑定与旧账号资料回填成功时写入；字段缺失/
-  `null` 表示旧 Account 尚未完成兼容回填。就绪与否必须由该字段判断，不能用 avatar 或
-  display_name 是否为空推断（AtCoder 等平台本就可能没有头像）；API 只暴露派生布尔值
-  `userInfoReady`，不要求前端理解迁移时间戳；
+  `display_name` 为展示名（如洛谷用户名），`avatar` 初始为验证时的平台头像 URL，
+  用户上传后替换为本地 512×512 data URL；
+  单平台信息卡主名称显示 `display_name ?? handle`；
 - sync 引擎按 (platform, handle) 从 secrets.json 加载凭据注入 adapter
   （匿名平台为 None）。
 
-- 用户组头像与平台账号头像是两层数据：`Profile.avatar` 为用户本地选择并经前端裁剪的
-  **512×512 JPEG data URL**（信息卡容器约 268px，2 倍超采样防糊；上限 500k 字符），
-  `Account.avatar` 为平台验证回执随账号持久化的 URL（可为空）。信息卡在所有视图都允许
-  更换 `Profile.avatar`；单平台视图按 `Profile.avatar ?? Account.avatar` 选择显示头像。
-  绑定或换绑平台账号不得静默改写 `Profile.avatar`。
-  Profile 的 data URL 内嵌数据，**不依赖原图文件路径**，目录迁移/重命名不受影响。
+- 用户组头像与平台账号头像是独立数据：汇总视图上传写 `Profile.avatar`；单平台视图上传写
+  目标 `Account.avatar`，不得改写 `Profile.avatar` 或其他 Account。本地头像均由前端裁剪为
+  **512×512 JPEG data URL**（单字段上限 500k 字符），不依赖原图文件路径。
 - 信息栏 ID 与组名（目录名）分离：编辑 ID 只改 `profile.json`，重命名组不改变 ID。
 
 ### 3.2 统一提交模型
@@ -185,10 +178,10 @@ ID 不改变组名，重命名组不改变信息卡。
    「立即同步」（汇总视图点击先确认"同步全部平台"，平台视图只同步该平台）、
    「编辑用户组」（仅汇总视图）与账号入口（汇总视图为用户组下拉；平台视图为该平台
    绑定账号按钮，未绑定显示虚线「未绑定账号」）。
-2. **左栏 · 信息卡**：头像与签名始终属于用户组资料，在汇总与单平台视图均允许
-   就地编辑、防抖提交后端。主名称随视图切换：汇总视图显示可编辑的用户组 ID；
-   单平台视图显示只读的 `display_name ?? handle`。用户未设本地头像时，单平台视图
-   回退展示 `Account.avatar`；平台名称不得占用签名/简介位置。
+2. **左栏 · 信息卡**：主名称随视图切换：汇总视图显示可编辑的用户组 ID；单平台视图
+   显示只读的 `display_name ?? handle`。汇总头像读写 `Profile.avatar`；单平台头像读写当前
+   `Account.avatar`，各平台互不覆盖。签名属于用户组，
+   在所有视图共享且可编辑；平台名称不得占用签名/简介位置。
 3. **左栏 · 近期提交**：跨平台合并的最后 200 条提交（后端取历史倒序前 200，
    **不按时间窗口过滤**，近期没做题的账号也能看到最近记录），新在上；每行 verdict
    徽章 + 题号题名（点击跳平台外链）+ 平台 + 时间。每页固定 10 条分页（页码同步网址，
@@ -359,6 +352,9 @@ AdapterError                    # 基类
   `ts < since` 停止；全量拉到覆盖 `full_window_days` 窗口为止、窗口内不足
   `full_min_rows` 条时继续拉满；信封 `_check_envelope` / `_should_retry_envelope`
   （Call limit exceeded 走重试，其余 FAILED 抛 `PlatformError`）。
+- **verify 头像来源**：`user.info` 同时返回缩略图 `avatar` 与个人页大图 `titlePhoto`；
+  账号资料优先保存 `titlePhoto`，缺失时才回退 `avatar`。已完成资料回填的旧账号需重新绑定
+  才会更新头像快照。
 
 ### 5.5 AtCoder 适配器（kenkoooo API，第二期）
 
@@ -488,7 +484,7 @@ backend/src/
 ├─ routers/activity/router.py  # HTTP 边界：只做参数校验与转发，平台无关
 ├─ services/activity/service.py # 门面：用户组/信息卡/账号 CRUD/绑定验证、触发同步、聚合读取
 └─ modules/activity/
-   ├─ models.py                # Submission / Account（含 display_name/avatar/user_info_refreshed_at）/ Profile / Secrets / SyncStatus 领域模型
+   ├─ models.py                # Submission / Account / Profile / Secrets / SyncStatus 领域模型
    ├─ schemas.py               # API 出入参 DTO（camelCase，与前端 types.ts 对齐）
    ├─ store.py                 # data/user/<userid>/ 读写层 + 用户组目录管理 + secrets.json（原子写、锁）
    ├─ sync.py                  # 增量同步引擎：游标推进、去重合并、按组隔离、失败隔离
@@ -508,12 +504,12 @@ backend/src/
 - **用户组**：当前组内存态（默认 `default`，启动惰性创建）；新建自动切换、重命名
   同步目录与当前组、删除物理删除 + 清理该组同步状态、当前组被删回退（至少保留一组）；
 - **信息卡**：读写当前组 `profile.json`（ID 与组名分离，avatar 显式 null 清除、
-  上限 500k 字符）；头像与签名在汇总/单平台视图共用并均可编辑，不从平台
-  绑定隐式回填；
+  上限 500k 字符）；用户组头像只供汇总视图，签名在所有视图共享，不从平台绑定隐式回填；
 - **账号**：绑定（cookie 平台凭据必填并落 secrets.json、换绑删旧含凭据、
   canonical handle / display_name / avatar 随验证回执持久化）、解绑、验证（能力校验 +
-  `credentials` 透传，verify 返回值是账号身份事实来源，bind 不得重新采用原始输入，
-  新绑定直接写 `user_info_refreshed_at`；`UserNotFoundError → 400`、
+  `credentials` 透传，verify 返回值是账号身份事实来源，bind 不得重新采用原始输入）；
+  账号头像更新只修改目标 Account，不影响用户组头像
+  或其他账号；`UserNotFoundError → 400`、
   `AuthExpiredError → 400`、`PlatformError → 502`）；
 - **凭据**：secrets.json 读写清理（store 层）；browser-login 会话编排
   （启动/状态轮询/暂存凭据 10 分钟 TTL，bind 消费，凭据不经前端）；
@@ -541,10 +537,10 @@ backend/src/
 | POST | `/api/activity/current-group` | 切换当前用户组 `{name}` |
 | GET | `/api/activity/profile` | 当前组信息卡（ID / 签名 / 头像） |
 | PATCH | `/api/activity/profile` | 更新信息卡（avatar 显式 null 清除；ID 与组名分离） |
-| GET | `/api/activity/platforms` | 平台元数据（id/名称/capabilities/auth/browserLogin）+ 已绑定账号（含 canonical handle、displayName、avatar、userInfoReady）及同步状态 |
+| GET | `/api/activity/platforms` | 平台元数据（id/名称/capabilities/auth/browserLogin）+ 已绑定账号（含 canonical handle、displayName、avatar）及同步状态 |
 | POST | `/api/activity/accounts/verify` | 校验 `{platform, handle, credentials?}`，返回 `{platform, handle, displayName?, avatar?}`；返回的 handle 是 canonical 值；用户不存在/凭据无效 400，平台故障或 canonical 解析失败 502；cookie 平台凭据必填 |
 | POST | `/api/activity/accounts` | 绑定验证回执 `{platform, handle, displayName?, avatar?, credentials?}`（handle 必须取 verify 回执；换绑删旧；cookie 平台凭据必填或消费 browser-login 暂存），持久化账号资料并自动触发首次同步（201） |
-| POST | `/api/activity/accounts/refresh-info` | 对当前用户组中 `userInfoReady=false` 的旧账号做一次兼容回填；按账号读取已存凭据调用 adapter `verify`，单账号失败只记日志、不改写训练同步状态也不阻断其他账号；完成后 204，前端重新请求 `/platforms` |
+| PATCH | `/api/activity/accounts/{platform}/{handle}/avatar` | 更新该账号头像 `{avatar}`；data URL 上限 500k，不影响用户组与其他平台 |
 | POST | `/api/activity/platforms/{platform}/browser-login` | 启动浏览器一键登录会话（202；仅 cookie 平台且服务端具备 Playwright；单会话互斥） |
 | GET | `/api/activity/platforms/{platform}/browser-login/status` | 登录会话状态（waiting/success/canceled/timeout/error + 成功后回执 handle/displayName/avatar），前端轮询 |
 | DELETE | `/api/activity/accounts/{platform}/{handle}` | 解绑并删除该账号本地数据（204） |
@@ -554,35 +550,6 @@ backend/src/
 | GET | `/api/activity/sync/status` | 各账号同步状态（idle/running/error + 上次结果 + errorCode），前端轮询 |
 
 错误响应统一由全局异常处理器结构化（`{error: {code, message, detail}}`）。
-
-### 6.5 旧 Account 的一次性兼容回填
-
-引入账号头像、canonical 展示资料前保存的 `profile.json` 没有 `Account.avatar` 与
-`user_info_refreshed_at`。Pydantic 模型用可选字段兼容读取，禁止要求用户删除或手改旧数据。
-回填遵循以下约定：
-
-1. `GET /platforms` 将 `user_info_refreshed_at is not None` 派生为 `userInfoReady`；旧账号
-   缺字段时返回 false，新绑定在保存验证回执时直接写时间戳并返回 true；
-2. 前端每个浏览器会话、每个用户组最多后台触发一次 `POST /accounts/refresh-info`：首次
-   拉到任一 `userInfoReady=false` 后异步发起，不阻塞页面初始化、不显示全屏同步遮罩；
-   切换用户组时按组独立判定，完成后刷新账号元数据；同一组本会话失败后不循环重试，
-   下次会话可再次尝试；
-3. 后端只处理当前组内尚未就绪的账号。匿名平台以 `credentials=None` 调 adapter
-   `verify`；cookie 平台按旧 `(platform, handle)` 键从 `secrets.json` 读取已存凭据。
-   service 在外呼前固定当前用户组与 store，避免等待期间切组后写错目录。每个账号独立
-   捕获用户不存在、凭据过期、平台故障与格式错误；一个失败不回滚已成功
-   账号，也不让整个接口失败。失败只记日志，不改写该账号的训练同步状态；
-   失败账号保持未就绪，成功账号补齐最新 avatar /
-   display_name（回执字段为空时保留旧值）并写 `user_info_refreshed_at`；即使平台合法返回的
-   两项都为空也要标记成功，防止每次会话重复外呼；
-4. 兼容回填**一律不迁移身份键**：当 verify 的 canonical handle 与旧 handle 仅大小写不同
-   （`casefold()` 相等）时，保留旧 `Account.handle`、提交文件名、同步状态键与
-   `secrets.json` 凭据键，把 canonical handle 写入 `display_name` 供界面规范展示；平台另有
-   独立 `display_name` 时优先使用平台展示名。非大小写差异的 canonical 返回值不触发
-   自动迁移，也不覆盖为展示名；仍保留旧 handle/数据键，补充 adapter 明确返回的展示名、
-   头像并标记 ready。确需改变身份主键时只能显式换绑，禁止兼容任务猜测并移动用户数据；
-5. 回填只补平台账号快照，不修改汇总视图的 `Profile.id/signature/avatar`，也不触发训练
-   数据同步。后续正常换绑会按新绑定路径保存 canonical handle 并直接进入 ready 状态。
 
 ## 7. 前端落地
 
@@ -596,7 +563,7 @@ frontend/src/features/activity/
 ├─ model/                      # 纯函数层（vitest 覆盖）
 │  ├─ heatmap.ts / heatmap-grid.ts / bars.ts / echarts-theme.ts / pagination.ts / dates.ts
 ├─ components/
-│  ├─ UserProfileCard.vue      # 信息卡（平台主名称 + 共享可编辑头像/签名）
+│  ├─ UserProfileCard.vue      # 信息卡（平台主名称 + 作用域隔离头像 + 共享签名）
 │  ├─ UserGroupMenu.vue        # 用户组下拉（新建 / 切换，按钮显示组名）
 │  ├─ UserGroupEditModal.vue   # 编辑用户组（重命名 / 删除 / 平台账号绑定管理）
 │  ├─ AccountBindModal.vue     # 绑定 / 换绑（cookie 平台：一键登录 + cookie 逐字段输入）
@@ -613,10 +580,6 @@ frontend/src/features/activity/
   **遮罩等待 30s，超时转后台低频轮询**（2s 间隔、不持遮罩、合并状态到 accounts
   使账号按钮实时显示「同步中」），完成后刷新数据；洛谷首次全量需数分钟
   （20 条/页 × 5s 反爬间隔），此机制避免"空数据无提示"假象；
-- 账号列表加载后检查 `userInfoReady`：每个用户组在当前前端会话中至多后台调用一次
-  `/accounts/refresh-info`，调用立即登记组级尝试标记以防并发重复；请求完成后重拉
-  `/platforms` 更新 displayName/avatar/ready。回填失败不弹全屏遮罩、不阻断统计数据，
-  同一组本会话不重试；切到其他组按该组独立检查；
 - 平台页签（PlatformTabs）由后端 `/platforms` 返回驱动，前端不硬编码平台清单；
   `types.ts` 的 `PlatformId` 随新平台补充联合类型；
 - 页面以 `activePlatform` 对应的账号派生四态（未绑定 / 同步中 / 已绑定无提交 /
@@ -634,11 +597,12 @@ frontend/src/features/activity/
 
 - `useUserGroups()`：`groups` / `currentKey` / `createGroup` / `switchGroup` /
   `renameGroup` / `deleteGroup`，全部走后端目录 API；
-- `useProfile()`：信息卡 `profile`（id/签名/头像），编辑防抖 400ms 提交
-  `PATCH /profile`；头像前端裁剪 512px data URL（`fileToAvatar`，JPEG 0.9）；头像与签名
-  在汇总/单平台视图都可展示和编辑；
+- `useProfile()`：用户组信息卡 `profile`（id/签名/汇总头像），编辑防抖 400ms 提交
+  `PATCH /profile`；头像前端裁剪 512px data URL（`fileToAvatar`，JPEG 0.9）；签名在
+  汇总/单平台视图共享且可编辑；
 - 单平台信息卡仅从当前 `BoundAccount` 读取 canonical handle / displayName 作为
-  只读主名称。验证回执的 avatar 随账号持久化，仅在 `Profile.avatar` 未设时作回退；
+  只读主名称；头像读取 `avatar`。单平台上传调用账号头像 API，
+  只更新当前 BoundAccount；汇总上传才更新 `Profile.avatar`；
 
 ### 7.4 能力条件渲染
 
@@ -651,26 +615,21 @@ frontend/src/features/activity/
 - 后端 pytest：`adapters`（net 限流/退避/信封/凭据/单次覆盖、各平台 adapter
   录制 fixture 解析；CF / AtCoder 混合大小写输入必须返回 canonical handle，AtCoder
   页面存在但 canonical 标记缺失必须报平台格式错误）、`store`（原子写/去重合并/
-  组目录管理/损坏容错、旧 Account 缺 avatar/user_info_refreshed_at 的兼容读取、账号
-  display_name/avatar/刷新时间回环）、
+  组目录管理/损坏容错、账号 display_name/avatar 回环）、
   `aggregate`（口径/时区切天/streak）、`sync`（游标推进/失败隔离/按组隔离/
   auth_expired 标记）、`service`（用户组 CRUD/组数据隔离/信息卡/绑定同步、verify 回执的
-  canonical handle/displayName/avatar 持久化且新绑定直接 ready、旧账号 refresh-info 使用
-  已存凭据、单账号失败隔离、空资料也标记 ready、仅大小写变化时保留旧 handle 与数据/
-  凭据键并以 displayName 展示 canonical、其他身份差异也绝不自动迁移、回填不覆盖用户组
-  profile）；
+  canonical handle/displayName/avatar 持久化、平台头像更新只修改目标账号）；
   `ruff check src tests`；
 - 前端 vitest：`model/` 纯函数，其中作用域测试覆盖汇总、当前已绑定平台与
-  其他未绑定平台的判定；旧账号 `userInfoReady=false` 时每用户组会话只后台 refresh
-  一次、全 ready 不请求、切组独立触发、失败不在同会话循环；自定义头像优先/平台头像回退、未绑定
+  其他未绑定平台的判定；汇总头像与各平台账号头像隔离、未绑定
   CTA/同步禁用、绑定确认使用 verify 回执通过 `typecheck`、`build` 与下方手动走查验证；
 - API 契约：起服务后 `curl http://127.0.0.1:8000/api/diagnostics` 正常返回；
 - 手动走查：新建中文组 → 切组 → 先进入未绑定平台确认专属引导 → 用混合大小写绑定
   CF/AtCoder 并确认 canonical 账号资料 → 首次同步中态 → 有数据正常态；另用零提交账号
-  验证“已绑定无提交”态 → 汇总/单平台页均可修改头像与签名，平台名不占简介位置 →
-  组间数据隔离 → 重命名组
-  → 准备一份缺 avatar/刷新时间的旧 profile，确认页面无阻塞回填且原提交/凭据仍可用 →
-  删除组回退 → 明暗主题与色相切换图表跟随 → 断网/平台故障时诊断降级不白屏。
+  验证“已绑定无提交”态 → 分别上传汇总/CF/AtCoder 头像，确认三者互不覆盖且签名仍共享可改，
+  平台名不占简介位置 →
+  组间数据隔离 → 重命名组 → 删除组回退 → 明暗主题与色相切换图表跟随 →
+  断网/平台故障时诊断降级不白屏。
 
 ## 9. 实施顺序（历史）
 
@@ -687,24 +646,19 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
 - **`difficulty: int | str | None`**：保留平台原始难度值（CF 分数 / LC 档位），
   不做跨平台归一；
 - **退避基准 `max(base_backoff, min_interval) × 2^n`**：首次重试错开完整限流窗口；
-- **头像 512px data URL**：data URL 内嵌数据不依赖文件路径，目录迁移/重命名无损；
-  512px 是信息卡 2 倍超采样防糊的决策；
+- **本地头像 512px data URL**：用户组头像与各平台 `Account.avatar` 均内嵌数据，不依赖
+  文件路径，目录迁移/重命名无损；512px 是信息卡 2 倍超采样防糊的决策；
 - **近期提交 = 最后 200 条**（非时间窗口）：近期没做题的账号也能看到最近记录；
 - **平台列表来自后端**：前端页签/绑定下拉不硬编码，新平台只加 `PlatformId` 联合类型；
 - **单平台视图是四态而非“有任意账号/无账号”二态**：状态必须按当前平台账号判定为
   未绑定、同步中、已绑定无提交、正常数据；不得因其他平台已绑定而渲染一套全零图表；
 - **用户组资料与平台身份分层**：汇总页主名称使用可编辑用户组 ID，单平台页主名称
-  使用只读 canonical handle / displayName；头像与签名始终共用用户组资料并可编辑，
-  单平台在未设自定义头像时回退平台头像；平台名称不是简介；
+  使用只读 canonical handle / displayName；签名始终共用用户组资料并可编辑；汇总头像只读写
+  `Profile.avatar`，单平台头像只读写该账号 `Account.avatar`；平台名称不是简介；
 - **账号身份以 verify 回执为准**：Account 持久化 canonical handle、display_name、avatar，
-  bind 与后续同步不得重新使用验证前原始输入；Codeforces 取官方 API handle，AtCoder 从
+  bind 与后续同步不得重新使用验证前原始输入；Codeforces 取官方 API handle，并优先使用
+  `titlePhoto` 大图而非 `avatar` 缩略图；AtCoder 从
   官方用户页解析规范大小写，解析失败必须显式报平台格式错误；
-- **旧账号资料按用户组、按会话惰性回填一次**：`user_info_refreshed_at` 缺失即
-  `userInfoReady=false`，前端后台触发 `/accounts/refresh-info`，后端用旧 handle 对应的
-  已存凭据逐账号 verify；失败隔离且留待下次会话重试，新绑定直接 ready；
-- **兼容回填不迁移旧身份键**：canonical 与旧 handle 仅大小写不同时，保留 Account.handle、
-  提交文件与 secrets 键，仅用 display_name 展示 canonical；非大小写变化时若要采用新的
-  主键必须显式换绑，禁止兼容任务猜测并移动用户数据；
 - **能力方法默认抛 `CapabilityNotSupportedError`**：能力残缺平台不写空壳，
   service 按 capabilities 调用；
 - **用户组删除至少保留一个组**：后端强制，前端按钮禁用联动；

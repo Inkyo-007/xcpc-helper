@@ -95,9 +95,17 @@ export function bindAccount(
   })
 }
 
-/** 为旧绑定账号一次性回填平台规范展示名与头像。 */
-export function refreshAccountInfo(): Promise<void> {
-  return request<void>('/activity/accounts/refresh-info', { method: 'POST' })
+export function updateAccountAvatar(
+  platform: string,
+  handle: string,
+  avatar: string,
+): Promise<BoundAccount> {
+  const path = `/activity/accounts/${encodeURIComponent(platform)}/${encodeURIComponent(handle)}/avatar`
+  return request<BoundAccount>(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ avatar }),
+  })
 }
 
 /** 启动浏览器一键登录会话（202 立即返回；轮询 fetchBrowserLoginStatus） */

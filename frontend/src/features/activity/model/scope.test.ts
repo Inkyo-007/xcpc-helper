@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   findPlatformAccount,
   hasAccountForScope,
-  needsUserInfoRefresh,
   resolveProfileAvatar,
 } from '@/features/activity/model/scope'
 import type { BoundAccount } from '@/features/activity/types'
@@ -12,7 +11,6 @@ const codeforces: BoundAccount = {
   handle: 'tourist',
   displayName: 'tourist',
   avatar: 'https://example.com/avatar.png',
-  userInfoReady: true,
   lastSyncAt: null,
   syncState: 'idle',
 }
@@ -36,21 +34,19 @@ describe('hasAccountForScope', () => {
   })
 })
 
-describe('needsUserInfoRefresh', () => {
-  it('只有全部账号明确完成回填时才跳过', () => {
-    expect(needsUserInfoRefresh([])).toBe(false)
-    expect(needsUserInfoRefresh([{ userInfoReady: true }])).toBe(false)
-    expect(needsUserInfoRefresh([{ userInfoReady: false }])).toBe(true)
-    expect(needsUserInfoRefresh([{}])).toBe(true)
-  })
-})
-
 describe('resolveProfileAvatar', () => {
-  it('自定义头像优先，未设置时才回退平台头像', () => {
-    expect(resolveProfileAvatar('data:image/jpeg;base64,custom', 'https://avatar')).toBe(
-      'data:image/jpeg;base64,custom',
+  it('汇总头像与各平台账号头像互相隔离', () => {
+    const groupAvatar = 'data:image/jpeg;base64,group'
+    const platformAccount = {
+      avatar: 'data:image/jpeg;base64,codeforces',
+    }
+    expect(resolveProfileAvatar(groupAvatar, null)).toBe(groupAvatar)
+    expect(resolveProfileAvatar(groupAvatar, platformAccount)).toBe(
+      'data:image/jpeg;base64,codeforces',
     )
-    expect(resolveProfileAvatar(null, 'https://avatar')).toBe('https://avatar')
-    expect(resolveProfileAvatar(null, null)).toBeNull()
+    expect(resolveProfileAvatar(groupAvatar, { avatar: 'https://atcoder' })).toBe(
+      'https://atcoder',
+    )
+    expect(resolveProfileAvatar(null, { avatar: null })).toBeNull()
   })
 })

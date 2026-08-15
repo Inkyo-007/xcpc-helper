@@ -23,10 +23,8 @@ export interface BoundAccount {
   handle: string
   /** 展示名（洛谷用户名等）；空则界面回退显示 handle */
   displayName?: string | null
-  /** 平台头像；不支持头像的平台或尚未获取时为空 */
+  /** 当前平台账号头像；上传自定义头像后替换为本地 data URL */
   avatar?: string | null
-  /** 平台展示名与头像是否已完成新格式回填 */
-  userInfoReady: boolean
   /** ISO 时间；null 表示从未同步成功 */
   lastSyncAt: string | null
   syncState: 'idle' | 'running' | 'error'

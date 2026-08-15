@@ -157,7 +157,6 @@ class SyncEngine:
                     last_synced_at=new_cursor,
                     display_name=account.display_name,  # 游标推进不丢展示名
                     avatar=account.avatar,  # 游标推进不丢平台头像
-                    user_info_refreshed_at=account.user_info_refreshed_at,
                 )
             )
         self._status[(user_id, platform, handle)] = SyncStatus(

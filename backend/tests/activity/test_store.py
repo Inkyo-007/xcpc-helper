@@ -65,7 +65,6 @@ def test_profile_without_account_avatar_is_backward_compatible(tmp_path):
 
     loaded = make_store(tmp_path).load_profile()
     assert loaded.accounts[0].avatar is None
-    assert loaded.accounts[0].user_info_refreshed_at is None
 
 
 def test_save_account_add_and_update(tmp_path):

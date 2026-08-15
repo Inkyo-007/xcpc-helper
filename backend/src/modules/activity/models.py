@@ -44,7 +44,6 @@ class Account(BaseModel):
     last_synced_at: int | None = None  # null = 从未同步成功
     display_name: str | None = None  # 展示名（与 API 主键分离）
     avatar: str | None = None  # 平台账号头像 URL
-    user_info_refreshed_at: int | None = None
 
 
 class Secrets(BaseModel):

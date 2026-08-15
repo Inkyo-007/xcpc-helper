@@ -1,11 +1,10 @@
 <script setup lang="ts">
-/** 用户信息卡：单平台使用平台账号名，头像与签名始终保持可编辑。 */
-
 import { computed, nextTick, ref } from 'vue'
 import { Camera, PencilLine, UserRound } from 'lucide-vue-next'
 import { NInput, NTooltip, useMessage } from 'naive-ui'
 import { resolveProfileAvatar } from '@/features/activity/model/scope'
 import { fileToAvatar, useProfile } from '@/features/activity/profile'
+import { useActivity } from '@/features/activity/store'
 import type { BoundAccount } from '@/features/activity/types'
 
 const props = withDefaults(
@@ -17,10 +16,11 @@ const props = withDefaults(
 )
 
 const { profile } = useProfile()
+const { updateAccountAvatar } = useActivity()
 const message = useMessage()
 const platformMode = computed(() => props.account !== null)
 const shownAvatar = computed(() =>
-  resolveProfileAvatar(profile.avatar, props.account?.avatar),
+  resolveProfileAvatar(profile.avatar, props.account),
 )
 const shownName = computed(() =>
   props.account ? (props.account.displayName || props.account.handle) : profile.name,
@@ -38,9 +38,14 @@ async function onAvatarChange(event: Event): Promise<void> {
   input.value = ''
   if (!file) return
   try {
-    profile.avatar = await fileToAvatar(file)
-  } catch {
-    message.error('头像读取失败，请换一张图片试试')
+    const avatar = await fileToAvatar(file)
+    if (props.account) {
+      await updateAccountAvatar(props.account.platform, props.account.handle, avatar)
+    } else {
+      profile.avatar = avatar
+    }
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '头像保存失败，请换一张图片试试')
   }
 }
 

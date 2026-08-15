@@ -8,11 +8,12 @@ from pathlib import Path
 
 import httpx
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from adapters.base import (
     BrowserLoginCancelledError,
     Credentials,
-    PlatformError,
     UserInfo,
 )
 from adapters.net import HttpFetcher
@@ -22,16 +23,19 @@ from core.exceptions import (
     BadRequestError,
     ConflictError,
     NotFoundError,
+    register_exception_handlers,
 )
 from modules.activity.models import Account
 from modules.activity.schemas import (
+    AccountAvatarUpdateIn,
     BindIn,
     GroupCreateIn,
     GroupRenameIn,
     ProfileUpdateIn,
     VerifyIn,
 )
-from services.activity.service import ActivityService
+from routers.activity.router import router as activity_router
+from services.activity.service import ActivityService, get_activity_service
 
 FIXTURES = Path(__file__).resolve().parents[1] / "adapters" / "fixtures"
 INFO_OK = json.loads((FIXTURES / "cf_user_info_ok.json").read_text(encoding="utf-8"))
@@ -161,7 +165,6 @@ async def test_bind_triggers_first_sync(service: ActivityService):
     out = await service.bind(BindIn(platform="codeforces", handle="demo"))
     assert out.platform == "codeforces"
     assert out.handle == "demo"
-    assert out.userInfoReady is True
 
     statuses = await wait_sync_done(service)
     acc = next(a for a in statuses if a.handle == "demo")
@@ -200,7 +203,6 @@ async def test_bind_persists_user_info(service: ActivityService):
     assert meta.account is not None
     assert meta.account.handle == "tourist"
     assert meta.account.avatar == receipt.avatar
-    assert meta.account.userInfoReady is True
 
     # 平台账号资料与用户组信息卡分离，绑定不应改写后者。
     profile = service.current_profile()
@@ -208,57 +210,79 @@ async def test_bind_persists_user_info(service: ActivityService):
     assert profile.avatar is None
 
 
-async def test_refresh_account_info_backfills_legacy_account(
+async def test_account_avatar_isolated_by_platform(
     service: ActivityService,
 ):
-    """旧账号保留原 handle/文件键，只用 canonical handle 补展示名。"""
     store = service._store()
-    store.save_account(Account(platform="codeforces", handle="ToUrIsT"))
+    store.save_account(
+        Account(
+            platform="codeforces",
+            handle="tourist",
+            avatar="https://example.com/cf.png",
+        )
+    )
+    store.save_account(
+        Account(
+            platform="atcoder",
+            handle="chokudai",
+            avatar="https://example.com/atcoder.png",
+        )
+    )
 
-    await service.refresh_account_info()
+    custom = "data:image/jpeg;base64,codeforces-custom"
+    out = service.update_account_avatar(
+        "codeforces",
+        "tourist",
+        AccountAvatarUpdateIn(avatar=custom),
+    )
 
-    account = store.load_profile().accounts[0]
-    assert account.handle == "ToUrIsT"
-    assert account.display_name == "tourist"
-    assert account.avatar == "https://userpic.codeforces.org/no-avatar.jpg"
-    assert account.user_info_refreshed_at is not None
-    meta = next(p for p in service.platforms().platforms if p.id == "codeforces")
-    assert meta.account is not None
-    assert meta.account.userInfoReady is True
-
-
-async def test_refresh_account_info_isolates_adapter_failure(
-    service: ActivityService, monkeypatch: pytest.MonkeyPatch
-):
-    store = service._store()
-    store.save_account(Account(platform="codeforces", handle="broken"))
-    store.save_account(Account(platform="atcoder", handle="AtUser"))
-    credentials = Credentials(cookies={"session": "legacy"})
-    store.save_account_secrets("atcoder", "AtUser", credentials)
-
-    async def fail_verify(handle: str, credentials: Credentials | None):
-        raise PlatformError("Codeforces 暂时不可用")
-
-    async def ok_verify(handle: str, received: Credentials | None):
-        assert handle == "AtUser"
-        assert received == credentials
-        return UserInfo(handle="atuser", avatar="https://example.com/avatar.png")
-
-    monkeypatch.setattr(service._adapters["codeforces"], "verify", fail_verify)
-    monkeypatch.setattr(service._adapters["atcoder"], "verify", ok_verify)
-
-    await service.refresh_account_info()
-
+    assert out.avatar == custom
     accounts = {
         account.platform: account for account in store.load_profile().accounts
     }
-    assert accounts["codeforces"].user_info_refreshed_at is None
-    assert accounts["atcoder"].user_info_refreshed_at is not None
-    assert accounts["atcoder"].handle == "AtUser"
-    assert accounts["atcoder"].display_name == "atuser"
-    assert accounts["atcoder"].avatar == "https://example.com/avatar.png"
-    # 资料回填与训练同步是两条链路；失败不得污染同步状态。
-    assert service._engine.status_of("default", "codeforces", "broken").error is None
+    assert accounts["codeforces"].avatar == custom
+    assert accounts["atcoder"].avatar == "https://example.com/atcoder.png"
+    assert service.current_profile().avatar is None
+
+
+async def test_account_avatar_validates_target_and_size(
+    service: ActivityService,
+):
+    with pytest.raises(NotFoundError):
+        service.update_account_avatar(
+            "codeforces",
+            "ghost",
+            AccountAvatarUpdateIn(avatar="data:image/jpeg;base64,x"),
+        )
+    with pytest.raises(BadRequestError, match="头像文件过大"):
+        service.update_account_avatar(
+            "codeforces",
+            "ghost",
+            AccountAvatarUpdateIn(avatar="x" * 500_001),
+        )
+
+
+async def test_account_avatar_route(service: ActivityService):
+    service._store().save_account(
+        Account(
+            platform="codeforces",
+            handle="tourist",
+            avatar="https://example.com/platform.png",
+        )
+    )
+    app = FastAPI()
+    register_exception_handlers(app)
+    app.include_router(activity_router)
+    app.dependency_overrides[get_activity_service] = lambda: service
+
+    with TestClient(app) as client:
+        response = client.patch(
+            "/api/activity/accounts/codeforces/tourist/avatar",
+            json={"avatar": "data:image/jpeg;base64,custom"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["avatar"] == "data:image/jpeg;base64,custom"
 
 
 async def test_bind_rebind_replaces_account(service: ActivityService):
