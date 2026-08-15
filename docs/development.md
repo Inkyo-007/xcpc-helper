@@ -15,6 +15,7 @@
 
 ```
 xcpc-helper/
+├── Makefile                # 环境准备与启动的统一命令入口
 ├── desktop.py              # 桌面模式入口（pywebview + 自动拉起后端）
 ├── docs/                   # 需求与设计文档
 ├── frontend/               # 前端（Vue 3 + Vite）
@@ -49,6 +50,19 @@ xcpc-helper/
 - Python 3.12+ 与 [uv](https://docs.astral.sh/uv/)
 
 也可以直接运行环境搭建脚本一键完成依赖安装与前端构建：Windows 用 `scripts/dev.ps1`，Linux/macOS 用 `scripts/dev.sh`。
+
+### Makefile 统一入口
+
+安装了 GNU Make 时，可在仓库根目录通过 Makefile 统一执行常用工作流；原有的 PowerShell、Shell 与批处理脚本仍然保留。
+
+```bash
+make setup            # 安装依赖并构建前端
+make start            # 启动浏览器模式
+make setup-desktop    # 安装桌面依赖并构建前端
+make desktop          # 启动桌面模式
+```
+
+四个目标分别对应 README 中源码部署与桌面模式的准备、启动步骤。服务地址可通过变量覆盖，例如 `make start HOST=0.0.0.0 PORT=9000`。
 
 ### 方式一：本地服务（推荐）
 
