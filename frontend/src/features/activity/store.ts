@@ -30,9 +30,9 @@ const selectedDate = ref<string | null>(null)
 const recentPage = ref(1)
 /** 当日明细列表的分页页码（从 1 起；与近期提交各自独立，切换日期时重置） */
 const dayPage = ref(1)
-const syncing = ref(false)
-/** 绑定或同步进行中（驱动全屏加载遮罩，背景不可操作） */
-const busy = ref(false)
+/** 任一账号同步中（驱动同步按钮转圈 / 平台页签角标 / 平台视图进度面板；
+ * 同步为纯后台属性，不再有全局遮罩） */
+const syncing = computed(() => accounts.value.some((a) => a.syncState === 'running'))
 const initialized = ref(false)
 
 const overviewData = ref<api.ApiOverviewResponse | null>(null)
@@ -109,19 +109,7 @@ async function refreshAll(): Promise<void> {
   await Promise.all([refreshAccounts(), refreshOverview(), refreshSubmissions()])
 }
 
-/** 轮询同步状态直到全部账号不再同步中（失败亦视为结束）。
- * 返回 true = 已全部结束；false = 超时仍在跑（洛古首次全量需数分钟）。 */
-async function pollUntilIdle(timeoutMs = 30_000): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const statuses = await api.fetchSyncStatus()
-    if (statuses.every((s) => s.syncState !== 'running')) return true
-    await new Promise((r) => setTimeout(r, 300))
-  }
-  return false
-}
-
-/** 把 /sync/status 的运行态合并进 accounts（同步中/错误实时可见） */
+/** 把 /sync/status 的运行态合并进 accounts（同步中/进度/错误实时可见） */
 function mergeSyncStatuses(statuses: BoundAccount[]): void {
   for (const s of statuses) {
     const acc = accounts.value.find(
@@ -132,9 +120,8 @@ function mergeSyncStatuses(statuses: BoundAccount[]): void {
   }
 }
 
-/** 后台低频轮询（不持遮罩）：同步结束后刷新数据并呈现最终状态。
- * 用于首次全量同步超过遮罩等待时长的场景（洛古约数分钟）——
- * 避免"数据为空且无提示"被误判为失败。 */
+/** 后台低频轮询：状态（含 syncProgress）实时合并到 accounts，账号按钮 /
+ * 平台页签角标 / 平台视图进度面板即时反映；全部完成后刷新数据。 */
 let bgPolling = false
 function pollInBackground(): void {
   if (bgPolling) return
@@ -164,6 +151,8 @@ function init(): void {
   void (async () => {
     await ensureLoaded() // 用户组列表 + 当前组 + 信息卡
     await refreshAll()
+    // 页面刷新/重开时若有账号仍在同步（服务端任务存活），接入后台轮询
+    if (syncing.value) pollInBackground()
   })()
 }
 
@@ -200,42 +189,23 @@ function setListPage(page: number): void {
 
 /* ---------- 动作 ---------- */
 
-/** 立即同步全部账号（或当前平台视图的账号），完成后刷新数据。
- * 遮罩等待 30s；超时仍在跑则转后台轮询（完成后再刷新），不卡页面。 */
+/** 立即同步全部账号（或当前平台视图的账号）：后台执行，轮询至完成后刷新。
+ * 引擎按账号串行去重，重复触发安全。 */
 async function syncNow(): Promise<void> {
-  if (syncing.value) return
-  syncing.value = true
-  busy.value = true
-  try {
-    await api.triggerSync(activePlatform.value === 'all' ? undefined : activePlatform.value)
-    if (await pollUntilIdle()) await refreshAll()
-    else pollInBackground()
-  } finally {
-    syncing.value = false
-    busy.value = false
-  }
+  await api.triggerSync(activePlatform.value === 'all' ? undefined : activePlatform.value)
+  pollInBackground()
 }
 
-/** 绑定（或换绑）账号：后端自动触发首次同步，等待完成后刷新数据；
- * cookie 平台携带凭据（手动粘贴）或留空（消费一键登录暂存凭据）。
- * 返回 true = 首次同步已完成；false = 仍在后台进行（转后台轮询）。 */
+/** 绑定（或换绑）账号：后端自动触发首次同步（后台执行，进度实时可见）；
+ * cookie 平台携带凭据（手动输入）或留空（消费一键登录暂存凭据）。 */
 async function bindAccount(
   platform: PlatformId,
   handle: string,
   opts: { displayName?: string | null; credentials?: AccountCredentials } = {},
-): Promise<boolean> {
-  busy.value = true
-  try {
-    await api.bindAccount(platform, handle, opts)
-    if (await pollUntilIdle()) {
-      await refreshAll()
-      return true
-    }
-    pollInBackground()
-    return false
-  } finally {
-    busy.value = false
-  }
+): Promise<void> {
+  await api.bindAccount(platform, handle, opts)
+  await refreshAccounts() // 新账号（含同步进行态）立即可见
+  pollInBackground()
 }
 
 /** 解绑并删除该账号本地数据 */
@@ -305,7 +275,6 @@ export function useActivity() {
     selectedDate,
     listPage,
     syncing,
-    busy,
     initialized,
     mergedDaily,
     totals,

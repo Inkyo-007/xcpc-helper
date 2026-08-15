@@ -13,7 +13,7 @@ import PlatformTabs from '@/features/activity/components/PlatformTabs.vue'
 import StatCards from '@/features/activity/components/StatCards.vue'
 import SubmissionList from '@/features/activity/components/SubmissionList.vue'
 import SyncBar from '@/features/activity/components/SyncBar.vue'
-import SyncOverlay from '@/features/activity/components/SyncOverlay.vue'
+import SyncProgressPanel from '@/features/activity/components/SyncProgressPanel.vue'
 import UserGroupEditModal from '@/features/activity/components/UserGroupEditModal.vue'
 import UserProfileCard from '@/features/activity/components/UserProfileCard.vue'
 import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
@@ -28,7 +28,6 @@ const {
   selectedDate,
   listPage,
   syncing,
-  busy,
   mergedDaily,
   totals,
   entries,
@@ -43,6 +42,8 @@ const {
   bindAccount,
   unbindAccount,
   boundOn,
+  platformName,
+  accountLabel,
 } = useActivity()
 
 const message = useMessage()
@@ -54,6 +55,13 @@ const showGroupEdit = ref(false)
 
 const weeklyBars = computed(() => weeklySolved(mergedDaily.value))
 const monthlyBars = computed(() => monthlySolved(mergedDaily.value))
+
+/** 平台视图下该平台账号（每平台至多一个） */
+const activeAccount = computed(() =>
+  activePlatform.value === 'all' ? null : boundOn(activePlatform.value),
+)
+/** 平台视图且该平台同步中：右栏替换为进度面板（不影响其他视图与功能） */
+const platformSyncing = computed(() => activeAccount.value?.syncState === 'running')
 
 /* ---------- 网址状态同步：?platform=<平台>&date=<日期>&page=<页码> ----------
  * all、无选中日期与第 1 页为缺省值，不出现在网址中；切换平台重置日期
@@ -155,17 +163,13 @@ async function onBind(
 ): Promise<void> {
   const rebinding = boundOn(platform) !== null
   try {
-    const finished = await bindAccount(platform, handle, opts)
-    if (finished) {
-      message.success(rebinding ? '换绑成功，已重新同步' : '绑定成功，已完成首次同步')
-    } else {
-      // 首次同步仍在后台进行（洛古全量约数分钟），状态在账号区实时可见
-      message.success(
-        rebinding
-          ? '换绑成功，正在后台同步数据'
-          : '绑定成功，首次同步进行中（数据量较大时可能需要几分钟）',
-      )
-    }
+    await bindAccount(platform, handle, opts)
+    // 同步为后台属性：平台页签角标与平台视图进度面板实时呈现进度
+    message.success(
+      rebinding
+        ? '换绑成功，正在后台同步数据'
+        : '绑定成功，首次同步进行中（可在平台页签查看进度）',
+    )
   } catch (e) {
     message.error(e instanceof Error ? e.message : '绑定失败，请稍后重试')
   }
@@ -213,7 +217,16 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
         </section>
       </aside>
 
-      <div class="act-main">
+      <div v-if="platformSyncing" class="act-main">
+        <section class="act-panel act-syncing">
+          <SyncProgressPanel
+            :platform-name="platformName(activePlatform as PlatformId)"
+            :progress="activeAccount?.syncProgress"
+            :account="activeAccount ? accountLabel(activeAccount) : undefined"
+          />
+        </section>
+      </div>
+      <div v-else class="act-main">
         <StatCards :totals="totals" />
 
         <section class="act-panel">
@@ -273,7 +286,6 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
       @bind="openBind"
       @unbind="onUnbind"
     />
-    <SyncOverlay :show="busy" />
   </div>
 </template>
 
@@ -322,6 +334,13 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.act-syncing {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .act-charts {

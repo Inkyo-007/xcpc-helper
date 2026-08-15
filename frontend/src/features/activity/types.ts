@@ -30,6 +30,8 @@ export interface BoundAccount {
   syncError?: string
   /** 结构化错误码；auth_expired = 凭据过期，引导重新授权 */
   syncErrorCode?: string | null
+  /** 同步进度 0~1；null/缺省 = 总量未知（不定态） */
+  syncProgress?: number | null
 }
 
 /** 单日聚合（后端按本地时区切天后返回） */
@@ -55,8 +57,9 @@ export interface OverviewData {
   daily: DayActivity[]
 }
 
-/** 评测结果；JG = 评测中（如 Codeforces 的 SUBMITTED / TESTING） */
-export type Verdict = 'AC' | 'WA' | 'CE' | 'RE' | 'TLE' | 'MLE' | 'OLE' | 'UKE' | 'JG'
+/** 评测结果；JG = 评测中（如 Codeforces 的 SUBMITTED / TESTING）；
+ * UNAC = 未通过但细分未知（洛谷记录列表口径只有 AC/CE/Unaccepted） */
+export type Verdict = 'AC' | 'WA' | 'CE' | 'RE' | 'TLE' | 'MLE' | 'OLE' | 'UKE' | 'JG' | 'UNAC'
 
 export interface SubmissionEntry {
   id: string

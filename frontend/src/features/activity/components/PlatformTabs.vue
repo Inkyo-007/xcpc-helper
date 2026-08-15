@@ -1,7 +1,10 @@
 <script setup lang="ts">
 /** 汇总 / 单平台分段切换器：汇总 + 全部支持平台（来自后端平台注册表，
- * 与是否绑定无关；未绑定平台的视图用于引导绑定 / 换绑）。 */
+ * 与是否绑定无关；未绑定平台的视图用于引导绑定 / 换绑）。
+ * 某平台账号同步中时，其页签文本右上角显示黄色圆点角标（不进入
+ * 该平台页也可知悉；同步为后台属性，见 activity.md §7.2）。 */
 
+import { computed } from 'vue'
 import { LayoutGrid } from 'lucide-vue-next'
 import { useActivity } from '@/features/activity/store'
 import type { PlatformScope } from '@/features/activity/store'
@@ -14,7 +17,12 @@ const emit = defineEmits<{
   'update:modelValue': [value: PlatformScope]
 }>()
 
-const { platforms } = useActivity()
+const { platforms, accounts } = useActivity()
+
+/** 正在同步的平台 id 集合（页签黄点角标） */
+const syncingIds = computed(
+  () => new Set(accounts.value.filter((a) => a.syncState === 'running').map((a) => a.platform)),
+)
 </script>
 
 <template>
@@ -40,7 +48,10 @@ const { platforms } = useActivity()
       :aria-selected="modelValue === p.id"
       @click="emit('update:modelValue', p.id)"
     >
-      {{ p.name }}
+      <span class="tab-label">
+        {{ p.name }}
+        <i v-if="syncingIds.has(p.id)" class="tab-dot" title="正在同步" />
+      </span>
     </button>
   </div>
 </template>
@@ -81,5 +92,36 @@ const { platforms } = useActivity()
   background: var(--accent-soft);
   color: var(--accent-strong);
   animation: chip-pop 0.3s cubic-bezier(0.2, 0.8, 0.3, 1.2);
+}
+
+.tab-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 同步中角标：文本右上角黄色圆点，轻呼吸提示 */
+.tab-dot {
+  position: absolute;
+  top: -3px;
+  right: -8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #eab308;
+  box-shadow: 0 0 0 2px var(--surface);
+  animation: dot-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
 }
 </style>
