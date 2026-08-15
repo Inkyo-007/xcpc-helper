@@ -88,6 +88,11 @@ async def bind_account(payload: BindIn, service: ServiceDep) -> BoundAccountOut:
     return await service.bind(payload)
 
 
+@router.post("/accounts/refresh-info", status_code=204)
+async def refresh_account_info(service: ServiceDep) -> None:
+    await service.refresh_account_info()
+
+
 @router.delete("/accounts/{platform}/{handle}", status_code=204)
 async def unbind_account(
     platform: str, handle: str, service: ServiceDep

@@ -47,7 +47,11 @@ const emit = defineEmits<{
   bind: [
     platform: PlatformId,
     handle: string,
-    opts: { displayName?: string | null; credentials?: AccountCredentials },
+    opts: {
+      displayName?: string | null
+      avatar?: string | null
+      credentials?: AccountCredentials
+    },
   ]
 }>()
 
@@ -202,6 +206,7 @@ function confirm(): void {
   if (!receipt.value) return
   emit('bind', platform.value, receipt.value.handle, {
     displayName: receipt.value.displayName,
+    avatar: receipt.value.avatar,
     // 一键登录的凭据由后端暂存消费；手动输入路径携带逐字段凭据
     credentials: receiptFromLogin.value ? undefined : (parsedCredentials.value ?? undefined),
   })
@@ -298,7 +303,10 @@ const receiptLabel = computed(() =>
 
       <p v-if="errorText" class="bind-error">{{ errorText }}</p>
       <div v-if="receipt" class="bind-receipt">
-        <span class="receipt-avatar">{{ receiptLabel.slice(0, 1).toUpperCase() }}</span>
+        <span class="receipt-avatar">
+          <img v-if="receipt.avatar" :src="receipt.avatar" alt="平台头像" />
+          <template v-else>{{ receiptLabel.slice(0, 1).toUpperCase() }}</template>
+        </span>
         <div class="receipt-body">
           <div class="receipt-handle mono">{{ receiptLabel }}</div>
           <div class="receipt-meta mono">
@@ -456,6 +464,14 @@ const receiptLabel = computed(() =>
   color: var(--on-accent);
   font-weight: 700;
   font-size: 14px;
+  overflow: hidden;
+}
+
+.receipt-avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .receipt-body {

@@ -9,6 +9,10 @@ import { computed, ref } from 'vue'
 import { Link2, Plus, RefreshCw, TriangleAlert, UserRoundPen } from 'lucide-vue-next'
 import { NButton, NModal, NTooltip } from 'naive-ui'
 import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
+import {
+  findPlatformAccount,
+  hasAccountForScope,
+} from '@/features/activity/model/scope'
 import { accountLabel } from '@/features/activity/store'
 import type { PlatformScope } from '@/features/activity/store'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
@@ -29,8 +33,12 @@ const emit = defineEmits<{
 /** 平台视图下当前平台绑定的账号（每平台至多一个） */
 const platformAccount = computed<BoundAccount | null>(() => {
   if (props.activePlatform === 'all') return null
-  return props.accounts.find((a) => a.platform === props.activePlatform) ?? null
+  return findPlatformAccount(props.accounts, props.activePlatform)
 })
+
+const syncDisabled = computed(
+  () => props.syncing || !hasAccountForScope(props.accounts, props.activePlatform),
+)
 
 /** 凭据过期（auth_expired）：账号按钮警示态，点击重新授权（走换绑路径） */
 const authExpired = computed(
@@ -64,7 +72,7 @@ function confirmSyncAll(): void {
           type="button"
           class="tool-icon-btn"
           :class="{ spinning: syncing }"
-          :disabled="syncing || accounts.length === 0"
+          :disabled="syncDisabled"
           aria-label="立即同步"
           @click="onSyncClick"
         >

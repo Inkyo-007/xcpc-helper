@@ -28,7 +28,7 @@ class CfEnvelope[T](BaseModel):
 class CfUserInfo(BaseModel):
     """user.info 单个用户（仅解析第一期需要的字段，多余字段忽略）。"""
 
-    handle: str = ""
+    handle: str
     avatar: str | None = None
 
 

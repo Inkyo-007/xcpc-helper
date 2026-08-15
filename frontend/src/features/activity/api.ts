@@ -76,7 +76,11 @@ export function verifyAccount(
 export function bindAccount(
   platform: string,
   handle: string,
-  opts: { displayName?: string | null; credentials?: AccountCredentials } = {},
+  opts: {
+    displayName?: string | null
+    avatar?: string | null
+    credentials?: AccountCredentials
+  } = {},
 ): Promise<BoundAccount> {
   return request<BoundAccount>('/activity/accounts', {
     method: 'POST',
@@ -85,9 +89,15 @@ export function bindAccount(
       platform,
       handle,
       ...(opts.displayName ? { displayName: opts.displayName } : {}),
+      ...(opts.avatar ? { avatar: opts.avatar } : {}),
       ...(opts.credentials ? { credentials: opts.credentials } : {}),
     }),
   })
+}
+
+/** 为旧绑定账号一次性回填平台规范展示名与头像。 */
+export function refreshAccountInfo(): Promise<void> {
+  return request<void>('/activity/accounts/refresh-info', { method: 'POST' })
 }
 
 /** 启动浏览器一键登录会话（202 立即返回；轮询 fetchBrowserLoginStatus） */

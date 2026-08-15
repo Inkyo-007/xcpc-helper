@@ -9,7 +9,12 @@ from pathlib import Path
 import httpx
 import pytest
 
-from adapters.base import BrowserLoginCancelledError, Credentials, UserInfo
+from adapters.base import (
+    BrowserLoginCancelledError,
+    Credentials,
+    PlatformError,
+    UserInfo,
+)
 from adapters.net import HttpFetcher
 from core.config import Settings
 from core.exceptions import (
@@ -18,6 +23,7 @@ from core.exceptions import (
     ConflictError,
     NotFoundError,
 )
+from modules.activity.models import Account
 from modules.activity.schemas import (
     BindIn,
     GroupCreateIn,
@@ -97,7 +103,7 @@ async def test_platforms_empty(service: ActivityService):
 
 
 async def test_verify_ok(service: ActivityService):
-    out = await service.verify(VerifyIn(platform="codeforces", handle="tourist"))
+    out = await service.verify(VerifyIn(platform="codeforces", handle="ToUrIsT"))
     assert out.handle == "tourist"
     assert out.avatar
 
@@ -155,6 +161,7 @@ async def test_bind_triggers_first_sync(service: ActivityService):
     out = await service.bind(BindIn(platform="codeforces", handle="demo"))
     assert out.platform == "codeforces"
     assert out.handle == "demo"
+    assert out.userInfoReady is True
 
     statuses = await wait_sync_done(service)
     acc = next(a for a in statuses if a.handle == "demo")
@@ -168,16 +175,90 @@ async def test_bind_triggers_first_sync(service: ActivityService):
     assert overview.daily[-1].submissions == 2
 
 
-async def test_bind_persists_display_name(service: ActivityService):
-    """绑定携带展示名：随账号持久化并在 platforms/同步状态透出。"""
-    out = await service.bind(
-        BindIn(platform="codeforces", handle="demo", displayName="演示账号")
+async def test_bind_persists_user_info(service: ActivityService):
+    """验证回执中的规范用户名与头像在绑定、同步和重载后不丢失。"""
+    receipt = await service.verify(
+        VerifyIn(platform="codeforces", handle="ToUrIsT")
     )
-    assert out.displayName == "演示账号"
+    out = await service.bind(
+        BindIn(
+            platform=receipt.platform,
+            handle=receipt.handle,
+            displayName=receipt.displayName,
+            avatar=receipt.avatar,
+        )
+    )
+    assert out.handle == "tourist"
+    assert out.avatar == receipt.avatar
     await wait_sync_done(service)
+
+    # 从 profile.json 重新读取，覆盖 Account 默认值兼容与同步游标推进链路。
+    stored = service._store().load_profile().accounts[0]
+    assert stored.handle == "tourist"
+    assert stored.avatar == receipt.avatar
     meta = next(p for p in service.platforms().platforms if p.id == "codeforces")
     assert meta.account is not None
-    assert meta.account.displayName == "演示账号"
+    assert meta.account.handle == "tourist"
+    assert meta.account.avatar == receipt.avatar
+    assert meta.account.userInfoReady is True
+
+    # 平台账号资料与用户组信息卡分离，绑定不应改写后者。
+    profile = service.current_profile()
+    assert profile.id == "default"
+    assert profile.avatar is None
+
+
+async def test_refresh_account_info_backfills_legacy_account(
+    service: ActivityService,
+):
+    """旧账号保留原 handle/文件键，只用 canonical handle 补展示名。"""
+    store = service._store()
+    store.save_account(Account(platform="codeforces", handle="ToUrIsT"))
+
+    await service.refresh_account_info()
+
+    account = store.load_profile().accounts[0]
+    assert account.handle == "ToUrIsT"
+    assert account.display_name == "tourist"
+    assert account.avatar == "https://userpic.codeforces.org/no-avatar.jpg"
+    assert account.user_info_refreshed_at is not None
+    meta = next(p for p in service.platforms().platforms if p.id == "codeforces")
+    assert meta.account is not None
+    assert meta.account.userInfoReady is True
+
+
+async def test_refresh_account_info_isolates_adapter_failure(
+    service: ActivityService, monkeypatch: pytest.MonkeyPatch
+):
+    store = service._store()
+    store.save_account(Account(platform="codeforces", handle="broken"))
+    store.save_account(Account(platform="atcoder", handle="AtUser"))
+    credentials = Credentials(cookies={"session": "legacy"})
+    store.save_account_secrets("atcoder", "AtUser", credentials)
+
+    async def fail_verify(handle: str, credentials: Credentials | None):
+        raise PlatformError("Codeforces 暂时不可用")
+
+    async def ok_verify(handle: str, received: Credentials | None):
+        assert handle == "AtUser"
+        assert received == credentials
+        return UserInfo(handle="atuser", avatar="https://example.com/avatar.png")
+
+    monkeypatch.setattr(service._adapters["codeforces"], "verify", fail_verify)
+    monkeypatch.setattr(service._adapters["atcoder"], "verify", ok_verify)
+
+    await service.refresh_account_info()
+
+    accounts = {
+        account.platform: account for account in store.load_profile().accounts
+    }
+    assert accounts["codeforces"].user_info_refreshed_at is None
+    assert accounts["atcoder"].user_info_refreshed_at is not None
+    assert accounts["atcoder"].handle == "AtUser"
+    assert accounts["atcoder"].display_name == "atuser"
+    assert accounts["atcoder"].avatar == "https://example.com/avatar.png"
+    # 资料回填与训练同步是两条链路；失败不得污染同步状态。
+    assert service._engine.status_of("default", "codeforces", "broken").error is None
 
 
 async def test_bind_rebind_replaces_account(service: ActivityService):
@@ -468,17 +549,30 @@ async def wait_login_state(service: ActivityService, state: str, timeout: float 
 
 async def test_browser_login_success_and_bind_consumes_stash(service: ActivityService):
     """一键登录成功：回执透出 + 凭据暂存，bind 无显式凭据时消费暂存并落 secrets。"""
+    avatar = "https://cdn.luogu.com.cn/upload/usericon/100000.png"
     stub_luogu(
         service,
-        login_result=(LUOGU_CREDS, UserInfo(handle="100000", display_name="demo_user")),
+        login_result=(
+            LUOGU_CREDS,
+            UserInfo(handle="100000", display_name="demo_user", avatar=avatar),
+        ),
     )
     await service.start_browser_login("luogu")
     status = await wait_login_state(service, "success")
     assert status.handle == "100000"
     assert status.displayName == "demo_user"
+    assert status.avatar == avatar
 
-    out = await service.bind(BindIn(platform="luogu", handle="100000", displayName="demo_user"))
+    out = await service.bind(
+        BindIn(
+            platform="luogu",
+            handle=status.handle,
+            displayName=status.displayName,
+            avatar=status.avatar,
+        )
+    )
     assert out.displayName == "demo_user"
+    assert out.avatar == avatar
     # 凭据已落 secrets.json（sync 将使用）
     stored = service._store().get_account_credentials("luogu", "100000")
     assert stored is not None

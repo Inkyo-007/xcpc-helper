@@ -89,14 +89,29 @@ async def fetch(adapter, since=None, min_rows=FULL_MIN_ROWS):
 async def test_verify_ok():
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.host == "atcoder.jp"
-        assert request.url.path == "/users/chokudai"
-        return httpx.Response(200, text="<html>profile</html>")
+        assert request.url.path == "/users/ChOkUdAi"
+        return httpx.Response(
+            200,
+            text="<html><head><title>choku&#100;ai - AtCoder</title></head></html>",
+        )
 
     adapter, fetcher = make_adapter(handler)
     try:
-        info = await adapter.verify("chokudai")
+        info = await adapter.verify("ChOkUdAi")
         assert info.handle == "chokudai"
         assert info.avatar is None
+    finally:
+        await fetcher.aclose()
+
+
+async def test_verify_unrecognized_profile_html_is_platform_error():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text="<html><head><title>AtCoder</title></head></html>")
+
+    adapter, fetcher = make_adapter(handler)
+    try:
+        with pytest.raises(PlatformError, match="缺少可识别的标题"):
+            await adapter.verify("chokudai")
     finally:
         await fetcher.aclose()
 

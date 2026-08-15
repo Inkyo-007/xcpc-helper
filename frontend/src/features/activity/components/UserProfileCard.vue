@@ -1,13 +1,30 @@
 <script setup lang="ts">
-/** 用户信息卡：头像本地上传（居中裁剪缩放）+ 主标签 ID / 副标签签名就地编辑。 */
+/** 用户信息卡：单平台使用平台账号名，头像与签名始终保持可编辑。 */
 
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { Camera, PencilLine, UserRound } from 'lucide-vue-next'
 import { NInput, NTooltip, useMessage } from 'naive-ui'
+import { resolveProfileAvatar } from '@/features/activity/model/scope'
 import { fileToAvatar, useProfile } from '@/features/activity/profile'
+import type { BoundAccount } from '@/features/activity/types'
+
+const props = withDefaults(
+  defineProps<{
+    /** 单平台视图的绑定账号；null 表示汇总视图。 */
+    account?: BoundAccount | null
+  }>(),
+  { account: null },
+)
 
 const { profile } = useProfile()
 const message = useMessage()
+const platformMode = computed(() => props.account !== null)
+const shownAvatar = computed(() =>
+  resolveProfileAvatar(profile.avatar, props.account?.avatar),
+)
+const shownName = computed(() =>
+  props.account ? (props.account.displayName || props.account.handle) : profile.name,
+)
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -56,9 +73,9 @@ function cancelEdit(): void {
     <NTooltip :show-arrow="false">
       <template #trigger>
         <button type="button" class="avatar-btn" aria-label="更换头像" @click="pickAvatar">
-          <img v-if="profile.avatar" class="avatar-img" :src="profile.avatar" alt="用户头像" />
-          <span v-else-if="profile.name.trim()" class="avatar-fallback">
-            {{ profile.name.trim().slice(0, 1).toUpperCase() }}
+          <img v-if="shownAvatar" class="avatar-img" :src="shownAvatar" alt="用户头像" />
+          <span v-else-if="shownName.trim()" class="avatar-fallback">
+            {{ shownName.trim().slice(0, 1).toUpperCase() }}
           </span>
           <UserRound v-else class="avatar-icon" :size="26" />
           <span class="avatar-mask"><Camera :size="15" /></span>
@@ -76,8 +93,11 @@ function cancelEdit(): void {
 
     <div class="profile-tags">
       <div class="tag-row">
+        <template v-if="platformMode">
+          <span class="tag-text tag-name readonly">{{ shownName }}</span>
+        </template>
         <NInput
-          v-if="editing === 'name'"
+          v-else-if="editing === 'name'"
           ref="editInput"
           v-model:value="draft"
           size="small"
@@ -262,6 +282,10 @@ function cancelEdit(): void {
 
 .tag-text.unset {
   color: var(--faint);
+}
+
+.tag-text.readonly {
+  cursor: default;
 }
 
 /* 主副标签间的主题色短粗分割线 */

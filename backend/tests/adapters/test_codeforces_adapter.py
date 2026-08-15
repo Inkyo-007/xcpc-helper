@@ -61,12 +61,12 @@ def now_minus(days: float) -> int:
 
 async def test_verify_ok():
     async def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.params["handles"] == "tourist"
+        assert request.url.params["handles"] == "ToUrIsT"
         return ok_json(INFO_OK)
 
     adapter, fetcher = make_adapter(handler)
     try:
-        info = await adapter.verify("tourist")
+        info = await adapter.verify("ToUrIsT")
         assert info.handle == "tourist"
         assert info.avatar == "https://userpic.codeforces.org/no-avatar.jpg"
     finally:
@@ -93,6 +93,20 @@ async def test_verify_empty_result_not_found():
     try:
         with pytest.raises(UserNotFoundError):
             await adapter.verify("ghost")
+    finally:
+        await fetcher.aclose()
+
+
+async def test_verify_mismatched_canonical_handle_is_platform_error():
+    async def handler(request: httpx.Request) -> httpx.Response:
+        data = copy.deepcopy(INFO_OK)
+        data["result"][0]["handle"] = "another_user"
+        return ok_json(data)
+
+    adapter, fetcher = make_adapter(handler)
+    try:
+        with pytest.raises(PlatformError, match="身份与请求用户名不匹配"):
+            await adapter.verify("tourist")
     finally:
         await fetcher.aclose()
 

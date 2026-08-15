@@ -1,5 +1,7 @@
 """UserStore 读写层测试：profile 往返、原子写、去重合并、损坏容错、名称校验、用户组目录管理。"""
 
+import json
+
 import pytest
 
 from adapters.base import Credentials
@@ -45,6 +47,25 @@ def test_profile_roundtrip(tmp_path):
     loaded = store.load_profile()
     assert loaded.id == "default"
     assert loaded.accounts[0].handle == "demo"
+
+
+def test_profile_without_account_avatar_is_backward_compatible(tmp_path):
+    """旧 profile.json 的账号没有 avatar 字段时按 None 读取。"""
+    path = tmp_path / "user" / "default" / "profile.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "id": "default",
+                "accounts": [{"platform": "codeforces", "handle": "tourist"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = make_store(tmp_path).load_profile()
+    assert loaded.accounts[0].avatar is None
+    assert loaded.accounts[0].user_info_refreshed_at is None
 
 
 def test_save_account_add_and_update(tmp_path):

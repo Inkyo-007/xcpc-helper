@@ -5,8 +5,9 @@
 - 提交明细：kenkoooo v3 user/submissions（升序、单页 ≤500、from_second 含边界）；
 - 题目目录：kenkoooo problems.json（题名）+ problem-models.json（难度），
   实例内内存缓存 + TTL，不落盘；
-- 绑定验证：官方用户主页 404 判定（history/json 与 kenkoooo user_info 对
-  不存在用户均返回 200，实测确认不可用于存在性判断）。
+- 绑定验证：官方用户主页 404 判定，并从页面标题提取平台规范用户名
+  （history/json 与 kenkoooo user_info 对不存在用户均返回 200，实测确认
+  不可用于存在性判断）。
 
 第二期范围：提交明细（SUBMISSIONS）+ 绑定验证（USER_INFO）；
 rating 属后续增量（官方 history/json 端点已探明，本期不声明 RATING）。
@@ -14,6 +15,7 @@ rating 属后续增量（官方 history/json 端点已探明，本期不声明 R
 
 import logging
 import time
+from html.parser import HTMLParser
 from typing import Any
 
 from pydantic import ValidationError
@@ -47,6 +49,52 @@ MAX_PAGES = 400  # 安全护栏（20 万条），正常路径不会触发
 CATALOG_TTL_SECONDS = 24 * 3600  # 题目目录内存缓存有效期（不落盘）
 
 
+class _ProfileTitleParser(HTMLParser):
+    """从 AtCoder 用户页提取 ``<title>`` 文本。"""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._in_title = False
+        self._parts: list[str] = []
+
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
+        if tag.casefold() == "title":
+            self._in_title = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.casefold() == "title":
+            self._in_title = False
+
+    def handle_data(self, data: str) -> None:
+        if self._in_title:
+            self._parts.append(data)
+
+    @property
+    def title(self) -> str:
+        return "".join(self._parts).strip()
+
+
+def _canonical_handle_from_profile(html: str, requested_handle: str) -> str:
+    """从官方页标题提取规范用户名，并校验确实对应本次请求。"""
+    parser = _ProfileTitleParser()
+    try:
+        parser.feed(html)
+        parser.close()
+    except Exception as exc:
+        raise PlatformError(f"AtCoder 用户主页 HTML 解析失败: {exc}") from exc
+
+    suffix = " - AtCoder"
+    title = parser.title
+    if not title.endswith(suffix):
+        raise PlatformError("AtCoder 用户主页缺少可识别的标题")
+    canonical = title[: -len(suffix)].strip()
+    if not canonical or canonical.casefold() != requested_handle.casefold():
+        raise PlatformError("AtCoder 用户主页返回的身份与请求用户名不匹配")
+    return canonical
+
+
 class AtCoderAdapter(PlatformAdapter):
     platform_id = "atcoder"
     name = "AtCoder"
@@ -66,9 +114,9 @@ class AtCoderAdapter(PlatformAdapter):
     async def verify(
         self, handle: str, credentials: Credentials | None = None
     ) -> UserInfo:
-        """官方用户主页 404 判定用户存在性（响应为 HTML，仅看状态码）。"""
+        """官方用户主页 404 判存在性，并从标题提取平台规范用户名。"""
         try:
-            await self._fetcher.request(
+            response = await self._fetcher.request(
                 "GET",
                 f"{PROFILE_URL}/{handle}",
                 platform=self.platform_id,
@@ -78,7 +126,8 @@ class AtCoderAdapter(PlatformAdapter):
             if exc.status_code == 404:
                 raise UserNotFoundError(f"AtCoder 用户不存在: {handle}") from exc
             raise
-        return UserInfo(handle=handle)
+        canonical = _canonical_handle_from_profile(response.text, handle)
+        return UserInfo(handle=canonical)
 
     # ===== 提交拉取 =====
 

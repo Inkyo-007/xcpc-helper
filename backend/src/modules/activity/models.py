@@ -35,13 +35,16 @@ class Account(BaseModel):
     """已绑定账号；last_synced_at 兼作增量同步游标（数据水位，UTC 秒）。
 
     handle 为平台内 API 主键（洛谷为 uid 数字），display_name 为展示名
-    （洛谷用户名等，仅展示用途，可为空则前端回退显示 handle）。
+    （洛谷用户名等，仅展示用途，可为空则前端回退显示 handle），avatar
+    为平台账号头像。
     """
 
     platform: str
     handle: str
     last_synced_at: int | None = None  # null = 从未同步成功
     display_name: str | None = None  # 展示名（与 API 主键分离）
+    avatar: str | None = None  # 平台账号头像 URL
+    user_info_refreshed_at: int | None = None
 
 
 class Secrets(BaseModel):

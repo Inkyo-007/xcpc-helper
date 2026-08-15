@@ -19,8 +19,12 @@ import UserProfileCard from '@/features/activity/components/UserProfileCard.vue'
 import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
 import { parseDate, toDateStr } from '@/features/activity/model/dates'
 import { pageCount } from '@/features/activity/model/pagination'
+import {
+  findPlatformAccount,
+  hasAccountForScope,
+} from '@/features/activity/model/scope'
 import { useActivity, type PlatformScope } from '@/features/activity/store'
-import type { AccountCredentials, PlatformId } from '@/features/activity/types'
+import type { AccountCredentials, BoundAccount, PlatformId } from '@/features/activity/types'
 
 const {
   accounts,
@@ -43,6 +47,7 @@ const {
   bindAccount,
   unbindAccount,
   boundOn,
+  platformName,
 } = useActivity()
 
 const message = useMessage()
@@ -54,6 +59,29 @@ const showGroupEdit = ref(false)
 
 const weeklyBars = computed(() => weeklySolved(mergedDaily.value))
 const monthlyBars = computed(() => monthlySolved(mergedDaily.value))
+/** 单平台视图对应的账号；汇总视图没有单一平台身份。 */
+const activeAccount = computed<BoundAccount | null>(() =>
+  activePlatform.value === 'all'
+    ? null
+    : findPlatformAccount(accounts.value, activePlatform.value),
+)
+/** 汇总需至少一个账号；单平台必须已绑定当前平台，不能借用其他平台的绑定态。 */
+const showDashboard = computed(() =>
+  hasAccountForScope(accounts.value, activePlatform.value),
+)
+const emptyPlatform = computed<PlatformId | null>(() =>
+  activePlatform.value === 'all' ? null : activePlatform.value,
+)
+const emptyTitle = computed(() =>
+  emptyPlatform.value
+    ? `${platformName(emptyPlatform.value)} 尚未绑定`
+    : '还没有训练数据',
+)
+const emptyHint = computed(() =>
+  emptyPlatform.value
+    ? `绑定 ${platformName(emptyPlatform.value)} 账号后，这里会展示该平台的训练统计。`
+    : '绑定一个竞赛平台账号，同步后这里会展示你的训练统计。',
+)
 
 /* ---------- 网址状态同步：?platform=<平台>&date=<日期>&page=<页码> ----------
  * all、无选中日期与第 1 页为缺省值，不出现在网址中；切换平台重置日期
@@ -151,7 +179,11 @@ function openBind(platform: PlatformId | null): void {
 async function onBind(
   platform: PlatformId,
   handle: string,
-  opts: { displayName?: string | null; credentials?: AccountCredentials } = {},
+  opts: {
+    displayName?: string | null
+    avatar?: string | null
+    credentials?: AccountCredentials
+  } = {},
 ): Promise<void> {
   const rebinding = boundOn(platform) !== null
   try {
@@ -169,6 +201,10 @@ async function onBind(
   } catch (e) {
     message.error(e instanceof Error ? e.message : '绑定失败，请稍后重试')
   }
+}
+
+function bindEmptyScope(): void {
+  openBind(emptyPlatform.value)
 }
 
 async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
@@ -199,9 +235,9 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
       />
     </div>
 
-    <div v-if="accounts.length" class="act-body">
+    <div v-if="showDashboard" class="act-body">
       <aside class="act-side">
-        <UserProfileCard />
+        <UserProfileCard :account="activeAccount" />
         <section class="act-panel act-submissions">
           <SubmissionList
             :selected-date="selectedDate"
@@ -258,11 +294,11 @@ async function onUnbind(platform: PlatformId, handle: string): Promise<void> {
       <div class="empty-icon">
         <ChartColumn :size="26" />
       </div>
-      <h2 class="empty-title">还没有训练数据</h2>
-      <p class="empty-hint">绑定一个竞赛平台账号，同步后这里会展示你的训练统计。</p>
-      <NButton type="primary" @click="openBind(null)">
+      <h2 class="empty-title">{{ emptyTitle }}</h2>
+      <p class="empty-hint">{{ emptyHint }}</p>
+      <NButton type="primary" @click="bindEmptyScope">
         <template #icon><Plus :size="15" /></template>
-        绑定第一个账号
+        {{ emptyPlatform ? `绑定 ${platformName(emptyPlatform)}` : '绑定第一个账号' }}
       </NButton>
     </div>
 

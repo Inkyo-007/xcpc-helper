@@ -6,6 +6,10 @@
 
 import { computed, ref, watch } from 'vue'
 import * as api from '@/features/activity/api'
+import {
+  findPlatformAccount,
+  needsUserInfoRefresh,
+} from '@/features/activity/model/scope'
 import { useUserGroups } from '@/features/activity/profile'
 import type {
   AccountCredentials,
@@ -59,12 +63,16 @@ const recentEntries = computed<RecentSubmission[]>(() => recentItems.value)
 
 let overviewReq = 0
 let submissionsReq = 0
+let accountsReq = 0
+/** 每个用户组在当前页面会话最多尝试一次旧账号资料回填，失败也不自动重试。 */
+const userInfoRefreshAttempted = new Set<string>()
 
 async function refreshOverview(): Promise<void> {
   const req = ++overviewReq
+  const groupKey = currentKey.value
   try {
     const data = await api.fetchOverview(activePlatform.value)
-    if (req === overviewReq) overviewData.value = data
+    if (req === overviewReq && currentKey.value === groupKey) overviewData.value = data
   } catch {
     /* 请求失败保持旧数据；账号错误由 sync/status 呈现 */
   }
@@ -72,12 +80,13 @@ async function refreshOverview(): Promise<void> {
 
 async function refreshSubmissions(): Promise<void> {
   const req = ++submissionsReq
+  const groupKey = currentKey.value
   try {
     const data = await api.fetchSubmissions({
       date: selectedDate.value,
       platform: activePlatform.value,
     })
-    if (req !== submissionsReq) return
+    if (req !== submissionsReq || currentKey.value !== groupKey) return
     if (selectedDate.value) {
       dayItems.value = data.items
     } else {
@@ -88,20 +97,64 @@ async function refreshSubmissions(): Promise<void> {
   }
 }
 
-async function refreshAccounts(): Promise<void> {
+function applyPlatforms(res: api.ApiPlatformsResponse): BoundAccount[] {
+  platforms.value = res.platforms.map((p) => ({
+    id: p.id,
+    name: p.name,
+    auth: p.auth,
+    browserLogin: p.browserLogin,
+  }))
+  const nextAccounts = res.platforms
+    .map((p) => p.account)
+    .filter((a): a is BoundAccount => a !== null)
+  accounts.value = nextAccounts
+  return nextAccounts
+}
+
+/** 只应用仍属于同一用户组且未被更新请求取代的账号响应。 */
+async function fetchAccountsForGroup(groupKey: string): Promise<BoundAccount[] | null> {
+  const req = ++accountsReq
   try {
     const res = await api.fetchPlatforms()
-    platforms.value = res.platforms.map((p) => ({
-      id: p.id,
-      name: p.name,
-      auth: p.auth,
-      browserLogin: p.browserLogin,
-    }))
-    accounts.value = res.platforms
-      .map((p) => p.account)
-      .filter((a): a is BoundAccount => a !== null)
+    if (req !== accountsReq || currentKey.value !== groupKey) return null
+    return applyPlatforms(res)
   } catch {
     /* 后端未就绪时保持空列表 */
+    return null
+  }
+}
+
+function refreshLegacyUserInfoInBackground(
+  groupKey: string,
+  currentAccounts: readonly BoundAccount[],
+): void {
+  if (
+    !groupKey ||
+    userInfoRefreshAttempted.has(groupKey) ||
+    !needsUserInfoRefresh(currentAccounts)
+  ) {
+    return
+  }
+
+  // 调用前即标记，保证接口失败或回填结果仍不完整时也不会形成自动重试循环。
+  userInfoRefreshAttempted.add(groupKey)
+  void (async () => {
+    try {
+      await api.refreshAccountInfo()
+      if (currentKey.value !== groupKey) return
+      await fetchAccountsForGroup(groupKey)
+    } catch {
+      /* 兼容回填不影响首次渲染；本页面会话不再自动重试。 */
+    }
+  })()
+}
+
+async function refreshAccounts(): Promise<void> {
+  const groupKey = currentKey.value
+  const currentAccounts = await fetchAccountsForGroup(groupKey)
+  if (currentAccounts !== null) {
+    // 先展示现有账号，再在后台补齐旧数据的平台头像和规范展示名。
+    refreshLegacyUserInfoInBackground(groupKey, currentAccounts)
   }
 }
 
@@ -168,7 +221,16 @@ function init(): void {
 }
 
 function setPlatform(scope: PlatformScope): void {
-  activePlatform.value = scope
+  if (activePlatform.value !== scope) {
+    // 先废弃在途请求并清空旧作用域数据，避免切换后短暂展示上个平台内容；
+    // 新作用域请求由下方 watch(activePlatform) 自动触发。
+    overviewReq += 1
+    submissionsReq += 1
+    overviewData.value = null
+    recentItems.value = []
+    dayItems.value = []
+    activePlatform.value = scope
+  }
   selectedDate.value = null
   recentPage.value = 1
   dayPage.value = 1
@@ -222,7 +284,11 @@ async function syncNow(): Promise<void> {
 async function bindAccount(
   platform: PlatformId,
   handle: string,
-  opts: { displayName?: string | null; credentials?: AccountCredentials } = {},
+  opts: {
+    displayName?: string | null
+    avatar?: string | null
+    credentials?: AccountCredentials
+  } = {},
 ): Promise<boolean> {
   busy.value = true
   try {
@@ -247,7 +313,7 @@ async function unbindAccount(platform: PlatformId, handle: string): Promise<void
 
 /** 当前平台绑定的账号（每平台至多一个） */
 function boundOn(platform: PlatformId): BoundAccount | null {
-  return accounts.value.find((a) => a.platform === platform) ?? null
+  return findPlatformAccount(accounts.value, platform)
 }
 
 /** 判断 handle 是否已被绑定（绑定弹窗防重复用） */
@@ -291,6 +357,14 @@ watch([activePlatform, selectedDate], () => {
 
 /* 切换用户组：重置视图并拉取该组数据 */
 watch(currentKey, () => {
+  // 立即废弃上一个用户组的所有在途响应并清空组数据，避免快速切组时串组。
+  accountsReq += 1
+  overviewReq += 1
+  submissionsReq += 1
+  accounts.value = []
+  overviewData.value = null
+  recentItems.value = []
+  dayItems.value = []
   selectedDate.value = null
   recentPage.value = 1
   dayPage.value = 1

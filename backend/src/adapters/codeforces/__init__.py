@@ -70,7 +70,10 @@ class CodeforcesAdapter(PlatformAdapter):
         if not envelope.result:
             raise UserNotFoundError(f"Codeforces 用户不存在: {handle}")
         user = envelope.result[0]
-        return UserInfo(handle=user.handle or handle, avatar=user.avatar)
+        canonical = user.handle.strip()
+        if not canonical or canonical.casefold() != handle.casefold():
+            raise PlatformError("Codeforces API 返回的身份与请求用户名不匹配")
+        return UserInfo(handle=canonical, avatar=user.avatar)
 
     # ===== 提交拉取 =====
 

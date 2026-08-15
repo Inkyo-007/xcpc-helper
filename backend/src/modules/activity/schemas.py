@@ -20,6 +20,8 @@ class BoundAccountOut(BaseModel):
     platform: str
     handle: str
     displayName: str | None = None  # 展示名（洛谷用户名等；空则前端回退 handle）
+    avatar: str | None = None  # 平台账号头像 URL
+    userInfoReady: bool = False  # 是否已通过 adapter 回填平台用户资料
     lastSyncAt: datetime | None = None  # 最近一次成功同步的结束时间
     syncState: SyncStateOut = "idle"
     syncError: str | None = None
@@ -60,6 +62,7 @@ class BindIn(BaseModel):
     platform: str
     handle: str
     displayName: str | None = None  # 验证回执带回的展示名，随绑定持久化
+    avatar: str | None = None  # 验证回执带回的平台头像，随绑定持久化
     credentials: dict[str, Any] | None = None  # cookie 授权平台必填（洛谷等）
 
 

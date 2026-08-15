@@ -16,6 +16,7 @@ from datetime import datetime, tzinfo
 
 from adapters import REGISTRY, HttpFetcher
 from adapters.base import (
+    AdapterError,
     AuthExpiredError,
     AuthMode,
     BrowserLoginCancelledError,
@@ -228,6 +229,8 @@ class ActivityService:
             platform=account.platform,
             handle=account.handle,
             displayName=account.display_name,
+            avatar=account.avatar,
+            userInfoReady=account.user_info_refreshed_at is not None,
             lastSyncAt=last_sync_at,
             syncState=status.state.value,
             syncError=status.error,
@@ -376,6 +379,8 @@ class ActivityService:
             platform=payload.platform,
             handle=handle,
             display_name=(payload.displayName or "").strip() or None,
+            avatar=(payload.avatar or "").strip() or None,
+            user_info_refreshed_at=int(time.time()),
         )
         store.save_account(account)
         if credentials is not None:
@@ -383,6 +388,84 @@ class ActivityService:
         # 首次同步后台异步执行，前端轮询 /sync/status
         asyncio.create_task(self._safe_sync(payload.platform, handle))
         return self._account_out(account)
+
+    async def refresh_account_info(self) -> None:
+        """并行回填当前组内尚未刷新过的平台用户资料。
+
+        用户组与 store 在任何外部请求前捕获，避免请求期间切组后写入新组。
+        只补展示名、头像和刷新标记，不迁移 handle、提交文件或凭据键。
+        """
+        user_id = self._current_group
+        store = activity_store.UserStore(self._settings.user_data_dir, user_id)
+        accounts = [
+            account
+            for account in store.load_profile().accounts
+            if account.user_info_refreshed_at is None
+        ]
+        await asyncio.gather(
+            *(self._refresh_account_info(user_id, store, account) for account in accounts)
+        )
+
+    async def _refresh_account_info(
+        self,
+        user_id: str,
+        store: activity_store.UserStore,
+        account: Account,
+    ) -> None:
+        adapter = self._adapters.get(account.platform)
+        if adapter is None:
+            logger.warning(
+                "用户资料回填失败 [%s/%s/%s] %s",
+                user_id,
+                account.platform,
+                account.handle,
+                f"不支持的平台: {account.platform}",
+            )
+            return
+
+        credentials = store.get_account_credentials(account.platform, account.handle)
+        try:
+            info = await adapter.verify(account.handle, credentials)
+        except AdapterError as exc:
+            logger.warning(
+                "用户资料回填失败 [%s/%s/%s] %s",
+                user_id,
+                account.platform,
+                account.handle,
+                exc,
+            )
+            return
+
+        # 外呼期间同步任务可能推进游标；以最新磁盘记录为基底，避免写回旧游标。
+        latest = next(
+            (
+                item
+                for item in store.load_profile().accounts
+                if item.platform == account.platform and item.handle == account.handle
+            ),
+            None,
+        )
+        if latest is None or latest.user_info_refreshed_at is not None:
+            return
+
+        display_name = (info.display_name or "").strip() or None
+        if (
+            display_name is None
+            and info.handle != latest.handle
+            and info.handle.casefold() == latest.handle.casefold()
+        ):
+            # 旧 CF / AtCoder 账号可能保留用户输入大小写；不迁移主键，
+            # 仅用平台规范写法作为展示名，避免移动提交文件与凭据键。
+            display_name = info.handle
+
+        refreshed = latest.model_copy(
+            update={
+                "display_name": display_name or latest.display_name,
+                "avatar": (info.avatar or "").strip() or latest.avatar,
+                "user_info_refreshed_at": int(time.time()),
+            }
+        )
+        store.save_account(refreshed)
 
     def unbind(self, platform: str, handle: str) -> None:
         self._adapter(platform)
