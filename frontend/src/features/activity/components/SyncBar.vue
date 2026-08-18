@@ -6,10 +6,10 @@
  * 可能较慢），平台视图只同步该平台（直接触发）。 */
 
 import { computed, ref } from 'vue'
-import { Link2, Plus, RefreshCw, TriangleAlert, UserRoundPen } from 'lucide-vue-next'
+import { Link2, Plus, RefreshCw, Sparkles, TriangleAlert, UserRoundPen } from 'lucide-vue-next'
 import { NButton, NModal, NTooltip } from 'naive-ui'
 import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
-import { accountLabel } from '@/features/activity/store'
+import { accountLabel, platformMeta } from '@/features/activity/store'
 import type { PlatformScope } from '@/features/activity/store'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
@@ -24,6 +24,7 @@ const emit = defineEmits<{
   sync: []
   bind: [platform: PlatformId]
   manage: [account: BoundAccount]
+  refine: [account: BoundAccount]
   'edit-group': []
 }>()
 
@@ -39,6 +40,13 @@ const authExpired = computed(
 )
 /** 该平台账号同步中（首次全量可能数分钟）：按钮显示进行态 */
 const accountSyncing = computed(() => platformAccount.value?.syncState === 'running')
+
+/** 精细化同步入口可见：平台视图 + 平台声明 refine_verdict 能力 + 已绑定 */
+const canRefine = computed(() => {
+  if (props.activePlatform === 'all' || !platformAccount.value) return false
+  const meta = platformMeta(props.activePlatform as PlatformId)
+  return meta?.capabilities.includes('refine_verdict') ?? false
+})
 
 /* ---------- 同步全部平台确认 ---------- */
 
@@ -73,6 +81,19 @@ function confirmSyncAll(): void {
         </button>
       </template>
       立即同步
+    </NTooltip>
+    <NTooltip v-if="canRefine" :show-arrow="false">
+      <template #trigger>
+        <button
+          type="button"
+          class="tool-icon-btn"
+          aria-label="精细化同步"
+          @click="emit('refine', platformAccount!)"
+        >
+          <Sparkles :size="15" />
+        </button>
+      </template>
+      精细化同步（UNAC → 具体评测结果）
     </NTooltip>
     <NTooltip v-if="activePlatform === 'all'" :show-arrow="false">
       <template #trigger>

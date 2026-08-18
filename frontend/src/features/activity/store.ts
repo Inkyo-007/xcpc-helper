@@ -100,6 +100,7 @@ async function refreshAccounts(): Promise<void> {
       name: p.name,
       auth: p.auth,
       browserLogin: p.browserLogin,
+      capabilities: p.capabilities,
     }))
     accounts.value = res.platforms
       .map((p) => p.account)
@@ -253,7 +254,9 @@ function platformName(id: PlatformId): string {
 }
 
 /** 平台完整元数据（auth / browserLogin，驱动绑定弹窗凭据区渲染） */
-function platformMeta(id: PlatformId): PlatformMeta | null {
+/** 平台完整元数据（auth / browserLogin / capabilities，驱动绑定弹窗与
+ * 精化按钮等能力条件渲染） */
+export function platformMeta(id: PlatformId): PlatformMeta | null {
   return platforms.value.find((p) => p.id === id) ?? null
 }
 
@@ -320,6 +323,7 @@ export function useActivity() {
     syncNow,
     bindAccount,
     unbindAccount,
+    refreshAll,
     boundOn,
     isBound,
     platformName,

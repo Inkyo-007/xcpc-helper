@@ -8,6 +8,7 @@ import { ChartColumn, Link2, MousePointerClick, Plus } from 'lucide-vue-next'
 import { NButton, useMessage } from 'naive-ui'
 import AccountBindModal from '@/features/activity/components/AccountBindModal.vue'
 import AccountManageModal from '@/features/activity/components/AccountManageModal.vue'
+import RefineModal from '@/features/activity/components/RefineModal.vue'
 import ActivityHeatmap from '@/features/activity/components/ActivityHeatmap.vue'
 import PassBarChart from '@/features/activity/components/PassBarChart.vue'
 import PlatformTabs from '@/features/activity/components/PlatformTabs.vue'
@@ -42,6 +43,7 @@ const {
   syncNow,
   bindAccount,
   unbindAccount,
+  refreshAll,
   boundOn,
   platformName,
   accountLabel,
@@ -56,6 +58,9 @@ const showGroupEdit = ref(false)
 /** 账号管理弹窗（换绑 / 解绑）及其目标账号 */
 const showAccountManage = ref(false)
 const managingAccount = ref<BoundAccount | null>(null)
+/** 精细化同步弹窗及其目标账号（REFINE_VERDICT 能力平台） */
+const showRefine = ref(false)
+const refiningAccount = ref<BoundAccount | null>(null)
 
 const weeklyBars = computed(() => weeklySolved(mergedDaily.value))
 const monthlyBars = computed(() => monthlySolved(mergedDaily.value))
@@ -201,6 +206,12 @@ function openAccountManage(account: BoundAccount): void {
   showAccountManage.value = true
 }
 
+/** 打开精细化同步弹窗（平台视图精化按钮，能力驱动挂载） */
+function openRefine(account: BoundAccount): void {
+  refiningAccount.value = account
+  showRefine.value = true
+}
+
 /** 手动同步：即时进行态 + 完成/失败提示（快速或无新增同步也有明确反馈） */
 async function onSync(): Promise<void> {
   try {
@@ -234,6 +245,7 @@ async function onSync(): Promise<void> {
         @sync="onSync"
         @bind="openBind"
         @manage="openAccountManage"
+        @refine="openRefine"
         @edit-group="showGroupEdit = true"
       />
     </div>
@@ -340,6 +352,7 @@ async function onSync(): Promise<void> {
       @bind="openBind"
       @unbind="onUnbind"
     />
+    <RefineModal v-model:show="showRefine" :account="refiningAccount" @done="refreshAll" />
     <UserGroupEditModal
       v-model:show="showGroupEdit"
       :accounts="accounts"

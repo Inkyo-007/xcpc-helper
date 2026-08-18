@@ -8,6 +8,7 @@ import type {
   OverviewTotals,
   PlatformId,
   PlatformMeta,
+  RefineStatus,
   SubmissionEntry,
 } from '@/features/activity/types'
 import type { PlatformScope } from '@/features/activity/store'
@@ -131,6 +132,39 @@ export function triggerSync(platform?: PlatformId): Promise<void> {
 
 export function fetchSyncStatus(): Promise<BoundAccount[]> {
   return request<BoundAccount[]>('/activity/sync/status')
+}
+
+/* ---------- 精细化同步（REFINE_VERDICT 能力平台） ---------- */
+
+function refinePath(platform: string, handle: string): string {
+  return `/activity/accounts/${encodeURIComponent(platform)}/${encodeURIComponent(handle)}/refine`
+}
+
+export function fetchRefineStatus(platform: string, handle: string): Promise<RefineStatus> {
+  return request<RefineStatus>(refinePath(platform, handle))
+}
+
+export function startRefine(platform: string, handle: string): Promise<void> {
+  return request<void>(refinePath(platform, handle), { method: 'POST' })
+}
+
+export function stopRefine(platform: string, handle: string): Promise<void> {
+  return request<void>(refinePath(platform, handle), { method: 'DELETE' })
+}
+
+export function setRefineAuto(
+  platform: string,
+  handle: string,
+  refineAuto: boolean,
+): Promise<RefineStatus> {
+  return request<RefineStatus>(
+    `/activity/accounts/${encodeURIComponent(platform)}/${encodeURIComponent(handle)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refineAuto }),
+    },
+  )
 }
 
 /* ---------- 用户组与信息卡 ---------- */

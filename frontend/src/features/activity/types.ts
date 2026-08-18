@@ -15,6 +15,8 @@ export interface PlatformMeta {
   auth: 'none' | 'cookie'
   /** 一键登录可用（cookie 平台且服务端具备浏览器登录能力） */
   browserLogin: boolean
+  /** 数据区块能力（refine_verdict = 支持 UNAC 精细化同步） */
+  capabilities: string[]
 }
 
 /** 已绑定账号及其同步状态 */
@@ -77,4 +79,16 @@ export interface SubmissionEntry {
 export interface RecentSubmission extends SubmissionEntry {
   /** YYYY-MM-DD（本地时区） */
   date: string
+}
+
+/** 精细化同步状态（与后端 RefineStatusOut 对齐） */
+export type RefineState = 'idle' | 'running' | 'stopped' | 'done'
+
+export interface RefineStatus {
+  state: RefineState
+  done: number
+  /** idle 时为存量 UNAC 数（供耗时预估） */
+  total: number
+  /** 普通同步完成后自动精化 */
+  auto: boolean
 }
