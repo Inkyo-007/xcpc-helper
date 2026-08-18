@@ -528,7 +528,8 @@ class ActivityService:
         if p.state.value == "running":
             state, done, total = "running", p.done, p.total
         elif p.state.value == "stopped":
-            state, done, total = "stopped", p.done, p.total
+            # 中止后 total 按存量剩余重算（快照分母已过时），done 保留已精化计数
+            state, done, total = "stopped", p.done, remaining
         elif remaining == 0 and items:
             state, done, total = "done", p.done, max(p.total, p.done)
         else:

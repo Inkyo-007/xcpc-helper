@@ -104,11 +104,15 @@ class RefineEngine:
         return True
 
     def stop(self, user_id: str, platform: str, handle: str) -> None:
-        """中止：在记录粒度生效（≤ 一条记录耗时）；未运行为空操作。"""
+        """中止：状态立即翻转为 stopped（前端即时反馈），后台任务在记录粒度
+        退出（在飞的一条最多多完成一次写入，无害）；未运行为空操作。"""
         key = (user_id, platform, handle)
         flag = self._stop_flags.get(key)
         if flag is not None:
             flag.set()
+        progress = self._progress.get(key)
+        if progress is not None and progress.state == RefineState.RUNNING:
+            progress.state = RefineState.STOPPED
 
     def drop_account(self, user_id: str, platform: str, handle: str) -> None:
         """解绑/换绑时清理该账号的精化运行时状态。"""
@@ -186,4 +190,7 @@ class RefineEngine:
             progress.state = RefineState.STOPPED
             progress.error = str(exc)
         finally:
-            self._tasks.pop(key, None)
+            # 防陈旧任务覆写：stop 后可能已 restart（新 progress/新 task 在档），
+            # 仅当注册的还是本任务时才移除
+            if self._tasks.get(key) is asyncio.current_task():
+                self._tasks.pop(key, None)

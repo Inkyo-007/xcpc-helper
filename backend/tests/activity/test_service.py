@@ -679,3 +679,43 @@ async def test_refine_auto_triggers_after_sync(service: ActivityService):
     st = await wait_refine_done(service)
     assert refined == ["1"]  # 同步完成后自动精化
     assert st.state == "done"
+
+
+async def test_refine_stopped_total_reflects_remaining(service: ActivityService):
+    """中止后返回的 total 按存量剩余重算（快照分母已过时），done 保留计数。"""
+    adapter = stub_luogu(service)
+    await service.bind(BindIn(platform="luogu", handle="100000", credentials={"cookies": {"_uid": "100000", "__client_id": "tok"}}))
+    await wait_sync_done(service)
+    service._store().merge_submissions(
+        "luogu", "100000", [unac_row("1", 1000), unac_row("2", 2000), unac_row("3", 3000)]
+    )
+
+    gate = asyncio.Event()
+    refine_calls: list[str] = []
+
+    async def fake_refine(record_id, credentials=None):
+        refine_calls.append(record_id)
+        await gate.wait()
+        return Verdict.WA
+
+    adapter.fetch_submission_verdict = fake_refine
+
+    service.start_refine("luogu", "100000")
+    # 等第一条真正在飞后中止：状态立即翻转 stopped
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline and not refine_calls:
+        await asyncio.sleep(0.02)
+    service.stop_refine("luogu", "100000")
+    gate.set()  # 释放在飞记录（完成第 1 条）
+    # 等在飞记录的写入落盘（stop 已即时翻转状态，写盘随后完成）
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline:
+        items, _ = service._store().load_submissions("luogu", "100000")
+        if any(s.verdict == Verdict.WA for s in items):
+            break
+        await asyncio.sleep(0.02)
+
+    st = service.refine_status("luogu", "100000")
+    assert st.state == "stopped"
+    assert st.total == 2  # 剩余 2 条（第 1 条已精化）
+    assert st.done == 1

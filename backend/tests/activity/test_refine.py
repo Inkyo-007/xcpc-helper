@@ -136,6 +136,8 @@ async def test_refine_stop_and_resume(tmp_path):
     while not adapter.calls:  # 等第一条在飞
         await asyncio.sleep(0.01)
     refine.stop(USER, "fake", "demo")
+    # 即时反馈：状态立即翻转 stopped（不等在飞记录完成，防用户误以为未点到）
+    assert refine.progress_of(USER, "fake", "demo").state == RefineState.STOPPED
     adapter.gate.set()
     p = await wait_idle(refine)
     assert p.state == RefineState.STOPPED
