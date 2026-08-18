@@ -289,8 +289,8 @@ REGISTRY: dict[str, type[PlatformAdapter]] = {
 **枚举**：
 
 ```python
-class Verdict(str, Enum):     # AC/WA/CE/RE/TLE/MLE/OLE/UKE/JG（平台无关，adapter 归一化）
-class Capability(str, Enum):  # SUBMISSIONS / USER_INFO / RATING / CONTESTS
+class Verdict(str, Enum):     # AC/WA/CE/RE/TLE/MLE/OLE/UKE/JG/UNAC（平台无关，adapter 归一化）
+class Capability(str, Enum):  # SUBMISSIONS / USER_INFO / RATING / CONTESTS / REFINE_VERDICT
 class AuthMode(str, Enum):    # NONE（匿名）/ COOKIE（cookie 授权）
 ```
 
@@ -333,6 +333,7 @@ AdapterError                    # 基类
 兜底（游标语义保证）。
 | `fetch_rating_history(handle, credentials=None) -> list[RatingPoint]` | rating 历史（后续增量） | RATING |
 | `fetch_contests() -> list[ContestInfo]` | 比赛信息（平台级，无 handle，未来 contest 功能消费） | CONTESTS |
+| `fetch_submission_verdict(record_id, credentials=None) -> Verdict \| None` | 单条提交的细分结果精化（列表只有 UNAC 的平台拉详情判定）；返回 None = 无法判定保持原样 | REFINE_VERDICT |
 
 **数据迁移钩子**：`normalize_url(url)`（5f7ffeb8 先例）——历史数据读取时经钩子
 幂等转换为当前口径（默认恒等），平台规则演进无需重新同步。
@@ -418,6 +419,9 @@ AdapterError                    # 基类
     返回纯 JSON 信封 `{code, currentData: {records: {result, count, perPage}}}`；
     不带则返回 SPA 页 + `_feInjection` 内嵌同构数据）。时间**倒序**、perPage=20、
     倒序回扫（与 CF 同模式：增量 `ts < since` 停止，record `id` 去重）；
+  - 单条精化：`GET /record/{id}?_contentOnly=1` →
+    `record.detail.judgeResult.subtasks[].testCases[].status`（细分 verdict 的唯一
+    来源；实测确认，UNAC 记录的测试点带真实状态码）；
   - 绑定验证存在性：`GET /api/user/search?keyword=X` **匿名可用**，返回
     `{uid, name, avatar}`，取精确匹配（用户名不区分大小写或 uid 相等）；
   - 绑定验证凭据有效性：携凭据试拉 record/list 第 1 页（绑定当下拦住死凭据）；
@@ -568,8 +572,47 @@ backend/src/
 | GET | `/api/activity/submissions?date=&platform=` | 带 `date` 为当日明细；不带 `date` 为最后 200 条近期提交（倒序）；平台过滤可选 |
 | POST | `/api/activity/sync` | 触发同步 `{platform?}`，空为全部账号；立即返回（202） |
 | GET | `/api/activity/sync/status` | 各账号同步状态（idle/running/error + 上次结果 + errorCode + syncProgress 0~1 可空），前端轮询 |
+| POST | `/api/activity/accounts/{platform}/{handle}/refine` | 启动精细化同步（202；能力缺失 400、进行中 409；仅 REFINE_VERDICT 平台） |
+| DELETE | `/api/activity/accounts/{platform}/{handle}/refine` | 中止精细化同步（204，幂等） |
+| GET | `/api/activity/accounts/{platform}/{handle}/refine` | 精化状态 `{state, done, total, auto}`（state: idle/running/stopped/done；idle 时 total = 当前存量 UNAC 数，供前端预估耗时） |
+| PATCH | `/api/activity/accounts/{platform}/{handle}` | 更新账号配置 `{refineAuto}`（普通同步完成后自动启动精化） |
 
 错误响应统一由全局异常处理器结构化（`{error: {code, message, detail}}`）。
+
+### 6.5 精细化同步（UNAC refine，第四期）
+
+**背景**：洛古记录列表口径只有 AC/CE/Unaccepted（官方常量 `filterable` 佐证），
+WA/TLE/MLE/RE 细分只存在于记录详情。精化把存量 UNAC 逐条拉详情改写为具体
+结果——只影响提交列表徽章的细分，统计口径（AC vs 非 AC）不受影响。
+
+**规则**：
+
+- 详情 `record/:id` → 全部 subtask 的全部测试点中，**按严重度取最重**
+  （对话确认）：`RE > TLE > MLE > OLE > WA`；
+- 保守规则：JG/UKE 测试点不参选（非用户程序错误）；全部参选测试点为空、
+  或测试点全 AC 但整题 UNAC → 保持 UNAC 不乱猜；
+- CE 不经精化（列表口径本就区分）；`fetch_submission_verdict` 返回 None
+  表示无法判定，保持原样。
+
+**引擎**（`modules/activity/refine.py`，service 持有）：
+
+- 启动时快照存量 UNAC（按 `submitted_at` **升序**，从旧往新），
+  `total` 固定为本轮快照条数（精化途中新增的 UNAC 留下轮，进度不倒退）；
+- **剩余 UNAC 即待办**：中止/中断后无需额外游标，下次启动重扫自动续传；
+- **与普通同步协同**：每条记录处理前获取该账号的同步锁（SyncEngine 单账号
+  `asyncio.Lock`）——普通同步全程持锁，精化自然暂停，结束后自动继续
+  （移交延迟 ≤ 一条记录）；
+- 与同步共用 adapter 的 5s 限流节奏（`_get_json` 实例级 pacing），不加速
+  WAF 风险；洛谷单条详情复用同一传输层与信封判定；
+- store 新增 `update_verdicts`（按 submission_id 就地改写 verdict，原子写 +
+  同锁串行）——这是"磁盘优先、合并不覆盖旧行"规则的**唯一受控例外**；
+- `Account.refine_auto`（默认关）：普通同步完成后自动启动精化（增量带来的
+  几条新 UNAC 秒级完成）；「已完成」按存量 UNAC 清零计算，不持久化状态。
+
+**前端**：平台视图工具条「同步」按钮右侧的「精细化同步」按钮
+（能力驱动：平台声明 REFINE_VERDICT 且已绑定时挂载）；弹窗三态——
+未开始（功能说明 + 按存量 UNAC×5s 的耗时预估 + 确认）/ 进行中（百分比 +
+中止）/ 已完成（「随同步自动精化」开关）。
 
 ## 7. 前端落地
 
@@ -690,6 +733,12 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
   （洛谷 records.count）上报；总量未知的平台不报，前端必须兼容不定态；
 - **同步无全局遮罩**：同步是后台属性，进行态只落在账号按钮 / 平台页签
   黄点角标 / 平台视图右栏进度面板，不得阻塞其他功能（对话确认）。
+- **精化是 store 合并规则的唯一受控例外**：`update_verdicts` 可按
+  submission_id 就地改写 verdict（仅精化器使用），其余路径维持"磁盘优先、
+  合并不覆盖旧行"；普通同步的 UNAC 行不会被后续同步覆盖回 UNAC 之外的
+  值之外的状态——精化结果落盘即终态（§6.5）；
+- **精化与普通同步共用账号锁**：精化器每条记录处理前必须获取该账号同步锁
+  （普通同步持锁期间精化自然暂停），绕开锁会导致并发写与限流失控（§6.5）。
 - **匿名/两步验证中间态也携带 `__client_id`**：一键登录的完成判定必须
   cookie 出现 + 鉴权探针双重确认，只看 cookie 会在两步验证码账号上提前
   关窗抓走半成品会话（§5.6）；
