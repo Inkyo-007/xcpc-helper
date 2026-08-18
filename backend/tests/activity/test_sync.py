@@ -1,6 +1,7 @@
-"""同步引擎测试：游标推进、去重合并、失败隔离、未绑定防护。"""
+"""同步引擎测试：游标推进、断点续传、去重合并、失败隔离、未绑定防护。"""
 
 import time
+from collections.abc import AsyncIterator
 
 import pytest
 
@@ -12,6 +13,7 @@ from adapters.base import (
     PlatformAdapter,
     PlatformError,
     PlatformSubmission,
+    SyncBatch,
     UserInfo,
 )
 from core.exceptions import NotFoundError
@@ -21,7 +23,7 @@ from modules.activity.sync import SyncEngine
 
 
 class FakeAdapter(PlatformAdapter):
-    """按调用次数返回预设页；记录每次收到的 since 游标。"""
+    """按调用次数返回预设页（单批 done）；记录每次收到的 since 游标。"""
 
     platform_id = "codeforces"
     name = "Codeforces"
@@ -46,13 +48,15 @@ class FakeAdapter(PlatformAdapter):
         full_window_days: int,
         full_min_rows: int,
         progress_cb=None,
-    ) -> list[PlatformSubmission]:
+        resume_checkpoint: dict | None = None,
+    ) -> AsyncIterator[SyncBatch]:
         self.calls.append(since)
         if self.fail_with is not None:
             raise self.fail_with
         if self.pages:
-            return self.pages.pop(0)
-        return []
+            yield SyncBatch(items=self.pages.pop(0), done=True)
+        else:
+            yield SyncBatch(done=True)
 
 
 def item(sid: str, ts: int) -> PlatformSubmission:
@@ -156,7 +160,7 @@ async def test_sync_progress_reported_and_cleared(tmp_path):
             if progress_cb is not None:
                 progress_cb(1, 2)
                 mid["value"] = engine.status_of(USER, "codeforces", "demo").progress
-            return []
+            yield SyncBatch(done=True)
 
     engine._adapters["codeforces"] = ProgressAdapter()
     status = await engine.sync_account(USER, "codeforces", "demo")
@@ -253,3 +257,119 @@ async def test_drop_user_clears_runtime(tmp_path):
     st = engine.status_of("groupA", "codeforces", "demo")
     assert st.state is SyncState.IDLE
     assert st.last_synced_at is None
+
+
+# ===== 断点续传（全量回填流式落盘） =====
+
+
+class BatchAdapter(FakeAdapter):
+    """按预设批次流式产出（items + checkpoint）；fail_at 批次处抛错模拟中断。"""
+
+    def __init__(
+        self,
+        batches: list[tuple[list[PlatformSubmission], dict]],
+        fail_at: int | None = None,
+    ) -> None:
+        super().__init__()
+        self.batches = batches
+        self.fail_at = fail_at
+        self.resume_seen: list[dict | None] = []
+
+    async def fetch_submissions(
+        self, handle, *, since, resume_checkpoint=None, **kw
+    ) -> AsyncIterator[SyncBatch]:
+        self.calls.append(since)
+        self.resume_seen.append(resume_checkpoint)
+        for i, (items, checkpoint) in enumerate(self.batches):
+            if self.fail_at is not None and i == self.fail_at:
+                raise PlatformError("模拟中断（进程退出/平台故障）")
+            yield SyncBatch(items=items, checkpoint=checkpoint, done=False)
+        yield SyncBatch(done=True)
+
+
+async def test_backfill_streams_batches_and_clears_checkpoint(tmp_path):
+    """全量回填：每批落盘 + 断点推进，完成后清除断点并推进游标。"""
+    adapter = BatchAdapter([
+        ([item("1", 1000), item("2", 2000)], {"page": 2, "fetched": 2}),
+        ([item("3", 500)], {"page": 3, "fetched": 3}),
+    ])
+    engine, store = make_engine(tmp_path, adapter)
+    store.save_account(Account(platform="codeforces", handle="demo"))
+
+    status = await engine.sync_account(USER, "codeforces", "demo")
+
+    assert status.state is SyncState.IDLE
+    assert adapter.resume_seen == [None]  # 首次全量无断点
+    account = store.load_profile().accounts[0]
+    assert account.sync_checkpoint is None  # 完成即清除
+    assert account.last_synced_at == 2000  # 游标 = 落盘数据最大时间戳
+    items, _ = store.load_submissions("codeforces", "demo")
+    assert len(items) == 3
+
+
+async def test_backfill_interrupt_and_resume(tmp_path):
+    """中断后续传：断点透传 adapter、游标不动、重叠由 store 去重吸收。"""
+    adapter = BatchAdapter(
+        [
+            ([item("1", 1000), item("2", 2000)], {"page": 2, "fetched": 2}),
+            # 第 2 批处中断（fail_at=1）：剩余历史未拉
+            ([item("3", 500)], {"page": 3, "fetched": 3}),
+        ],
+        fail_at=1,
+    )
+    engine, store = make_engine(tmp_path, adapter)
+    store.save_account(Account(platform="codeforces", handle="demo"))
+
+    status = await engine.sync_account(USER, "codeforces", "demo")
+    assert status.state is SyncState.ERROR  # 降级为诊断
+    account = store.load_profile().accounts[0]
+    assert account.sync_checkpoint == {"page": 2, "fetched": 2}  # 断点保留
+    assert account.last_synced_at is None  # 游标绝不在中途推进
+    items, _ = store.load_submissions("codeforces", "demo")
+    assert len(items) == 2  # 已落盘批次安全保留
+
+    # 续传：断点透传；批次含一条重叠记录（页码漂移），由 store 去重吸收
+    adapter2 = BatchAdapter([
+        ([item("2", 2000), item("3", 500)], {"page": 3, "fetched": 4}),
+    ])
+    engine2, _ = make_engine(tmp_path, adapter2)
+    status2 = await engine2.sync_account(USER, "codeforces", "demo")
+
+    assert status2.state is SyncState.IDLE
+    assert adapter2.resume_seen == [{"page": 2, "fetched": 2}]  # 断点续传
+    account = store.load_profile().accounts[0]
+    assert account.sync_checkpoint is None
+    assert account.last_synced_at == 2000
+    items, _ = store.load_submissions("codeforces", "demo")
+    assert len(items) == 3  # 重叠的 id=2 未重复堆积
+
+
+async def test_incremental_does_not_touch_checkpoint(tmp_path):
+    """增量模式：整批一次落盘，不写断点（增量段短，无断点需求）。"""
+    adapter = BatchAdapter([([item("3", 3000)], {"page": 2, "fetched": 1})])
+    engine, store = make_engine(tmp_path, adapter)
+    store.save_account(
+        Account(platform="codeforces", handle="demo", last_synced_at=2000)
+    )
+
+    status = await engine.sync_account(USER, "codeforces", "demo")
+
+    assert status.state is SyncState.IDLE
+    assert adapter.resume_seen == [None]
+    account = store.load_profile().accounts[0]
+    assert account.sync_checkpoint is None
+    assert account.last_synced_at == 3000
+
+
+async def test_backfill_empty_account_no_cursor_no_checkpoint(tmp_path):
+    """空账号全量：不落 0 游标、不留断点（与增量空账号口径一致）。"""
+    adapter = BatchAdapter([])
+    engine, store = make_engine(tmp_path, adapter)
+    store.save_account(Account(platform="codeforces", handle="demo"))
+
+    await engine.sync_account(USER, "codeforces", "demo")
+
+    account = store.load_profile().accounts[0]
+    assert account.last_synced_at is None
+    assert account.sync_checkpoint is None
+    assert account.last_sync_ok_at is not None

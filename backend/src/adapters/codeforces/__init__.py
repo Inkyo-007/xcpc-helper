@@ -6,6 +6,7 @@ rating / 比赛记录属后续增量（Capability.RATING 已预留，本期不�
 
 import logging
 import time
+from collections.abc import AsyncIterator
 from typing import Any, TypeVar
 
 from pydantic import ValidationError
@@ -18,6 +19,7 @@ from adapters.base import (
     PlatformError,
     PlatformSubmission,
     ProgressCallback,
+    SyncBatch,
     UserInfo,
     UserNotFoundError,
 )
@@ -84,8 +86,9 @@ class CodeforcesAdapter(PlatformAdapter):
         full_window_days: int,
         full_min_rows: int,
         progress_cb: ProgressCallback | None = None,
-    ) -> list[PlatformSubmission]:
-        """按页拉取提交（返回按时间倒序）。
+        resume_checkpoint: dict[str, Any] | None = None,
+    ) -> AsyncIterator[SyncBatch]:
+        """按页流式拉取提交（每页一批，按时间倒序）。
 
         CF user.status 无总量字段，不上报进度（progress_cb 为契约参数，
         本平台忽略，前端显示不定态）。
@@ -95,19 +98,26 @@ class CodeforcesAdapter(PlatformAdapter):
           submission_id 去重吸收（避免同秒多提交被永久漏掉）；
         - 全量（since 为空）：拉到覆盖 full_window_days 窗口为止，窗口内
           不足 full_min_rows 条时继续拉满该数（为 all-time 总量留缓冲）；
+          断点 = {"from": 下一页偏移, "fetched": 累计条数}（偏移随新提交
+          漂移由 store 去重吸收，多拉无代价）；
         - 绝对护栏：最多 MAX_PAGES 页。
 
         full_window_days / full_min_rows 为同步策略，由调用方（sync 引擎）
         按上层配置传入，见 core/config.py 的 activity_window_days 等。
         """
-        out: list[PlatformSubmission] = []
+        start_offset = 1
+        fetched = 0
+        if since is None and resume_checkpoint:
+            start_offset = int(resume_checkpoint.get("from", 1))
+            fetched = int(resume_checkpoint.get("fetched", 0))
         window_start = int(time.time()) - full_window_days * 86400
-        for page in range(1, MAX_PAGES + 1):
+        page = (start_offset - 1) // PAGE_SIZE + 1
+        for _ in range(page, MAX_PAGES + 1):
             data = await self._fetcher.get_json(
                 STATUS_URL,
                 params={
                     "handle": handle,
-                    "from": (page - 1) * PAGE_SIZE + 1,
+                    "from": start_offset,
                     "count": PAGE_SIZE,
                 },
                 platform=self.platform_id,
@@ -119,18 +129,34 @@ class CodeforcesAdapter(PlatformAdapter):
             rows = envelope.result
             if not rows:
                 break
+            batch: list[PlatformSubmission] = []
+            hit_old = False
             for row in rows:
                 ts = row.creationTimeSeconds
                 if since is not None and ts < since:
-                    return out
-                out.append(self._to_submission(row, ts))
+                    hit_old = True
+                    break
+                batch.append(self._to_submission(row, ts))
+            fetched += len(batch)
+            start_offset += PAGE_SIZE
             last_ts = rows[-1].creationTimeSeconds
             # 全量停止条件：已越过窗口起点且累计条数达标；或页不满
-            if since is None and last_ts < window_start and len(out) >= full_min_rows:
-                break
-            if len(rows) < PAGE_SIZE:
-                break
-        return out
+            full_done = (
+                since is None
+                and (last_ts < window_start and fetched >= full_min_rows)
+            ) or (since is None and len(rows) < PAGE_SIZE)
+            done = hit_old or len(rows) < PAGE_SIZE or full_done
+            yield SyncBatch(
+                items=batch,
+                checkpoint=(
+                    None if done or since is not None
+                    else {"from": start_offset, "fetched": fetched}
+                ),
+                done=done,
+            )
+            if done:
+                return
+        yield SyncBatch(done=True)
 
     # ===== 内部 =====
 

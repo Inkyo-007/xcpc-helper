@@ -12,10 +12,14 @@ router / service / modules 主干保持平台无关（不出现 if platform == "
 均为普通方法，基类默认抛 CapabilityNotSupportedError：能力残缺的平台只实现
 capabilities 声明的方法，不被迫写空壳；正常路径由 service 按 capabilities
 决定调用，触发默认抛错即编程错误，直接暴露。
+
+提交拉取为**流式契约**（SyncBatch 异步生成器，见 fetch_submissions）：
+全量回填按批落盘 + 断点续传（sync_checkpoint），游标只在 done 时推进。
 """
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -70,6 +74,22 @@ class PlatformSubmission(BaseModel):
     verdict: Verdict
     submitted_at: int  # UTC 秒级时间戳
     language: str
+
+
+class SyncBatch(BaseModel):
+    """一次同步拉取的一个批次（流式契约，通常一页）。
+
+    - items：本批提交记录；
+    - checkpoint：全量回填断点（增量模式恒为 None），平台自解释
+      （洛谷页码 / CF 偏移 / AT from_second 秒，附累计条数 fetched），
+      由引擎持久化到 Account.sync_checkpoint，中断续传用；页码/偏移
+      随新提交漂移，由 store 按 submission_id 去重吸收（多拉无代价）；
+    - done：本批之后拉取完成——游标只在此时才可推进。
+    """
+
+    items: list[PlatformSubmission] = Field(default_factory=list)
+    checkpoint: dict[str, Any] | None = None
+    done: bool = False
 
 
 class UserInfo(BaseModel):
@@ -184,10 +204,14 @@ class PlatformAdapter:
         full_window_days: int,
         full_min_rows: int,
         progress_cb: ProgressCallback | None = None,
-    ) -> list[PlatformSubmission]:
-        """拉取提交：since 为 UTC 秒级游标（None 表示全量）。
+        resume_checkpoint: dict[str, Any] | None = None,
+    ) -> AsyncIterator[SyncBatch]:
+        """流式拉取提交：异步生成器逐批产出 SyncBatch（通常每页一批）。
 
-        增量语义由各平台自行解释（CF 按时间过滤、AtCoder 透传 from_second）。
+        since 为 UTC 秒游标（None 表示全量）；增量语义由各平台自行解释
+        （CF 按时间过滤、AtCoder 透传 from_second）。
+        resume_checkpoint 为全量回填断点（来自 Account.sync_checkpoint，
+        平台自解释），仅全量回填模式非空。
         full_window_days / full_min_rows 为同步策略（来自上层配置，
         如热力图窗口），由调用方传入，adapter 不内置产品策略。
         progress_cb(fetched, total) 为可选进度回调：总量可知的平台
@@ -196,6 +220,7 @@ class PlatformAdapter:
         仅具备 SUBMISSIONS 能力时实现。
         """
         raise CapabilityNotSupportedError(f"{self.platform_id} 不支持提交明细")
+        yield  # pragma: no cover - 使本方法成为异步生成器（契约默认抛错）
 
     async def fetch_rating_history(
         self, handle: str, credentials: Credentials | None = None

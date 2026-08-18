@@ -9,7 +9,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from adapters.base import BrowserLoginCancelledError, Credentials, UserInfo
+from adapters.base import BrowserLoginCancelledError, Credentials, SyncBatch, UserInfo
 from adapters.net import HttpFetcher
 from core.config import Settings
 from core.exceptions import (
@@ -487,7 +487,7 @@ def stub_luogu(service: ActivityService, login_result=None, login_exc=None):
     adapter.run_browser_login = fake_login
 
     async def no_network_fetch(handle, *, since, credentials, **kwargs):
-        return []
+        yield SyncBatch(done=True)
 
     adapter.fetch_submissions = no_network_fetch
     return adapter

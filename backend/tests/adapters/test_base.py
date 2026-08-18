@@ -32,9 +32,11 @@ async def test_unimplemented_capabilities_raise():
     with pytest.raises(CapabilityNotSupportedError):
         await adapter.verify("demo")
     with pytest.raises(CapabilityNotSupportedError):
-        await adapter.fetch_submissions(
+        # fetch_submissions 为异步生成器：首次取批时抛契约违约
+        async for _batch in adapter.fetch_submissions(
             "demo", since=None, full_window_days=370, full_min_rows=5000
-        )
+        ):
+            pass
     with pytest.raises(CapabilityNotSupportedError):
         await adapter.fetch_contests()
 

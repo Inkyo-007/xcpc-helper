@@ -75,12 +75,16 @@ def catalog_handler(pages: list[list[dict]]):
 
 
 async def fetch(adapter, since=None, min_rows=FULL_MIN_ROWS):
-    return await adapter.fetch_submissions(
+    """收集流式契约的全部批次（SyncBatch）为扁平列表。"""
+    items = []
+    async for batch in adapter.fetch_submissions(
         "chokudai",
         since=since,
         full_window_days=FULL_WINDOW_DAYS,
         full_min_rows=min_rows,
-    )
+    ):
+        items.extend(batch.items)
+    return items
 
 
 # ===== verify =====
@@ -186,6 +190,26 @@ async def test_fetch_paginates_and_dedups_overlap(monkeypatch):
         items = await fetch(adapter, since=now - 200)
         assert [s.submission_id for s in items] == ["1", "2", "3", "4"]
         assert requested_from == [now - 200, now - 50, now - 10]
+    finally:
+        await fetcher.aclose()
+
+
+async def test_fetch_resume_from_checkpoint():
+    """断点续传：resume_checkpoint 的 from_second 透传为起始拉取点。"""
+    handler, requested_from = catalog_handler([[]])
+    adapter, fetcher = make_adapter(handler)
+    try:
+        items = []
+        async for batch in adapter.fetch_submissions(
+            "chokudai",
+            since=None,
+            full_window_days=FULL_WINDOW_DAYS,
+            full_min_rows=FULL_MIN_ROWS,
+            resume_checkpoint={"from_second": 1750000000, "fetched": 100, "from_zero": True},
+        ):
+            items.extend(batch.items)
+        assert items == []
+        assert requested_from == [1750000000]  # 从断点秒续拉，不回头
     finally:
         await fetcher.aclose()
 

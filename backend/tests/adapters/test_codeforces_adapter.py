@@ -56,6 +56,14 @@ def now_minus(days: float) -> int:
     return int(time.time()) - int(days * 86400)
 
 
+async def collect(adapter, handle, **kwargs):
+    """收集流式契约的全部批次（SyncBatch）为扁平列表。"""
+    items = []
+    async for batch in adapter.fetch_submissions(handle, **kwargs):
+        items.extend(batch.items)
+    return items
+
+
 # ===== verify =====
 
 
@@ -151,7 +159,7 @@ async def test_fetch_full_pages_until_empty(monkeypatch):
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions(
+        items = await collect(adapter,
             "example",
             since=None,
             full_window_days=FULL_WINDOW_DAYS,
@@ -181,7 +189,7 @@ async def test_fetch_incremental_stops_at_cursor():
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions(
+        items = await collect(adapter,
             "example",
             since=since,
             full_window_days=FULL_WINDOW_DAYS,
@@ -210,7 +218,7 @@ async def test_fetch_incremental_repeats_cursor_second():
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions(
+        items = await collect(adapter,
             "example",
             since=since,
             full_window_days=FULL_WINDOW_DAYS,
@@ -238,7 +246,7 @@ async def test_fetch_full_stops_past_window_with_min_rows(monkeypatch):
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions(
+        items = await collect(adapter,
             "example",
             since=None,
             full_window_days=FULL_WINDOW_DAYS,
@@ -268,7 +276,7 @@ async def test_fetch_full_keeps_pulling_inside_window(monkeypatch):
 
     adapter, fetcher = make_adapter(handler)
     try:
-        items = await adapter.fetch_submissions(
+        items = await collect(adapter,
             "example",
             since=None,
             full_window_days=FULL_WINDOW_DAYS,
@@ -286,12 +294,36 @@ async def test_fetch_envelope_failure_raises():
     adapter, fetcher = make_adapter(handler)
     try:
         with pytest.raises(PlatformError):
-            await adapter.fetch_submissions(
+            await collect(adapter,
                 "example",
                 since=None,
                 full_window_days=FULL_WINDOW_DAYS,
                 full_min_rows=FULL_MIN_ROWS,
             )
+    finally:
+        await fetcher.aclose()
+
+
+async def test_fetch_resume_from_checkpoint():
+    """断点续传：resume_checkpoint 的偏移透传为起始页。"""
+    requested_from: list[int] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requested_from.append(int(request.url.params["from"]))
+        return ok_json({"status": "OK", "result": []})
+
+    adapter, fetcher = make_adapter(handler)
+    try:
+        items = await collect(
+            adapter,
+            "example",
+            since=None,
+            full_window_days=FULL_WINDOW_DAYS,
+            full_min_rows=FULL_MIN_ROWS,
+            resume_checkpoint={"from": 2001, "fetched": 2000},
+        )
+        assert items == []
+        assert requested_from == [2001]  # 从断点偏移续拉，不回头
     finally:
         await fetcher.aclose()
 
@@ -368,7 +400,7 @@ async def test_fetch_malformed_row_raises_platform_error():
     adapter, fetcher = make_adapter(handler)
     try:
         with pytest.raises(PlatformError):
-            await adapter.fetch_submissions(
+            await collect(adapter,
                 "example",
                 since=None,
                 full_window_days=FULL_WINDOW_DAYS,
@@ -391,7 +423,7 @@ async def test_fetch_row_missing_timestamp_raises_platform_error():
     adapter, fetcher = make_adapter(handler)
     try:
         with pytest.raises(PlatformError):
-            await adapter.fetch_submissions(
+            await collect(adapter,
                 "example",
                 since=None,
                 full_window_days=FULL_WINDOW_DAYS,

@@ -1,6 +1,13 @@
-"""增量同步引擎：游标推进、去重合并、单账号锁、失败隔离（按用户组隔离）。
+"""增量同步引擎：游标推进、断点续传、去重合并、单账号锁、失败隔离（按用户组隔离）。
 
-adapter 拉取 → 领域转换（补 platform / handle）→ store 去重合并 → 游标推进。
+adapter 流式产出批次（SyncBatch）→ 领域转换（补 platform / handle）→ store
+去重合并。双模式（见 activity.md §3.3 / §6.2）：
+
+- **全量/回填模式**（游标为空或断点存在）：每批落盘 + 每批推进断点
+  （Account.sync_checkpoint，平台自解释），`done` 时才推进游标并清除断点；
+  中断后下次同步从断点续跑——游标绝不在中途推进（否则未拉区段永久漏数据）；
+- **增量模式**：攒齐批次一次落盘（增量段短，无断点需求），游标语义不变。
+
 单账号失败只降级为该账号的诊断（SyncStatus.error），不阻断其他账号，
 遵循 conventions.md「诊断不阻断」哲学。
 
@@ -135,6 +142,7 @@ class SyncEngine:
         if account is None:
             raise NotFoundError(f"账号未绑定: {platform}/{handle}")
         since = account.last_synced_at
+        checkpoint = account.sync_checkpoint
         # cookie 授权平台：从 secrets.json 加载凭据（匿名平台为 None）
         credentials = store.get_account_credentials(platform, handle)
 
@@ -144,22 +152,106 @@ class SyncEngine:
             if st is not None and st.state == SyncState.RUNNING:
                 st.progress = min(fetched / total, 1.0) if total else None
 
-        raw = await adapter.fetch_submissions(
-            handle,
+        if since is None or checkpoint is not None:
+            await self._run_backfill(
+                adapter, store, account, since, checkpoint, credentials, _on_progress
+            )
+        else:
+            await self._run_incremental(
+                adapter, store, account, since, credentials, _on_progress
+            )
+        self._status[(user_id, platform, handle)] = SyncStatus(
+            platform=platform,
+            handle=handle,
+            state=SyncState.IDLE,
+            last_synced_at=datetime.now().astimezone(),
+        )
+
+    def _fetch_batches(
+        self,
+        adapter: PlatformAdapter,
+        account: Account,
+        since: int | None,
+        checkpoint: dict | None,
+        credentials,
+        on_progress,
+    ):
+        """透传调用 adapter 流式拉取（集中参数装配；普通函数返回异步生成器）。"""
+        return adapter.fetch_submissions(
+            account.handle,
             since=since,
             credentials=credentials,
             full_window_days=self._full_window_days,
             full_min_rows=self._full_min_rows,
-            progress_cb=_on_progress,
+            progress_cb=on_progress,
+            resume_checkpoint=checkpoint,
         )
+
+    async def _run_backfill(self, adapter, store, account, since, checkpoint, credentials, on_progress) -> None:
+        """全量/回填模式：每批落盘 + 每批推进断点，done 才推进游标。
+
+        中断（进程退出 / 平台故障）时：已落盘批次安全保留，断点指向续传
+        位置；下次同步识别断点从该处续跑。游标只在完成时推进——取该账号
+        落盘数据的最大时间戳（覆盖此前中断批次的成果），防倒退。
+        """
+        platform, handle = account.platform, account.handle
+        async for batch in self._fetch_batches(
+            adapter, account, since, checkpoint, credentials, on_progress
+        ):
+            submissions = [
+                Submission(platform=platform, handle=handle, **item.model_dump())
+                for item in batch.items
+            ]
+            if submissions:
+                store.merge_submissions(platform, handle, submissions)
+            if batch.done:
+                break
+            # 每批落盘后推进断点（游标不动！断点是唯一的中途进度标记）
+            store.save_account(
+                Account(
+                    platform=platform,
+                    handle=handle,
+                    last_synced_at=since,
+                    display_name=account.display_name,
+                    last_sync_ok_at=account.last_sync_ok_at,
+                    sync_checkpoint=batch.checkpoint,
+                )
+            )
+        # 完成：游标 = 该账号落盘数据的最大时间戳（含此前中断批次的成果）；
+        # 空账号不落 0 游标
+        items, _skipped = store.load_submissions(platform, handle)
+        final_max = max((s.submitted_at for s in items), default=0)
+        store.save_account(
+            Account(
+                platform=platform,
+                handle=handle,
+                last_synced_at=max(final_max, since or 0) or None,
+                display_name=account.display_name,
+                last_sync_ok_at=int(time.time()),
+                sync_checkpoint=None,  # 回填完成，清除断点
+            )
+        )
+
+    async def _run_incremental(self, adapter, store, account, since, credentials, on_progress) -> None:
+        """增量模式：攒齐批次一次落盘（增量段短，无断点需求；语义同改造前）。
+
+        游标推进：取最大值防倒退；无新提交时保持原游标（空账号不落 0 游标）。
+        同步成功时刻（last_sync_ok_at）每次成功都记录——它与数据水位游标
+        是两种时间（游标 = 数据新到哪，不是何时同步的），供"xx 前同步"展示。
+        """
+        platform, handle = account.platform, account.handle
+        raw = []
+        async for batch in self._fetch_batches(
+            adapter, account, since, None, credentials, on_progress
+        ):
+            raw.extend(batch.items)
+            if batch.done:
+                break
         submissions = [
             Submission(platform=platform, handle=handle, **item.model_dump())
             for item in raw
         ]
         store.merge_submissions(platform, handle, submissions)
-        # 游标推进：取最大值防倒退；无新提交时保持原游标（空账号不落 0 游标）。
-        # 同步成功时刻（last_sync_ok_at）每次成功都记录——它与数据水位游标
-        # 是两种时间（游标 = 数据新到哪，不是何时同步的），供"xx 前同步"展示。
         new_cursor = max((s.submitted_at for s in submissions), default=0)
         store.save_account(
             Account(
@@ -169,10 +261,4 @@ class SyncEngine:
                 display_name=account.display_name,  # 游标推进不丢展示名
                 last_sync_ok_at=int(time.time()),
             )
-        )
-        self._status[(user_id, platform, handle)] = SyncStatus(
-            platform=platform,
-            handle=handle,
-            state=SyncState.IDLE,
-            last_synced_at=datetime.now().astimezone(),
         )

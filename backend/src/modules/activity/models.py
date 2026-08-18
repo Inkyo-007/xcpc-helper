@@ -7,6 +7,7 @@ SQLite 仅作索引/缓存用途），故 models.py 存放 Pydantic 领域模型
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -41,6 +42,11 @@ class Account(BaseModel):
     哪个时刻，用于增量游标），last_sync_ok_at 是**最近一次同步成功的
     真实时刻**（用于"xx 前同步"展示）——混用会让重启后/同步中的
     标签显示成数据水龄（如 71 天前最后一次提交被显示为 71 天前同步）。
+
+    sync_checkpoint 为全量回填断点（平台自解释：洛谷页码 / CF 偏移 /
+    AT from_second 秒，附累计条数 fetched），仅回填期存在：每批落盘后
+    推进、全量完成即清除；与游标职责分离——游标只进不退、绝不在中途
+    推进，断点是临时的续传位置。
     """
 
     platform: str
@@ -48,6 +54,7 @@ class Account(BaseModel):
     last_synced_at: int | None = None  # null = 从未同步成功
     display_name: str | None = None  # 展示名（与 API 主键分离）
     last_sync_ok_at: int | None = None  # 最近一次同步成功时刻（UTC 秒；与游标分离）
+    sync_checkpoint: dict[str, Any] | None = None  # 全量回填断点（非空 = 回填进行中）
 
 
 class Secrets(BaseModel):

@@ -19,7 +19,7 @@ import asyncio
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 from curl_cffi.requests import AsyncSession
@@ -35,6 +35,7 @@ from adapters.base import (
     PlatformError,
     PlatformSubmission,
     ProgressCallback,
+    SyncBatch,
     UserInfo,
     UserNotFoundError,
 )
@@ -132,23 +133,30 @@ class LuoguAdapter(PlatformAdapter):
         full_window_days: int,
         full_min_rows: int,
         progress_cb: ProgressCallback | None = None,
-    ) -> list[PlatformSubmission]:
-        """倒序回扫分页拉取（返回按时间倒序，语义对齐 CF 适配器）。
+        resume_checkpoint: dict[str, Any] | None = None,
+    ) -> AsyncIterator[SyncBatch]:
+        """倒序回扫分页流式拉取（每页一批，按时间倒序）。
 
         - 增量（since 非空）：遇 ts < since 即停；游标当秒提交重复拉取，
           由 store 层按 submission_id 去重吸收；
         - 全量（since 为空）：拉到覆盖 full_window_days 窗口为止，窗口内
-          不足 full_min_rows 条时继续拉满；首页信封 records.count 即
-          全站总条数，经 progress_cb 逐页上报真实进度百分比；
+          不足 full_min_rows 条时继续拉满；断点 = {"page": 下一页页码,
+          "fetched": 累计条数}（页码随新提交漂移由 store 去重吸收，多拉
+          无代价）；首页信封 records.count 即全站总条数，经 progress_cb
+          逐页上报真实进度百分比（累计口径，含续传前已拉取部分）；
         - 绝对护栏：最多 MAX_PAGES 页。
         """
         if credentials is None:
             raise AuthExpiredError("未配置洛谷凭据，请先绑定账号并授权")
-        out: list[LgRecordRow] = []
         seen: set[int] = set()
         window_start = int(time.time()) - full_window_days * 86400
+        page = 1
+        fetched = 0
+        if since is None and resume_checkpoint:
+            page = int(resume_checkpoint.get("page", 1))
+            fetched = int(resume_checkpoint.get("fetched", 0))
         async with self._session_factory() as session:
-            for page in range(1, MAX_PAGES + 1):
+            for _ in range(page, MAX_PAGES + 1):
                 data = await self._get_json(
                     session,
                     RECORD_LIST_URL,
@@ -160,26 +168,39 @@ class LuoguAdapter(PlatformAdapter):
                 rows = page_data.result if page_data else []
                 if not rows:
                     break
+                batch: list[LgRecordRow] = []
+                hit_old = False
                 for row in rows:
                     if since is not None and row.submitTime < since:
-                        return [self._to_submission(r) for r in out]
+                        hit_old = True
+                        break
                     if row.id not in seen:
                         seen.add(row.id)
-                        out.append(row)
+                        batch.append(row)
+                fetched += len(batch)
                 # 进度上报：仅全量（总量 = 首页信封 count；增量子集总量不可知）
                 if progress_cb is not None and since is None and page_data is not None:
-                    progress_cb(len(out), page_data.count)
+                    progress_cb(fetched, page_data.count)
                 last_ts = rows[-1].submitTime
                 # 全量停止条件：已越过窗口起点且累计条数达标；或末页（不满 perPage）
-                if (
-                    since is None
-                    and last_ts < window_start
-                    and len(out) >= full_min_rows
-                ):
-                    break
-                if len(rows) < (page_data.perPage if page_data else 20):
-                    break
-        return [self._to_submission(r) for r in out]
+                full_done = (
+                    last_ts < window_start and fetched >= full_min_rows
+                )
+                short_page = len(rows) < (page_data.perPage if page_data else 20)
+                done = hit_old or short_page or (since is None and full_done)
+                page += 1
+                yield SyncBatch(
+                    items=[self._to_submission(r) for r in batch],
+                    checkpoint=(
+                        None
+                        if done or since is not None
+                        else {"page": page, "fetched": fetched}
+                    ),
+                    done=done,
+                )
+                if done:
+                    return
+        yield SyncBatch(done=True)
 
     # ===== 一键登录（browser-login，可选依赖 Playwright） =====
 

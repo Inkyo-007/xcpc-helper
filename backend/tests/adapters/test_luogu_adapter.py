@@ -91,13 +91,17 @@ def now_minus(days: float) -> int:
 
 
 async def fetch(adapter: LuoguAdapter, since=None, min_rows=FULL_MIN_ROWS):
-    return await adapter.fetch_submissions(
+    """收集流式契约的全部批次（SyncBatch）为扁平列表。"""
+    items = []
+    async for batch in adapter.fetch_submissions(
         "100000",
         since=since,
         credentials=CREDS,
         full_window_days=FULL_WINDOW_DAYS,
         full_min_rows=min_rows,
-    )
+    ):
+        items.extend(batch.items)
+    return items
 
 
 # ===== verify =====
@@ -266,16 +270,40 @@ async def test_fetch_full_stops_past_window_with_enough_rows():
     assert len(items) == 21
 
 
+async def test_fetch_resume_from_checkpoint():
+    """断点续传：resume_checkpoint 的页码透传为起始页。"""
+    requested_pages: list[int] = []
+
+    def handler(url, params):
+        requested_pages.append(int(params["page"]))
+        return FakeResponse(200, envelope([]))
+
+    adapter = make_adapter(handler)
+    items = []
+    async for batch in adapter.fetch_submissions(
+        "100000",
+        since=None,
+        credentials=CREDS,
+        full_window_days=FULL_WINDOW_DAYS,
+        full_min_rows=FULL_MIN_ROWS,
+        resume_checkpoint={"page": 3, "fetched": 40},
+    ):
+        items.extend(batch.items)
+    assert items == []
+    assert requested_pages == [3]  # 从断点页码续拉，不回头
+
+
 async def test_fetch_without_credentials_raises_auth_expired():
     adapter = make_adapter(lambda url, params: FakeResponse(200, envelope([])))
     with pytest.raises(AuthExpiredError):
-        await adapter.fetch_submissions(
+        async for _batch in adapter.fetch_submissions(
             "100000",
             since=None,
             credentials=None,
             full_window_days=FULL_WINDOW_DAYS,
             full_min_rows=FULL_MIN_ROWS,
-        )
+        ):
+            pass
 
 
 async def test_fetch_non_json_with_credentials_is_auth_expired():
@@ -414,14 +442,15 @@ async def test_fetch_reports_progress_with_total_on_full_sync():
 
     adapter = make_adapter(handler)
     calls: list[tuple[int, int | None]] = []
-    await adapter.fetch_submissions(
+    async for _batch in adapter.fetch_submissions(
         "100000",
         since=None,
         credentials=CREDS,
         full_window_days=FULL_WINDOW_DAYS,
         full_min_rows=1,
         progress_cb=lambda fetched, total: calls.append((fetched, total)),
-    )
+    ):
+        pass
     assert calls == [(20, 9999), (21, 9999)]  # envelope() 固定 count=9999
 
 
@@ -434,12 +463,13 @@ async def test_fetch_no_progress_on_incremental():
 
     adapter = make_adapter(handler)
     calls: list[tuple[int, int | None]] = []
-    await adapter.fetch_submissions(
+    async for _batch in adapter.fetch_submissions(
         "100000",
         since=since,
         credentials=CREDS,
         full_window_days=FULL_WINDOW_DAYS,
         full_min_rows=FULL_MIN_ROWS,
         progress_cb=lambda fetched, total: calls.append((fetched, total)),
-    )
+    ):
+        pass
     assert calls == []

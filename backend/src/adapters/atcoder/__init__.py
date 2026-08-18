@@ -14,6 +14,7 @@ rating 属后续增量（官方 history/json 端点已探明，本期不声明 R
 
 import logging
 import time
+from collections.abc import AsyncIterator
 from typing import Any
 
 from pydantic import ValidationError
@@ -30,6 +31,7 @@ from adapters.base import (
     PlatformError,
     PlatformSubmission,
     ProgressCallback,
+    SyncBatch,
     UserInfo,
     UserNotFoundError,
 )
@@ -92,8 +94,9 @@ class AtCoderAdapter(PlatformAdapter):
         full_window_days: int,
         full_min_rows: int,
         progress_cb: ProgressCallback | None = None,
-    ) -> list[PlatformSubmission]:
-        """升序翻页拉取提交（返回按时间升序）。
+        resume_checkpoint: dict[str, Any] | None = None,
+    ) -> AsyncIterator[SyncBatch]:
+        """升序翻页流式拉取（每页一批，按时间升序）。
 
         kenkoooo 无总量字段，不上报进度（progress_cb 为契约参数，
         本平台忽略，前端显示不定态）。
@@ -102,6 +105,8 @@ class AtCoderAdapter(PlatformAdapter):
           重复拉取，由 store 层按 submission_id 去重吸收）；
         - 全量（since 为空）：先拉 full_window_days 窗口；窗口内不足
           full_min_rows 条时退到 from_second=0 拉全部历史（两步策略）；
+          断点 = {"from_second": 续拉位置, "fetched": 累计条数,
+          "from_zero": 是否已进入全历史阶段}（含边界续拉由 store 去重吸收）；
         - 页间去重与防停滞：from_second 含边界 ⇒ 翻页下一页与上页末条
           同秒重叠，按 id 集合去重；单页无新 id 即停（防同秒满页死循环）；
         - 绝对护栏：最多 MAX_PAGES 页。
@@ -110,44 +115,57 @@ class AtCoderAdapter(PlatformAdapter):
         按上层配置传入，见 core/config.py 的 activity_window_days 等。
         """
         await self._ensure_catalog()
-        start = since
-        if start is None:
-            start = max(0, int(time.time()) - full_window_days * 86400)
         seen: set[int] = set()
-        rows: list[AtSubmissionRow] = []
-        await self._collect(handle, start, seen, rows)
-        if since is None and len(rows) < full_min_rows and start > 0:
-            # 全量窗口内条数不足：回拉全部历史（为 all-time 总量留缓冲）
-            await self._collect(handle, 0, seen, rows)
-        return [self._to_submission(row) for row in rows]
-
-    # ===== 内部：翻页 =====
-
-    async def _collect(
-        self,
-        handle: str,
-        start: int,
-        seen: set[int],
-        out: list[AtSubmissionRow],
-    ) -> None:
-        """从 start（含）升序翻页，新提交按 id 去重后追加到 out。"""
-        current = start
-        for _ in range(MAX_PAGES):
-            data = await self._get_json(
-                SUBMISSIONS_URL,
-                params={"user": handle, "from_second": current},
+        fetched = 0
+        from_zero = False
+        if since is None and resume_checkpoint:
+            current = int(resume_checkpoint.get("from_second", 0))
+            fetched = int(resume_checkpoint.get("fetched", 0))
+            from_zero = bool(resume_checkpoint.get("from_zero", False))
+        else:
+            current = (
+                since
+                if since is not None
+                else max(0, int(time.time()) - full_window_days * 86400)
             )
-            page = self._parse(data, api_models.SUBMISSIONS, "提交列表")
-            if not page:
-                return
-            new_rows = [row for row in page if row.id not in seen]
-            for row in new_rows:
-                seen.add(row.id)
-                out.append(row)
-            # 短页（未达上限）即最后一页；满页但无新 id 说明同秒重叠停滞
-            if len(page) < PAGE_LIMIT or not new_rows:
-                return
-            current = page[-1].epoch_second
+        while True:
+            for _ in range(MAX_PAGES):
+                data = await self._get_json(
+                    SUBMISSIONS_URL,
+                    params={"user": handle, "from_second": current},
+                )
+                page = self._parse(data, api_models.SUBMISSIONS, "提交列表")
+                if not page:
+                    yield SyncBatch(done=True)
+                    return
+                new_rows = [row for row in page if row.id not in seen]
+                for row in new_rows:
+                    seen.add(row.id)
+                fetched += len(new_rows)
+                current = page[-1].epoch_second
+                # 短页（未达上限）即最后一页；满页但无新 id 说明同秒重叠停滞
+                last = len(page) < PAGE_LIMIT or not new_rows
+                yield SyncBatch(
+                    items=[self._to_submission(row) for row in new_rows],
+                    checkpoint=(
+                        None
+                        if last or since is not None
+                        else {
+                            "from_second": current,
+                            "fetched": fetched,
+                            "from_zero": from_zero,
+                        }
+                    ),
+                    done=last,
+                )
+                if last:
+                    break
+            # 全量两步策略：窗口内不足 full_min_rows 且尚未拉全历史 → 从 0 再拉
+            if since is None and not from_zero and fetched < full_min_rows and current > 0:
+                from_zero = True
+                current = 0
+                continue
+            return
 
     # ===== 内部：题目目录 =====
 
