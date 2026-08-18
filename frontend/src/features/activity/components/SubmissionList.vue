@@ -6,7 +6,7 @@
 import { computed } from 'vue'
 import { ExternalLink, Inbox } from 'lucide-vue-next'
 import { NPagination } from 'naive-ui'
-import { parseDate, todayStr, weekdayCn } from '@/features/activity/model/dates'
+import { parseDate, recentDateStr, todayStr, weekdayCn } from '@/features/activity/model/dates'
 import { pageCount, paged } from '@/features/activity/model/pagination'
 import { useActivity } from '@/features/activity/store'
 import type { RecentSubmission, SubmissionEntry, Verdict } from '@/features/activity/types'
@@ -60,8 +60,8 @@ const rows = computed<Row[]>(() => {
   const today = todayStr()
   return paged(props.recent, props.page).map((e) => ({
     ...e,
-    // 今天的提交只显示时刻，更早的带上日期
-    timeLabel: e.date === today ? e.time : `${e.date.slice(5)} ${e.time}`,
+    // 今天的提交只显示时刻；更早的带上日期：当年 MM-DD，往年完整 YYYY-MM-DD
+    timeLabel: e.date === today ? e.time : `${recentDateStr(e.date, today)} ${e.time}`,
   }))
 })
 

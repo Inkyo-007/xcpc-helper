@@ -27,6 +27,11 @@ export function monthKey(s: string): string {
   return s.slice(0, 7)
 }
 
+/** 近期提交的行底日期：当年省略年份（MM-DD），往年显示完整 YYYY-MM-DD */
+export function recentDateStr(date: string, today: string = todayStr()): string {
+  return date.slice(0, 4) === today.slice(0, 4) ? date.slice(5) : date
+}
+
 const WEEKDAY_CN = ['日', '一', '二', '三', '四', '五', '六']
 
 export function weekdayCn(s: string): string {
