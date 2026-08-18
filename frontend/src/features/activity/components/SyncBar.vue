@@ -9,7 +9,7 @@ import { computed, ref } from 'vue'
 import { Link2, Plus, RefreshCw, Sparkles, TriangleAlert, UserRoundPen } from 'lucide-vue-next'
 import { NButton, NModal, NTooltip } from 'naive-ui'
 import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
-import { accountLabel, platformMeta } from '@/features/activity/store'
+import { accountLabel, platformMeta, refiningKeys } from '@/features/activity/store'
 import type { PlatformScope } from '@/features/activity/store'
 import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
@@ -46,6 +46,12 @@ const canRefine = computed(() => {
   if (props.activePlatform === 'all' || !platformAccount.value) return false
   const meta = platformMeta(props.activePlatform as PlatformId)
   return meta?.capabilities.includes('refine_verdict') ?? false
+})
+
+/** 该平台账号精化进行中：精化按钮显示黄点角标（与页签同步角标同语言） */
+const refining = computed(() => {
+  const acc = platformAccount.value
+  return acc !== null && refiningKeys.value.includes(`${acc.platform}/${acc.handle}`)
 })
 
 /* ---------- 同步全部平台确认 ---------- */
@@ -86,14 +92,15 @@ function confirmSyncAll(): void {
       <template #trigger>
         <button
           type="button"
-          class="tool-icon-btn"
+          class="tool-icon-btn refine-btn"
           aria-label="精细化同步"
           @click="emit('refine', platformAccount!)"
         >
           <Sparkles :size="15" />
+          <i v-if="refining" class="refine-dot" />
         </button>
       </template>
-      精细化同步（UNAC → 具体评测结果）
+      {{ refining ? '精细化同步进行中' : '精细化同步（UNAC → 具体评测结果）' }}
     </NTooltip>
     <NTooltip v-if="activePlatform === 'all'" :show-arrow="false">
       <template #trigger>
@@ -217,6 +224,36 @@ function confirmSyncAll(): void {
 
 .tool-icon-btn.spinning svg {
   animation: sync-spin 0.9s linear infinite;
+}
+
+/* 精化按钮：相对定位承载运行中黄点角标 */
+.refine-btn {
+  position: relative;
+}
+
+/* 精化运行中角标：右上角黄色圆点（与页签同步角标同视觉语言） */
+.refine-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #eab308;
+  box-shadow: 0 0 0 2px var(--surface);
+  animation: dot-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
 }
 
 @keyframes sync-spin {

@@ -105,6 +105,10 @@ async function refreshAccounts(): Promise<void> {
     accounts.value = res.platforms
       .map((p) => p.account)
       .filter((a): a is BoundAccount => a !== null)
+    // 发现页面加载前已在运行的精化（黄点角标），并在跑完前保持跟踪
+    void refreshRefineStates().then(() => {
+      if (refiningKeys.value.length > 0) pollRefineInBackground()
+    })
   } catch {
     /* 后端未就绪时保持空列表 */
   }
@@ -154,6 +158,65 @@ function pollInBackground(): void {
       bgPolling = false
     }
   })()
+}
+
+/* ---------- 精细化同步运行态（驱动精化按钮黄点角标） ---------- */
+
+/** 正在精化的账号键集合（"platform/handle"） */
+export const refiningKeys = ref<string[]>([])
+
+function refineKey(platform: string, handle: string): string {
+  return `${platform}/${handle}`
+}
+
+/** 拉取精化能力账号的运行态，维护 refiningKeys（启动时调用一次发现
+ * 页面加载前已在运行的精化；之后靠 poller 跟踪到结束） */
+async function refreshRefineStates(): Promise<void> {
+  const targets = accounts.value.filter((a) =>
+    platformMeta(a.platform)?.capabilities.includes('refine_verdict'),
+  )
+  const running: string[] = []
+  for (const acc of targets) {
+    try {
+      const st = await api.fetchRefineStatus(acc.platform, acc.handle)
+      if (st.state === 'running') running.push(refineKey(acc.platform, acc.handle))
+    } catch {
+      /* 单账号失败跳过 */
+    }
+  }
+  refiningKeys.value = running
+}
+
+/** 精化运行态后台轮询（有在跑精化时 2s 一探，全部结束后自停） */
+let refinePolling = false
+function pollRefineInBackground(): void {
+  if (refinePolling) return
+  refinePolling = true
+  void (async () => {
+    try {
+      while (refiningKeys.value.length > 0) {
+        await new Promise((r) => setTimeout(r, 2000))
+        await refreshRefineStates()
+      }
+    } finally {
+      refinePolling = false
+    }
+  })()
+}
+
+/** 标记账号精化进入运行态（启动精化/打开弹窗发现运行中时调用） */
+export function markRefining(platform: PlatformId, handle: string): void {
+  const key = refineKey(platform, handle)
+  if (!refiningKeys.value.includes(key)) {
+    refiningKeys.value = [...refiningKeys.value, key]
+  }
+  pollRefineInBackground()
+}
+
+/** 取消运行态标记（中止/完成时调用；后台轮询也会兜底纠正） */
+export function unmarkRefining(platform: PlatformId, handle: string): void {
+  const key = refineKey(platform, handle)
+  refiningKeys.value = refiningKeys.value.filter((k) => k !== key)
 }
 
 /* ---------- 视图状态（网址恢复由 ActivityPage 驱动） ---------- */

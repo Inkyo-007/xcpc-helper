@@ -19,6 +19,7 @@ import {
   stopRefine,
 } from '@/features/activity/api'
 import { estimateRefineDuration } from '@/features/activity/model/refine'
+import { markRefining, unmarkRefining } from '@/features/activity/store'
 import type { BoundAccount, RefineStatus } from '@/features/activity/types'
 
 const props = defineProps<{
@@ -58,6 +59,9 @@ async function refresh(): Promise<void> {
   if (!props.account) return
   try {
     status.value = await fetchRefineStatus(props.account.platform, props.account.handle)
+    // 同步运行态角标（启动/中止/轮询发现均即时驱动）
+    if (status.value.state === 'running') markRefining(props.account.platform, props.account.handle)
+    else unmarkRefining(props.account.platform, props.account.handle)
   } catch {
     /* 状态拉取失败保持旧值 */
   }
@@ -86,6 +90,7 @@ async function start(): Promise<void> {
   errorText.value = ''
   try {
     await startRefine(props.account.platform, props.account.handle)
+    markRefining(props.account.platform, props.account.handle)
     await refresh()
   } catch (e) {
     errorText.value = e instanceof Error ? e.message : '启动失败，请稍后重试'
@@ -100,6 +105,7 @@ async function stop(): Promise<void> {
   errorText.value = ''
   try {
     await stopRefine(props.account.platform, props.account.handle)
+    unmarkRefining(props.account.platform, props.account.handle)
     await refresh()
   } catch (e) {
     errorText.value = e instanceof Error ? e.message : '中止失败，请稍后重试'
