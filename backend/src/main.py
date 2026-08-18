@@ -41,6 +41,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_print_book_service(settings, service)
     init_transfer_service(settings, service)
     activity = init_activity_service(settings)
+    # 启动时自动同步当前用户组全部账号（后台执行；本地应用不常驻，
+    # 启动即同步保证数据新鲜度；单账号失败降级为诊断，不阻断启动）
+    if settings.activity_sync_on_startup:
+        await activity.sync(None)
 
     watcher: ContentWatcher | None = None
     if settings.watch_enabled:
