@@ -140,12 +140,18 @@ PlatformSubmission {
   为不误导（把 TLE 显示成 WA），14 归一为 UNAC（未通过、细分未知）；
   **存量历史 WA（旧口径落盘）不做迁移**，重新同步即被新口径覆盖（对话确认）。
 
-### 3.3 游标与去重
+### 3.3 游标、断点与去重
 
 - 每账号游标 = `profile.json` 中 `Account.last_synced_at`（数据水位，UTC 秒，null = 从未同步）；
 - **增量停止条件 `ts < since`**：游标当秒的提交会重复拉取，由 store 按
   `submission_id` 去重吸收（去重是硬保证，重复拉无代价）——避免同秒多提交被漏掉；
 - 游标推进取最大值防倒退；无新提交时保持原游标（空账号不落 0 游标）；
+- **断点 `Account.sync_checkpoint`**（可选字段，仅全量回填期存在）：
+  平台自解释的续传位置（洛谷=页码 / CF=偏移 / AT=from_second 秒，附累计
+  条数 fetched），**每批落盘后推进、全量完成即清除**；与游标职责严格分离——
+  游标回答"数据完整到哪个时间点"（只进不退、绝不在中途推进），断点回答
+  "回填进行到哪了"（临时状态）；中断后下次同步识别断点续跑，换绑/解绑/
+  删组随账号自动清理；
 - 「xx 前同步」展示用 `Account.last_sync_ok_at`（每次同步成功落盘的真实时刻，
   **与数据水位游标分离**——游标是"数据新到哪"，拿它展示会在重启后/同步中
   显示成数据水龄，如 71 天前最后提交被显示为"71 天前同步"）；
@@ -312,7 +318,16 @@ AdapterError                    # 基类
 | 方法 | 说明 | 能力 |
 | --- | --- | --- |
 | `verify(handle, credentials=None) -> UserInfo` | 绑定验证 | USER_INFO |
-| `fetch_submissions(handle, *, since, credentials=None, full_window_days, full_min_rows, progress_cb=None) -> list[PlatformSubmission]` | 提交明细；`since` 为 UTC 秒游标（None 全量），增量语义平台自解释；`full_window_days`/`full_min_rows` 为上层同步策略（见 §6.3），adapter 不内置；`progress_cb(fetched, total)` 为可选进度回调（total 可知的平台上报，驱动前端进度百分比；未知则不报，前端显示不定态） | SUBMISSIONS |
+| `fetch_submissions(handle, *, since, credentials=None, full_window_days, full_min_rows, progress_cb=None, resume_checkpoint=None) -> AsyncIterator[SyncBatch]` | 提交明细，**流式逐批产出**（见下）；`since` 为 UTC 秒游标（None 全量），增量语义平台自解释；`resume_checkpoint` 为全量回填断点（平台自解释，来自 `Account.sync_checkpoint`）；`full_window_days`/`full_min_rows` 为上层同步策略（见 §6.3），adapter 不内置；`progress_cb(fetched, total)` 为可选进度回调（total 可知的平台上报，驱动前端进度百分比；未知则不报，前端显示不定态） | SUBMISSIONS |
+
+**流式契约（SyncBatch）**：`{items, checkpoint, done}`——`items` 为本批提交
+（通常一页）；`checkpoint` 为全量回填断点（增量模式恒为 None），平台自解释
+并附累计条数（如 `{"page": 12, "fetched": 240}`），断点页码/偏移会随新提交
+漂移，靠 store 按 `submission_id` 去重吸收（多拉无代价、不漏）；`done=True`
+表示拉取完成（游标此时才可推进）。**方向差异的约定**：降序平台（CF/洛古）
+先产最新批次，升序平台（AT kenkoooo）先产最旧批次——中断时降序缺最旧、
+升序缺最新，正确性不受影响；同步开始后出现的新提交一律不追，由下次增量
+兜底（游标语义保证）。
 | `fetch_rating_history(handle, credentials=None) -> list[RatingPoint]` | rating 历史（后续增量） | RATING |
 | `fetch_contests() -> list[ContestInfo]` | 比赛信息（平台级，无 handle，未来 contest 功能消费） | CONTESTS |
 
@@ -511,7 +526,10 @@ backend/src/
 - **凭据**：secrets.json 读写清理（store 层）；browser-login 会话编排
   （启动/状态轮询/暂存凭据 10 分钟 TTL，bind 消费，凭据不经前端）；
 - **同步**：逐账号 `asyncio.create_task` 后台执行（兜底降级），前端轮询
-  `/sync/status`；同步前按账号从 secrets.json 注入凭据；
+  `/sync/status`；同步前按账号从 secrets.json 注入凭据；**流式双模式**——
+  账号有断点或游标为空为全量/回填模式（**每批落盘 + 每批存断点**，`done`
+  时推进游标并清除断点；中断后下次同步从断点续跑），否则增量模式
+  （攒齐批次一次落盘，游标语义不变）；
 - **聚合**：`overview`（totals + 370 天日序列，窗口来自配置）、`submissions`
   （当日明细 / 最后 200 条近期提交）。
 
@@ -657,11 +675,11 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
   可选依赖组，未安装时降级手动粘贴（§5.6）；
 - **`__client_id` 轮换不回写**：服务端 302 刷新会话但旧值不失效（实测），
   会话罐吸收即可；若未来失效应答频繁再考虑回写 secrets.json；
-- **同步"拉完才落盘"**：sync 引擎在全部页拉取完成后才 merge_submissions，
-  洛谷首次全量（数千条 × 5s 间隔）期间读取端看到的是旧数据/空数据——
-  属预期行为，前端靠"后台轮询 + 账号按钮/页签角标/平台视图进度面板"
-  呈现进行态（曾因此出现"绑定成功但无数据无提示"的误报，勿回退该机制；
-  按页落盘 + 断点续传为已排期的后续改造）；
+- **流式落盘 + 断点续传**：全量回填按批落盘（每页即存），中断后从
+  `Account.sync_checkpoint` 续跑；**游标绝不在中途推进**（增量段中途推进
+  游标会把未拉取的较旧区段永久漏掉）；断点页码/偏移随新提交漂移由
+  `submission_id` 去重吸收（多拉无代价、不漏）；增量同步保持整批完成后
+  一次落盘（增量段短，无断点需求）；
 - **同步进度为可选契约**：`progress_cb(fetched, total)` 只有总量可知的平台
   （洛谷 records.count）上报；总量未知的平台不报，前端必须兼容不定态；
 - **同步无全局遮罩**：同步是后台属性，进行态只落在账号按钮 / 平台页签
