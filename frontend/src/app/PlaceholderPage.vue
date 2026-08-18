@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { BookOpen, Settings, Timer } from 'lucide-vue-next'
+import { BookOpen, Settings } from 'lucide-vue-next'
 
 const route = useRoute()
 const meta = computed(() => route.meta.placeholder)
 
 const iconMap = {
   book: BookOpen,
-  timer: Timer,
   settings: Settings,
 }
 </script>

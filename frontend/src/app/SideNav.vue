@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChartColumn, Code2, ChevronRight, LayoutTemplate, Settings, Timer } from 'lucide-vue-next'
+import { ChartColumn, Code2, ChevronRight, LayoutTemplate, Settings } from 'lucide-vue-next'
 import { NAV_GROUPS } from '@/app/nav'
 import type { NavGroup } from '@/app/nav'
 
@@ -15,7 +15,6 @@ const emit = defineEmits<{
 
 const iconMap = {
   template: LayoutTemplate,
-  timer: Timer,
   settings: Settings,
   chart: ChartColumn,
 }
