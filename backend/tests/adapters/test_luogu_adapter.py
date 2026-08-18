@@ -19,7 +19,12 @@ from adapters.base import (
     Verdict,
 )
 from adapters.luogu import LuoguAdapter
-from adapters.luogu.normalize import map_language, map_verdict, problem_url
+from adapters.luogu.normalize import (
+    map_language,
+    map_verdict,
+    pick_verdict,
+    problem_url,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -418,6 +423,80 @@ def test_language_mapping():
     assert map_language(7) == "Python 3"
     assert map_language(0) == ""  # Invalid
     assert map_language(999) == ""
+
+
+def test_pick_verdict_severity_priority():
+    """严重度取最重：RE > TLE > MLE > OLE > WA（对话确认）。"""
+    assert pick_verdict([12, 12, 6]) is Verdict.WA  # 全 AC + 一个 WA
+    assert pick_verdict([6, 5]) is Verdict.TLE  # WA 与 TLE 并存取 TLE
+    assert pick_verdict([5, 7, 6]) is Verdict.RE  # 多重错误取 RE
+    assert pick_verdict([3, 4]) is Verdict.MLE  # OLE 与 MLE 取 MLE
+    assert pick_verdict([6, 6, 6]) is Verdict.WA
+
+
+def test_pick_verdict_conservative_rules():
+    """保守规则：无可参选测试点返回 None（保持 UNAC 不乱猜）。"""
+    assert pick_verdict([]) is None  # 无测试点信息
+    assert pick_verdict([12, 12]) is None  # 全 AC 但整题 UNAC
+    assert pick_verdict([0, 1]) is None  # JG 不参选
+    assert pick_verdict([11]) is None  # UKE 不参选
+    assert pick_verdict([2]) is None  # CE 不经精化
+
+
+async def test_fetch_submission_verdict_maps_detail():
+    """精化：record/:id 详情测试点 → 严重度归一。"""
+
+    def handler(url, params):
+        assert url.endswith("/record/280413653")
+        return FakeResponse(
+            200,
+            json.dumps(
+                {
+                    "code": 200,
+                    "currentTemplate": "RecordShow",
+                    "currentData": {
+                        "record": {
+                            "detail": {
+                                "judgeResult": {
+                                    "subtasks": [
+                                        {"testCases": [{"status": 12}, {"status": 5}]},
+                                        {"testCases": {"0": {"status": 6}}},  # dict 形态兼容
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                }
+            ),
+        )
+
+    adapter = make_adapter(handler)
+    verdict = await adapter.fetch_submission_verdict("280413653", CREDS)
+    assert verdict is Verdict.TLE  # 5(TLE) 与 6(WA) 并存取 TLE
+
+
+async def test_fetch_submission_verdict_conservative_none():
+    """测试点全 AC / 无详情 → None（保持 UNAC）。"""
+
+    def handler(url, params):
+        return FakeResponse(
+            200,
+            json.dumps(
+                {
+                    "code": 200,
+                    "currentData": {"record": {"detail": {"judgeResult": {"subtasks": [{"testCases": [{"status": 12}]}]}}}},
+                }
+            ),
+        )
+
+    adapter = make_adapter(handler)
+    assert await adapter.fetch_submission_verdict("1", CREDS) is None
+
+    # 无 detail 字段 → None
+    adapter2 = make_adapter(
+        lambda url, params: FakeResponse(200, json.dumps({"code": 200, "currentData": {"record": {}}}))
+    )
+    assert await adapter2.fetch_submission_verdict("2", CREDS) is None
 
 
 def test_problem_url():

@@ -9,7 +9,13 @@ from pathlib import Path
 import httpx
 import pytest
 
-from adapters.base import BrowserLoginCancelledError, Credentials, SyncBatch, UserInfo
+from adapters.base import (
+    BrowserLoginCancelledError,
+    Credentials,
+    SyncBatch,
+    UserInfo,
+    Verdict,
+)
 from adapters.net import HttpFetcher
 from core.config import Settings
 from core.exceptions import (
@@ -18,6 +24,7 @@ from core.exceptions import (
     ConflictError,
     NotFoundError,
 )
+from modules.activity.models import Submission
 from modules.activity.schemas import (
     BindIn,
     GroupCreateIn,
@@ -571,3 +578,104 @@ async def test_browser_login_unavailable_without_playwright(service: ActivitySer
     assert meta.browserLogin is False
     with pytest.raises(BadRequestError):
         await service.start_browser_login("luogu")
+
+
+# ===== 精细化同步（UNAC refine） =====
+
+
+def unac_row(sid: str, ts: int) -> Submission:
+    return Submission(
+        platform="luogu",
+        handle="100000",
+        submission_id=sid,
+        problem_key="P1001",
+        problem_name="X",
+        problem_url="https://www.luogu.com.cn/problem/P1001",
+        verdict=Verdict.UNAC,
+        submitted_at=ts,
+        language="C++20",
+    )
+
+
+async def wait_refine_done(service: ActivityService, timeout: float = 3.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        st = service.refine_status("luogu", "100000")
+        if st.state != "running":
+            return st
+        await asyncio.sleep(0.02)
+    raise AssertionError("精化未在超时内结束")
+
+
+async def test_refine_requires_capability(service: ActivityService):
+    """无 REFINE_VERDICT 能力的平台（CF）启动精化 → 400。"""
+    await service.bind(BindIn(platform="codeforces", handle="demo"))
+    await wait_sync_done(service)
+    with pytest.raises(BadRequestError):
+        service.start_refine("codeforces", "demo")
+
+
+async def test_refine_full_flow_and_done_state(service: ActivityService):
+    """精化全链路：启动 → 进行中 409 → 完成后 done，存量 UNAC 被改写。"""
+    adapter = stub_luogu(service)
+    await service.bind(BindIn(platform="luogu", handle="100000", credentials={"cookies": {"_uid": "100000", "__client_id": "tok"}}))
+    await wait_sync_done(service)
+    service._store().merge_submissions("luogu", "100000", [unac_row("1", 1000)])
+
+    gate = asyncio.Event()
+
+    async def fake_refine(record_id, credentials=None):
+        await gate.wait()
+        return Verdict.TLE
+
+    adapter.fetch_submission_verdict = fake_refine
+
+    service.start_refine("luogu", "100000")
+    with pytest.raises(ConflictError):
+        service.start_refine("luogu", "100000")  # 进行中重复启动
+    # total 由后台任务快照装配，轮询待其就位（gate 卡住保持 running）
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline:
+        st = service.refine_status("luogu", "100000")
+        if st.state == "running" and st.total == 1:
+            break
+        await asyncio.sleep(0.02)
+    assert st.state == "running"
+    assert st.total == 1
+
+    gate.set()
+    st = await wait_refine_done(service)
+    assert st.state == "done"  # 存量 UNAC 清零
+    items, _ = service._store().load_submissions("luogu", "100000")
+    assert items[0].verdict == Verdict.TLE
+
+
+async def test_refine_auto_triggers_after_sync(service: ActivityService):
+    """refine_auto 开启后，普通同步完成自动启动精化。"""
+    adapter = stub_luogu(service)
+    await service.bind(BindIn(platform="luogu", handle="100000", credentials={"cookies": {"_uid": "100000", "__client_id": "tok"}}))
+    await wait_sync_done(service)
+    service._store().merge_submissions("luogu", "100000", [unac_row("1", 1000)])
+
+    refined: list[str] = []
+
+    async def fake_refine(record_id, credentials=None):
+        refined.append(record_id)
+        return Verdict.WA
+
+    adapter.fetch_submission_verdict = fake_refine
+
+    out = service.set_refine_auto("luogu", "100000", True)
+    assert out.auto is True
+    # 档案持久化
+    account = service._store().load_profile().accounts[0]
+    assert account.refine_auto is True
+
+    await service.sync("luogu")
+    # 直接轮询终态：sync 任务调度与精化触发均异步，分段等待存在竞态
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline and not refined:
+        await asyncio.sleep(0.02)
+    st = await wait_refine_done(service)
+    assert refined == ["1"]  # 同步完成后自动精化
+    assert st.state == "done"

@@ -244,3 +244,32 @@ def test_remove_account_secrets_idempotent(tmp_path):
     store.save_account_secrets("luogu", "100", Credentials(cookies={"_uid": "1"}))
     store.remove_account_secrets("luogu", "999")
     assert store.get_account_credentials("luogu", "100") is not None
+
+
+# ===== update_verdicts（精化受控例外） =====
+
+
+def test_update_verdicts_in_place(tmp_path):
+    """按 submission_id 就地改写 verdict；其他字段与其他记录不受影响。"""
+    store = make_store(tmp_path)
+    store.merge_submissions(
+        "luogu",
+        "100",
+        [submission("1", 1000, Verdict.UNAC), submission("2", 2000, Verdict.AC)],
+    )
+    changed = store.update_verdicts("luogu", "100", {"1": Verdict.TLE})
+    assert changed == 1
+    items, _ = store.load_submissions("luogu", "100")
+    by_id = {s.submission_id: s for s in items}
+    assert by_id["1"].verdict == Verdict.TLE
+    assert by_id["1"].problem_key == "2245A"  # 其余字段不动
+    assert by_id["2"].verdict == Verdict.AC  # 其他记录不动
+
+
+def test_update_verdicts_noop_and_missing(tmp_path):
+    """空更新 / 目标不存在 / 值相同均为空操作（返回 0）。"""
+    store = make_store(tmp_path)
+    store.merge_submissions("luogu", "100", [submission("1", 1000, Verdict.UNAC)])
+    assert store.update_verdicts("luogu", "100", {}) == 0
+    assert store.update_verdicts("luogu", "100", {"ghost": Verdict.WA}) == 0
+    assert store.update_verdicts("luogu", "100", {"1": Verdict.UNAC}) == 0
