@@ -68,6 +68,13 @@ class SyncEngine:
         self._status.pop((user_id, platform, handle), None)
         self._locks.pop((user_id, platform, handle), None)
 
+    def account_lock(
+        self, user_id: str, platform: str, handle: str
+    ) -> asyncio.Lock:
+        """该账号的同步互斥锁（精化器等协同方逐条获取——普通同步持锁期间
+        精化自然暂停，结束后自动继续，见 activity.md §6.5）。"""
+        return self._locks.setdefault((user_id, platform, handle), asyncio.Lock())
+
     def drop_user(self, user_id: str) -> None:
         """删除用户组时清理其全部运行时状态。"""
         stale = [key for key in self._status if key[0] == user_id]
@@ -215,6 +222,7 @@ class SyncEngine:
                     display_name=account.display_name,
                     last_sync_ok_at=account.last_sync_ok_at,
                     sync_checkpoint=batch.checkpoint,
+                    refine_auto=account.refine_auto,
                 )
             )
         # 完成：游标 = 该账号落盘数据的最大时间戳（含此前中断批次的成果）；
@@ -229,6 +237,7 @@ class SyncEngine:
                 display_name=account.display_name,
                 last_sync_ok_at=int(time.time()),
                 sync_checkpoint=None,  # 回填完成，清除断点
+                refine_auto=account.refine_auto,
             )
         )
 
@@ -260,5 +269,6 @@ class SyncEngine:
                 last_synced_at=max(new_cursor, since or 0) or None,
                 display_name=account.display_name,  # 游标推进不丢展示名
                 last_sync_ok_at=int(time.time()),
+                refine_auto=account.refine_auto,
             )
         )

@@ -38,20 +38,28 @@ from adapters.base import (
     SyncBatch,
     UserInfo,
     UserNotFoundError,
+    Verdict,
 )
 from adapters.luogu.api_models import (
+    LgRecordDetailEnvelope,
     LgRecordListEnvelope,
     LgRecordRow,
     LgUserSearchResult,
     LgUserSummary,
 )
-from adapters.luogu.normalize import map_language, map_verdict, problem_url
+from adapters.luogu.normalize import (
+    map_language,
+    map_verdict,
+    pick_verdict,
+    problem_url,
+)
 from adapters.net import HttpFetcher
 
 logger = logging.getLogger("xcpc.adapters.luogu")
 
 BASE = "https://www.luogu.com.cn"
 RECORD_LIST_URL = f"{BASE}/record/list"
+RECORD_DETAIL_URL = f"{BASE}/record"  # /record/{id}
 USER_SEARCH_URL = f"{BASE}/api/user/search"
 
 MAX_PAGES = 1000  # 安全护栏（perPage 20 × 1000 = 2 万条），正常路径不会触发
@@ -66,7 +74,9 @@ _RATE_LIMIT_HINT = "请求频繁"
 class LuoguAdapter(PlatformAdapter):
     platform_id = "luogu"
     name = "洛谷"
-    capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
+    capabilities = frozenset(
+        {Capability.SUBMISSIONS, Capability.USER_INFO, Capability.REFINE_VERDICT}
+    )
     auth = AuthMode.COOKIE
     min_interval = 5.0  # 反爬敏感平台：低频请求长期避开 JS 挑战升级
 
@@ -201,6 +211,36 @@ class LuoguAdapter(PlatformAdapter):
                 if done:
                     return
         yield SyncBatch(done=True)
+
+    # ===== 单条精化（UNAC → 细分 verdict） =====
+
+    async def fetch_submission_verdict(
+        self, record_id: str, credentials: Credentials | None = None
+    ) -> Verdict | None:
+        """拉记录详情，从测试点状态按严重度取最重（RE>TLE>MLE>OLE>WA）。
+
+        保守规则：无可参选测试点（全 AC / 仅 JG/UKE / 无测试点信息）返回
+        None，调用方保持 UNAC（见 activity.md §6.5）。
+        """
+        if credentials is None:
+            raise AuthExpiredError("未配置洛谷凭据，请先绑定账号并授权")
+        async with self._session_factory() as session:
+            data = await self._get_json(
+                session,
+                f"{RECORD_DETAIL_URL}/{record_id}",
+                params={"_contentOnly": 1},
+                credentials=credentials,
+            )
+        envelope = self._parse(data, LgRecordDetailEnvelope, "记录详情")
+        judge = (
+            envelope.currentData.record.detail.judgeResult
+            if envelope.currentData and envelope.currentData.record.detail
+            else None
+        )
+        if judge is None:
+            return None
+        statuses = [case.status for sub in judge.subtasks for case in sub.test_cases]
+        return pick_verdict(statuses)
 
     # ===== 一键登录（browser-login，可选依赖 Playwright） =====
 

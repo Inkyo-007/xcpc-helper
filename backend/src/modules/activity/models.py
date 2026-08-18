@@ -55,6 +55,7 @@ class Account(BaseModel):
     display_name: str | None = None  # 展示名（与 API 主键分离）
     last_sync_ok_at: int | None = None  # 最近一次同步成功时刻（UTC 秒；与游标分离）
     sync_checkpoint: dict[str, Any] | None = None  # 全量回填断点（非空 = 回填进行中）
+    refine_auto: bool = False  # 普通同步完成后自动启动精细化同步（§6.5）
 
 
 class Secrets(BaseModel):

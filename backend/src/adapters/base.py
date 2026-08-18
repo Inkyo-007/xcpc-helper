@@ -54,6 +54,7 @@ class Capability(str, Enum):
     USER_INFO = "user_info"  # 用户基本信息（绑定验证回执）
     RATING = "rating"  # rating 历史（后续增量，结构已预留）
     CONTESTS = "contests"  # 比赛信息（平台级，未来 contest 功能消费）
+    REFINE_VERDICT = "refine_verdict"  # 单条提交细分结果精化（如洛谷 UNAC → 详情判定）
 
 
 class AuthMode(str, Enum):
@@ -231,3 +232,14 @@ class PlatformAdapter:
     async def fetch_contests(self) -> list[ContestInfo]:
         """比赛信息（平台级数据，未来 contest 功能消费）。仅具备 CONTESTS 能力时实现。"""
         raise CapabilityNotSupportedError(f"{self.platform_id} 不支持比赛信息")
+
+    async def fetch_submission_verdict(
+        self, record_id: str, credentials: Credentials | None = None
+    ) -> Verdict | None:
+        """单条提交的细分结果精化（列表只有汇总口径的平台拉详情判定）。
+
+        record_id 即 PlatformSubmission.submission_id；返回 None 表示无法
+        判定（详情缺失/保守规则兜底），调用方保持原值。失败抛 PlatformError。
+        仅具备 REFINE_VERDICT 能力时实现。
+        """
+        raise CapabilityNotSupportedError(f"{self.platform_id} 不支持提交结果精化")

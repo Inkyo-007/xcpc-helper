@@ -13,7 +13,9 @@ currentData, ...}`；错误响应同为 `{code: 4xx, currentData: {...}}` 形态
 提前终止，静默丢弃后续新提交）。
 """
 
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class LgProblemSummary(BaseModel):
@@ -75,3 +77,66 @@ class LgUserSearchResult(BaseModel):
     """api/user/search 响应（裸 JSON，无信封）。"""
 
     users: list[LgUserSummary] = Field(default_factory=list)
+
+
+# ===== 记录详情（精化用，record/:id） =====
+
+
+def _normalize_nodes(data: Any) -> list[Any]:
+    """subtasks / testCases 可能是数组或按编号键的 dict（d.ts 双重声明），统一为列表。"""
+    if isinstance(data, dict):
+        return list(data.values())
+    if isinstance(data, list):
+        return data
+    return []
+
+
+class LgTestCase(BaseModel):
+    """单个测试点（status 与列表同一套官方状态码）。"""
+
+    status: int = -1
+
+
+class LgSubtask(BaseModel):
+    """子任务：仅关心测试点列表（字段名为 testCases，兼容数组/dict 两种形态）。"""
+
+    model_config = {"populate_by_name": True}
+
+    test_cases: list[LgTestCase] = Field(default_factory=list, alias="testCases")
+
+    @field_validator("test_cases", mode="before")
+    @classmethod
+    def _normalize_cases(cls, data: Any) -> list[Any]:
+        return _normalize_nodes(data)
+
+
+class LgJudgeResult(BaseModel):
+    """评测结果：subtasks 兼容数组/dict 两种形态。"""
+
+    subtasks: list[LgSubtask] = Field(default_factory=list)
+
+    @field_validator("subtasks", mode="before")
+    @classmethod
+    def _normalize_subtasks(cls, data: Any) -> list[Any]:
+        return _normalize_nodes(data)
+
+
+class LgRecordDetail(BaseModel):
+    """record.detail：仅取评测结果（sourceCode 等大字段忽略）。"""
+
+    judgeResult: LgJudgeResult | None = None
+
+
+class LgRecordShow(BaseModel):
+    detail: LgRecordDetail | None = None
+
+
+class LgRecordShowData(BaseModel):
+    record: LgRecordShow = Field(default_factory=LgRecordShow)
+
+
+class LgRecordDetailEnvelope(BaseModel):
+    """record/:id 信封（精化只需 detail 链路）。"""
+
+    code: int = 0
+    currentData: LgRecordShowData | None = None

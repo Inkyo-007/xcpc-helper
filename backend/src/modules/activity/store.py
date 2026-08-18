@@ -19,7 +19,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from adapters.base import Credentials
+from adapters.base import Credentials, Verdict
 from common.validation import validate_name
 from core.exceptions import ConflictError, NotFoundError
 from modules.activity.models import (
@@ -257,10 +257,36 @@ class UserStore:
                     by_id[s.submission_id] = s
                     added += 1
             merged = sorted(by_id.values(), key=lambda s: s.submitted_at)
-            path = self._submissions_file(platform, handle)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            lines = "".join(
-                s.model_dump_json() + "\n" for s in merged
-            )
-            _atomic_write(path, lines)
+            self._write_submissions(platform, handle, merged)
             return added
+
+    def _write_submissions(
+        self, platform: str, handle: str, items: list[Submission]
+    ) -> None:
+        """整体原子重写 JSONL（调用方须持锁）。"""
+        path = self._submissions_file(platform, handle)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lines = "".join(s.model_dump_json() + "\n" for s in items)
+        _atomic_write(path, lines)
+
+    def update_verdicts(
+        self, platform: str, handle: str, updates: dict[str, Verdict]
+    ) -> int:
+        """按 submission_id 就地改写 verdict，返回更新条数。
+
+        这是"磁盘优先、合并不覆盖旧行"规则的**唯一受控例外**——仅精细化
+        同步（UNAC → 细分结果）使用，见 activity.md §6.5；其余路径不得调用。
+        """
+        if not updates:
+            return 0
+        with self._lock:
+            items, _skipped = self.load_submissions(platform, handle)
+            changed = 0
+            for s in items:
+                new_verdict = updates.get(s.submission_id)
+                if new_verdict is not None and s.verdict != new_verdict:
+                    s.verdict = new_verdict
+                    changed += 1
+            if changed:
+                self._write_submissions(platform, handle, items)
+            return changed

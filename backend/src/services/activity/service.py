@@ -24,6 +24,7 @@ from adapters.base import (
     PlatformAdapter,
     PlatformError,
     UserNotFoundError,
+    Verdict,
 )
 from core.config import Settings, get_settings
 from core.exceptions import (
@@ -35,6 +36,7 @@ from core.exceptions import (
 from modules.activity import aggregate
 from modules.activity import store as activity_store
 from modules.activity.models import DEFAULT_USER_ID, Account, Submission
+from modules.activity.refine import RefineEngine
 from modules.activity.schemas import (
     BindIn,
     BoundAccountOut,
@@ -50,6 +52,7 @@ from modules.activity.schemas import (
     PlatformsOut,
     ProfileOut,
     ProfileUpdateIn,
+    RefineStatusOut,
     SubmissionOut,
     SubmissionsOut,
     VerifyIn,
@@ -88,6 +91,8 @@ class ActivityService:
             full_window_days=settings.activity_window_days,
             full_min_rows=settings.activity_full_min_rows,
         )
+        # 精细化同步引擎（UNAC → 细分结果；与同步共享账号锁，见 §6.5）
+        self._refine = RefineEngine(settings.user_data_dir, self._adapters, self._engine)
         # 用户组初始化：仅在"一个组都不存在"时（真正的首次运行）创建 default；
         # 已有组时（default 被删除/重命名）不再重建，当前组回落到 default
         # 或现存首个组（目录即组，见 store.list_groups）
@@ -158,6 +163,7 @@ class ActivityService:
             raise BadRequestError("至少保留一个用户组")
         activity_store.delete_group(self._settings.user_data_dir, name)
         self._engine.drop_user(name)
+        self._refine.drop_user(name)
         if self._current_group == name:
             rest = activity_store.list_groups(self._settings.user_data_dir)
             self._current_group = rest[0] if rest else DEFAULT_USER_ID
@@ -380,6 +386,7 @@ class ActivityService:
                 self._engine.drop_status(
                     self._current_group, acc.platform, acc.handle
                 )
+                self._refine.drop_account(self._current_group, acc.platform, acc.handle)
                 break
         account = Account(
             platform=payload.platform,
@@ -405,6 +412,7 @@ class ActivityService:
             raise NotFoundError(f"账号未绑定: {platform}/{handle}")
         store.remove_account(platform, handle)
         self._engine.drop_status(self._current_group, platform, handle)
+        self._refine.drop_account(self._current_group, platform, handle)
 
     # ===== 聚合读取 =====
 
@@ -479,6 +487,72 @@ class ActivityService:
             date=dt.strftime("%Y-%m-%d"),
         )
 
+    # ===== 精细化同步（UNAC → 细分结果，§6.5） =====
+
+    def _require_account(self, platform: str, handle: str) -> tuple[Account, PlatformAdapter]:
+        """账号存在性校验并返回（账号, 适配器）。"""
+        adapter = self._adapter(platform)
+        profile = self._store().load_profile()
+        account = next(
+            (
+                acc
+                for acc in profile.accounts
+                if acc.platform == platform and acc.handle == handle
+            ),
+            None,
+        )
+        if account is None:
+            raise NotFoundError(f"账号未绑定: {platform}/{handle}")
+        return account, adapter
+
+    def start_refine(self, platform: str, handle: str) -> None:
+        """启动精细化同步（后台执行；进行中重复启动 409）。"""
+        _account, adapter = self._require_account(platform, handle)
+        if Capability.REFINE_VERDICT not in adapter.capabilities:
+            raise BadRequestError(f"平台 {platform} 不支持精细化同步")
+        if not self._refine.start(self._current_group, platform, handle):
+            raise ConflictError("精细化同步正在进行中")
+
+    def stop_refine(self, platform: str, handle: str) -> None:
+        """中止精细化同步（幂等；进度保留，再次启动自动续扫）。"""
+        self._require_account(platform, handle)
+        self._refine.stop(self._current_group, platform, handle)
+
+    def refine_status(self, platform: str, handle: str) -> RefineStatusOut:
+        """精化状态；「已完成」按存量 UNAC 清零推断（不持久化状态）。"""
+        account, _adapter = self._require_account(platform, handle)
+        p = self._refine.progress_of(self._current_group, platform, handle)
+        store = self._store()
+        items, _skipped = store.load_submissions(platform, handle)
+        remaining = sum(1 for s in items if s.verdict == Verdict.UNAC)
+        if p.state.value == "running":
+            state, done, total = "running", p.done, p.total
+        elif p.state.value == "stopped":
+            state, done, total = "stopped", p.done, p.total
+        elif remaining == 0 and items:
+            state, done, total = "done", p.done, max(p.total, p.done)
+        else:
+            state, done, total = "idle", 0, remaining
+        return RefineStatusOut(state=state, done=done, total=total, auto=account.refine_auto)
+
+    def set_refine_auto(self, platform: str, handle: str, enabled: bool) -> RefineStatusOut:
+        """设置「普通同步完成后自动精化」开关（其余账号字段保持不变）。"""
+        account, adapter = self._require_account(platform, handle)
+        if Capability.REFINE_VERDICT not in adapter.capabilities:
+            raise BadRequestError(f"平台 {platform} 不支持精细化同步")
+        self._store().save_account(
+            Account(
+                platform=account.platform,
+                handle=account.handle,
+                last_synced_at=account.last_synced_at,
+                display_name=account.display_name,
+                last_sync_ok_at=account.last_sync_ok_at,
+                sync_checkpoint=account.sync_checkpoint,
+                refine_auto=enabled,
+            )
+        )
+        return self.refine_status(platform, handle)
+
     # ===== 同步 =====
 
     async def sync(self, platform: str | None) -> None:
@@ -496,10 +570,26 @@ class ActivityService:
 
     async def _safe_sync(self, platform: str, handle: str) -> None:
         try:
-            await self._engine.sync_account(self._current_group, platform, handle)
+            status = await self._engine.sync_account(
+                self._current_group, platform, handle
+            )
         except Exception as exc:  # 兜底降级，见 sync()
             logger.exception("同步意外异常 [%s/%s]", platform, handle)
             self._engine.mark_error(self._current_group, platform, handle, str(exc))
+            return
+        # 普通同步成功完成后，按账号配置自动启动精细化同步（§6.5）
+        if status.state.value != "idle":
+            return
+        adapter = self._adapters.get(platform)
+        if adapter is None or Capability.REFINE_VERDICT not in adapter.capabilities:
+            return
+        profile = self._store().load_profile()
+        account = next(
+            (a for a in profile.accounts if a.platform == platform and a.handle == handle),
+            None,
+        )
+        if account is not None and account.refine_auto:
+            self._refine.start(self._current_group, platform, handle)
 
     def sync_status(self) -> list[BoundAccountOut]:
         profile = self._store().load_profile()

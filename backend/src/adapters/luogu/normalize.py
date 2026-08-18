@@ -74,6 +74,45 @@ def map_language(language: int) -> str:
     return LANGUAGE_MAP.get(language, "")
 
 
+# ===== UNAC 精化：测试点状态 → 细分 verdict =====
+
+# 可参选的状态码（可归因于用户程序的错误）→ 统一 Verdict；
+# JG（0/1）/UKE（11）不参选（评测中方/评测方故障），CE 不经精化，
+# AC（12）为通过不参与比较。
+_ELIGIBLE: dict[int, Verdict] = {
+    6: Verdict.WA,
+    7: Verdict.RE,
+    5: Verdict.TLE,
+    4: Verdict.MLE,
+    3: Verdict.OLE,
+}
+
+# 严重度优先级（对话确认）：RE > TLE > MLE > OLE > WA
+_SEVERITY: dict[Verdict, int] = {
+    Verdict.RE: 4,
+    Verdict.TLE: 3,
+    Verdict.MLE: 2,
+    Verdict.OLE: 1,
+    Verdict.WA: 0,
+}
+
+
+def pick_verdict(case_statuses: list[int]) -> Verdict | None:
+    """测试点状态码列表 → 细分 verdict：参选集合中取严重度最重者。
+
+    无参选测试点（全 AC / 仅 JG/UKE / 空列表）返回 None——调用方保持 UNAC，
+    不乱猜（保守规则，见 activity.md §6.5）。
+    """
+    best: Verdict | None = None
+    for status in case_statuses:
+        verdict = _ELIGIBLE.get(status)
+        if verdict is None:
+            continue
+        if best is None or _SEVERITY[verdict] > _SEVERITY[best]:
+            best = verdict
+    return best
+
+
 def problem_url(pid: str, contest_id: int | None) -> str:
     """题目外链；比赛内提交拼 contestId（clist 格式）；缺 pid 兜底平台主页。"""
     if not pid:

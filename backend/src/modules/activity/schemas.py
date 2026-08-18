@@ -120,6 +120,24 @@ class BrowserLoginStatusOut(BaseModel):
     error: str | None = None  # state=error 时的诊断信息
 
 
+# ===== 精细化同步（REFINE_VERDICT 能力平台，§6.5） =====
+
+RefineStateOut = Literal["idle", "running", "stopped", "done"]
+
+
+class RefineStatusOut(BaseModel):
+    """精化状态：idle 时 total = 存量 UNAC 数（供前端预估耗时）。"""
+
+    state: RefineStateOut
+    done: int = 0
+    total: int = 0
+    auto: bool = False  # 普通同步完成后自动启动精化
+
+
+class RefineConfigIn(BaseModel):
+    refineAuto: bool
+
+
 # ===== 用户组与信息卡 =====
 
 

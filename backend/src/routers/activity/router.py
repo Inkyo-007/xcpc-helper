@@ -19,6 +19,8 @@ from modules.activity.schemas import (
     PlatformsOut,
     ProfileOut,
     ProfileUpdateIn,
+    RefineConfigIn,
+    RefineStatusOut,
     SubmissionsOut,
     SyncIn,
     VerifyIn,
@@ -112,6 +114,34 @@ async def get_browser_login_status(
     platform: str, service: ServiceDep
 ) -> BrowserLoginStatusOut:
     return service.browser_login_status(platform)
+
+
+# ===== 精细化同步（REFINE_VERDICT 能力平台） =====
+
+
+@router.post("/accounts/{platform}/{handle}/refine", status_code=202)
+async def start_refine(platform: str, handle: str, service: ServiceDep) -> None:
+    # 立即返回；精化后台执行，前端轮询 GET refine
+    service.start_refine(platform, handle)
+
+
+@router.delete("/accounts/{platform}/{handle}/refine", status_code=204)
+async def stop_refine(platform: str, handle: str, service: ServiceDep) -> None:
+    service.stop_refine(platform, handle)
+
+
+@router.get("/accounts/{platform}/{handle}/refine", response_model=RefineStatusOut)
+async def get_refine_status(
+    platform: str, handle: str, service: ServiceDep
+) -> RefineStatusOut:
+    return service.refine_status(platform, handle)
+
+
+@router.patch("/accounts/{platform}/{handle}", response_model=RefineStatusOut)
+async def update_account_config(
+    platform: str, handle: str, payload: RefineConfigIn, service: ServiceDep
+) -> RefineStatusOut:
+    return service.set_refine_auto(platform, handle, payload.refineAuto)
 
 
 @router.get("/overview", response_model=OverviewOut)
