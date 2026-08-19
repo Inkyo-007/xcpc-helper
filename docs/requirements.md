@@ -7,7 +7,7 @@
 
 ### 模板整理及生成
 
-**模板库**（已实现，设计见 [design/template-library.md](design/template-library.md)）
+**模板库**（已实现，设计见 [design/template/template-library.md](design/template/template-library.md)）
 
 - 模板的显示页面：标题、分类、标签（多选）、代码、语言、说明（markdown）、复杂度、来源题目链接；
 - 代码编辑器：语法高亮、行号、只读预览模式；
@@ -17,13 +17,13 @@
 - 左侧分类 + 标签过滤 + 关键词搜索（标题/说明/代码全文）；
 - 模板列表支持按更新时间/名称/自定义优先级排序。
 
-**打印册**（已实现，设计见 [design/printbook.md](design/printbook.md)）
+**打印册**（已实现，设计见 [design/template/printbook.md](design/template/printbook.md)）
 
 - 从模板库中按版本勾选模板，与章节标题、自由文字、图片、显式分页符组合为有序块序列，生成单本"打印册"，支持拖拽排序与指定位置插入；
 - 导出 PDF：固定版式封面、带页码的层级目录、每模板一节（标题 + 元信息 + 代码块 + 可选说明框）、中文字体与公式支持；
 - 打印册模板化：保存多套打印册配置（如"ICPC 区域赛版"、"校内赛版"），可重复导出。
 
-**导入 / 导出**（已实现，设计见 [design/transfer.md](design/transfer.md)）
+**导入 / 导出**（已实现，设计见 [design/template/transfer.md](design/template/transfer.md)）
 
 - 模板库与打印册分开导入/导出（zip 压缩包），用于备份与跨机器迁移；
 - 导出即规范化：无论当前目录形态如何，统一整理为"分类 / 模板 / 版本"三层标准结构，代码统一 UTF-8 编码；

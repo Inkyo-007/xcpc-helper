@@ -1,7 +1,7 @@
 # 模板库（template）设计
 
-> 状态：已实现。背景与需求优先级见 [../requirements.md](../requirements.md)，
-> 跨功能公共约定见 [conventions.md](conventions.md)。
+> 状态：已实现。背景与需求优先级见 [../../requirements.md](../../requirements.md)，
+> 跨功能公共约定见 [../conventions.md](../conventions.md)。
 
 ## 1. 定位
 
@@ -82,7 +82,7 @@ priority: 5
 
 可视化写操作的约定：
 
-- 名称统一校验（规则见 [conventions.md](conventions.md)），中文正常放行；
+- 名称统一校验（规则见 [../conventions.md](../conventions.md)），中文正常放行；
 - README 由表单数据全量生成：缺省字段不写入 front matter，priority 为默认值 2 时省略；规范外的历史字段在首次编辑保存后丢弃；
 - 新建版本经 .tmp 暂存目录原子就位，更新走临时文件 + 原子替换；删除为物理删除（前端确认弹窗明确提示不可找回）；
 - 删除非空模板被拒绝（409），需先删除其所有版本；删除/移动后空分类目录自动清理；

@@ -1,6 +1,6 @@
 # 打印册（printbook）设计
 
-> 状态：已实现（2026-08-06 定稿）。跨功能公共约定见 [conventions.md](conventions.md)。
+> 状态：已实现（2026-08-06 定稿）。跨功能公共约定见 [../conventions.md](../conventions.md)。
 
 ## 1. 定位与总体形态
 
@@ -87,7 +87,7 @@ blocks:
 - 图片块引用的资源文件缺失，等同失效引用处理。
 - heading 块之后没有任何内容块（悬空章节）：导出时给出警告。
 - 失效引用**只报告、不改写配置**：模板被误删后恢复，册自动复原。汇总为 `issues: [{block_index, level, message}]` 随详情返回。
-- 损坏的 book.yaml 不阻断：册列表照常列出（名称取目录名）并附 error 信息，延续"诊断不阻断"的鲁棒哲学（见 [conventions.md](conventions.md)）。
+- 损坏的 book.yaml 不阻断：册列表照常列出（名称取目录名）并附 error 信息，延续"诊断不阻断"的鲁棒哲学（见 [../conventions.md](../conventions.md)）。
 
 ## 4. 页面与交互（三栏）
 

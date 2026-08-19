@@ -1,42 +1,42 @@
-# 训练统计聚合（activity）设计
+# 训练统计聚合（activity）：公共约定
 
-> 状态：已实现（第一期 Codeforces + 第二期 AtCoder）；第三期洛谷：进行中
-> （设计已定稿：提交统计 + 绑定验证 + cookie 凭据框架 + 多用户组全链路）。
-> 本文档与实际实现同步，是后续多平台适配（LeetCode / 牛客 / QOJ 等）
-> 与新增功能（rating 折线、比赛信息）的规范参考；改设计必须先改本文档再改代码。
-> 需求背景见 [../cache/requirement.md](../cache/requirement.md)，
-> 平台接口调研见 [../cache/platform-api-research.md](../cache/platform-api-research.md)。
+> 状态：已实现（Codeforces / AtCoder / 洛谷三期全链路）。
+> 本文档承载 activity 域的平台无关约定；各平台的适配细节见同目录
+> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md)。
+> 需求背景见 [../../cache/requirement.md](../../cache/requirement.md)，
+> 平台接口调研见 [../../cache/platform-api-research.md](../../cache/platform-api-research.md)。
+> 改设计必须先改本文档（或对应平台文档）再改代码。
 
-## 1. 背景与目标
+## 1. 这个功能做什么
 
 选手的训练数据散落在 Codeforces、AtCoder、洛谷等多个平台，难以直观观察与统计。
-本功能在用户绑定各平台账号后，自动拉取、整合训练数据，提供默认汇总页与单平台页，
-展示解题/提交统计、activity 热力图、统计卡片与近期提交；rating 折线与比赛信息为
-后续增量（契约已预留）。需求优先级归属见 [../requirements.md](../requirements.md)「做题统计」。
+本功能在用户绑定各平台账号后，自动拉取并整合训练数据，提供汇总页与单平台页，
+展示解题/提交统计、activity 热力图、统计卡片与近期提交；rating 折线与比赛信息
+为后续增量（契约已预留）。需求优先级归属见 [../../requirements.md](../../requirements.md)「做题统计」。
 
 ## 2. 总体形态
 
 ### 2.1 关键决策
 
-- **所有对外请求经由本地后端代理**：前端直连各平台会被 CORS 拦截，且凭据（cookie）
-  不能暴露给前端；FastAPI 后端天然承担采集代理角色。
-- **adapter 可插拔、失败可降级**：各平台接口稳定性差异大（官方 API / 第三方 API /
-  非官方接口 / cookie 授权），单平台失败只降级为该账号的诊断信息，不拖垮整个面板
-  （遵循 [conventions.md](conventions.md)「诊断不阻断」）。
-- **启动自动同步 + 手动同步**：本地应用不常驻运行，故每次启动（后端 lifespan
-  就绪后）自动对当前用户组全部账号触发一次同步（后台异步，等价于
-  "立即同步全部"；可用 `activity_sync_on_startup=false` 关闭）。另有
-  "立即同步"按钮（汇总视图同步全部平台，点击前确认；平台视图只同步该平台）
-  + 每账号新鲜度/上次同步时间/错误状态展示；同步在后台异步执行，前端轮询
-  状态接口。
-- **增量同步**：每个 (用户组, 平台, 账号) 维护同步游标（UTC 秒级数据水位），
-  **游标当秒的提交重复拉取、按 submission_id 去重合并**（停止条件 `ts < since`，
+- **所有对外请求经由本地后端代理**。前端直连各平台会被 CORS 拦截，且凭据
+  （cookie）不能暴露给前端；FastAPI 后端天然承担采集代理角色。
+- **adapter 可插拔、失败可降级**。各平台接口稳定性差异大（官方 API / 第三方
+  API / 非官方接口 / cookie 授权），单平台失败只降级为该账号的诊断信息，不拖垮
+  整个面板（遵循 [../conventions.md](../conventions.md)「诊断不阻断」）。
+- **启动自动同步 + 手动同步**。本地应用不常驻运行，所以每次启动（后端 lifespan
+  就绪后）自动对当前用户组全部账号触发一次同步（后台异步，等价于"立即同步
+  全部"；可用 `activity_sync_on_startup=false` 关闭）。界面上另有"立即同步"
+  按钮：汇总视图同步全部平台（点击前先确认），平台视图只同步该平台。每个账号
+  都有新鲜度/上次同步时间/错误状态展示；同步在后台异步执行，前端轮询状态接口。
+- **增量同步**。每个（用户组, 平台, 账号）维护同步游标（UTC 秒级数据水位），
+  游标当秒的提交重复拉取、按 submission_id 去重合并（停止条件 `ts < since`，
   避免同秒多提交被永久漏掉——见 §3.3）。
-- **时区**：远端时间戳均为 UTC 秒级，按后端本地时区切"天"聚合（本地部署，
+- **时区**。远端时间戳均为 UTC 秒级，按后端本地时区切"天"聚合（本地部署，
   后端时区即用户时区）。
-- **用户组 = data/user/<user_id>/ 目录**：多用户组真实隔离（账号绑定、训练数据、
-  信息卡），组名即目录名（支持中文），见 §3.1 与 §4.1。
-- **信息卡与组名分离**：信息卡（ID / 签名 / 头像）存组内 `profile.json`，编辑互不影响。
+- **用户组 = data/user/<user_id>/ 目录**。多用户组真实隔离（账号绑定、训练
+  数据、信息卡），组名即目录名（支持中文），见 §3.1 与 §4.1。
+- **信息卡与组名分离**。信息卡（ID / 签名 / 头像）存组内 `profile.json`，
+  编辑互不影响。
 
 ### 2.2 平台差异适配模式：公共内核 + 平台扩展
 
@@ -53,7 +53,7 @@ router / service / modules 主干保持平台无关（不出现 `if platform == 
 
 1. Codeforces（官方 API，匿名可取，风险最低）——**已实现**
 2. AtCoder（kenkoooo API + 官方用户主页 404 验证，匿名可取）——**已实现**
-3. 洛谷（cookie 授权框架首个实例 + 反爬对抗，QOJ 等后续平台复用同一套）——**进行中**
+3. 洛谷（cookie 授权框架首个实例 + 反爬对抗，QOJ 等后续平台复用同一套）——**已实现**
 4. LeetCode CN + 牛客（GraphQL 路径已探明 / rating 匿名接口）
 5. 长尾平台（评估 ojhunt 依赖或手动导入）
 
@@ -76,7 +76,7 @@ backend/data/user/
    ├─ activity/
    │  ├─ submissions/<platform>_<handle>.jsonl   # 每 (平台,账号) 一个文件
    │  └─ rating/<platform>_<handle>.json
-   └─ secrets.json              # cookie 等凭据（gitignore，仅存本机；第三期起实现）
+   └─ secrets.json              # cookie 等凭据（gitignore，仅存本机）
 ```
 
 `.gitignore` 已落实：
@@ -102,7 +102,7 @@ backend/data/user/*/   # 用户组运行数据不入库（每个组一个目录�
 }
 ```
 
-`secrets.json` 结构（`modules/activity/models.py::Secrets`，第三期起实现）：
+`secrets.json` 结构（`modules/activity/models.py::Secrets`）：
 
 ```json
 { "platforms": { "luogu": { "1085065": { "cookies": {"_uid": "...", "__client_id": "..."},
@@ -114,10 +114,10 @@ backend/data/user/*/   # 用户组运行数据不入库（每个组一个目录�
 - `handle` 为平台内 **API 主键**（洛谷为 uid 数字，用户名可改而 uid 稳定），
   `display_name` 为展示名（洛谷用户名），界面一律显示 `display_name ?? handle`；
 - sync 引擎按 (platform, handle) 从 secrets.json 加载凭据注入 adapter
-  （匿名平台为 None）。
-
-- 头像为前端裁剪后的 **512×512 JPEG data URL**（信息卡容器约 268px，2 倍超采样防糊；
-  上限 500k 字符）。data URL 内嵌数据，**不依赖原图文件路径**，目录迁移/重命名不受影响。
+  （匿名平台为 None）；
+- 头像为前端裁剪后的 **512×512 JPEG data URL**（信息卡容器约 268px，2 倍超采样
+  防糊；上限 500k 字符）。data URL 内嵌数据，**不依赖原图文件路径**，目录迁移/
+  重命名不受影响；
 - 信息栏 ID 与组名（目录名）分离：编辑 ID 只改 `profile.json`，重命名组不改变 ID。
 
 ### 3.2 统一提交模型
@@ -130,9 +130,9 @@ PlatformSubmission {
   submission_id   # 平台内唯一提交 id（去重依据）
   problem_key     # 平台内题目标识（CF "2245F" / AT "abc001_a" / LG "P1001"）
   problem_name
-  problem_url     # 平台内题目外链（CF 按 contestId 位数区分：四位数主题库 /contest/，六位数 gym /gym/）
-  difficulty      # 原始难度值，不做跨平台归一（int | str：CF 分数 / LC 档位 / 洛谷难度）
-  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中）/ UNAC（未通过但细分未知，洛谷列表口径）
+  problem_url     # 平台内题目外链
+  difficulty      # 原始难度值，不做跨平台归一（int | str：CF 分数 / LC 档位 / 洛谷难度档）
+  verdict         # AC / WA / CE / RE / TLE / MLE / OLE / UKE / JG（评测中）/ UNAC（未通过但细分未知）
   submitted_at    # UTC 秒级时间戳
   language
 }
@@ -140,30 +140,31 @@ PlatformSubmission {
 
 - **UNAC 语义**：洛谷记录列表只区分 AC / CE / Unaccepted（官方常量 `filterable`
   佐证：仅 2/12/14 可筛选），WA/TLE/MLE/RE 细分只在记录详情的测试点信息里。
-  为不误导（把 TLE 显示成 WA），14 归一为 UNAC（未通过、细分未知）；
-  **存量历史 WA（旧口径落盘）不做迁移**，重新同步即被新口径覆盖（对话确认）。
+  为不误导（把 TLE 显示成 WA），14 归一为 UNAC（未通过、细分未知），可经
+  精细化同步还原细分（见 [luogu.md](luogu.md)）；**存量历史 WA（旧口径落盘）
+  不做迁移**，重新同步即被新口径覆盖（对话确认）。
 
 ### 3.3 游标、断点与去重
 
-- 每账号游标 = `profile.json` 中 `Account.last_synced_at`（数据水位，UTC 秒，null = 从未同步）；
+这是同步正确性的核心约定，三个概念各司其职：
+
+- **游标**（`Account.last_synced_at`）= 数据水位：回答"数据完整到哪个时间点"。
+  只进不退、**绝不在一次同步的中途推进**（否则未拉取的较旧区段会被永久漏掉）；
+  无新提交时保持原游标（空账号不落 0 游标）。
 - **增量停止条件 `ts < since`**：游标当秒的提交会重复拉取，由 store 按
-  `submission_id` 去重吸收（去重是硬保证，重复拉无代价）——避免同秒多提交被漏掉；
-- 游标推进取最大值防倒退；无新提交时保持原游标（空账号不落 0 游标）；
-- **断点 `Account.sync_checkpoint`**（可选字段，仅全量回填期存在）：
-  平台自解释的续传位置（洛谷=页码 / CF=偏移 / AT=from_second 秒，附累计
-  条数 fetched），**每批落盘后推进、全量完成即清除**；与游标职责严格分离——
-  游标回答"数据完整到哪个时间点"（只进不退、绝不在中途推进），断点回答
-  "回填进行到哪了"（临时状态）；中断后下次同步识别断点续跑，换绑/解绑/
-  删组随账号自动清理；
+  `submission_id` 去重吸收（去重是硬保证，重复拉无代价）——避免同秒多提交被漏掉。
+- **断点**（`Account.sync_checkpoint`，可选字段，仅全量回填期存在）= 平台自解释
+  的续传位置（洛谷=页码 / CF=偏移 / AT=from_second 秒，附累计条数 fetched），
+  回答"回填进行到哪了"。**每批落盘后推进、全量完成即清除**；中断后下次同步
+  识别断点续跑，换绑/解绑/删组随账号自动清理。
 - 「xx 前同步」展示用 `Account.last_sync_ok_at`（每次同步成功落盘的真实时刻，
   **与数据水位游标分离**——游标是"数据新到哪"，拿它展示会在重启后/同步中
-  显示成数据水龄，如 71 天前最后提交被显示为"71 天前同步"）；
-  内存态 `SyncStatus.last_synced_at` 为本次会话的同步结束时间，缺失时回退
-  last_sync_ok_at。
+  显示成数据水龄，如 71 天前最后提交被显示为"71 天前同步"）；内存态
+  `SyncStatus.last_synced_at` 为本次会话的同步结束时间，缺失时回退 last_sync_ok_at。
 
 ### 3.4 写入约定
 
-沿用 [conventions.md](conventions.md)：写操作经 store 原子写入（临时文件 +
+沿用 [../conventions.md](../conventions.md)：写操作经 store 原子写入（临时文件 +
 `os.replace`），同资源并发写用 `RLock` 串行化；JSONL 读入合并去重后整体原子替换；
 单行损坏只跳过不阻断（返回损坏行数供日志）。用户组目录的创建/重命名/删除：
 新建建目录 + 初始档案，重命名 `os.rename`（数据随目录迁移），删除 `shutil.rmtree`
@@ -231,10 +232,10 @@ verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**�
   →「确认绑定」→ 自动触发首次同步；
 - 换绑：每平台每用户组只保留一个账号，绑定新账号替换旧账号并删除其本地数据；
 - 解绑：确认后删除该账号本地数据（不可找回）；
-- 凭据平台（洛谷，第三期落地）：绑定弹窗提供两条路径——「方式一 · 一键登录」
-  （后端 Playwright 拉起系统浏览器登录窗口，见 §5.6）与「方式二 · 手动输入
-  cookie」（逐字段输入框：`_uid`（即平台 UID，兼作 handle）与 `__client_id`，
-  配「如何获取 cookie？」悬浮引导）；
+- 凭据平台（洛谷）：绑定弹窗提供两条路径——「方式一 · 一键登录」（后端
+  Playwright 拉起系统浏览器登录窗口，见 [luogu.md](luogu.md)）与
+  「方式二 · 手动输入 cookie」（逐字段输入框：`_uid`（即平台 UID，兼作 handle）
+  与 `__client_id`，配「如何获取 cookie？」悬浮引导）；
   `verify`/同步携带 `credentials`；绑定当下即携凭据试拉验证有效性
   （`AuthExpiredError` 在 verify 路径转 400，不放行死凭据）；
   同步中 `AuthExpiredError` → `syncErrorCode: "auth_expired"` → 账号按钮警示态
@@ -280,6 +281,8 @@ backend/src/adapters/
 ```python
 REGISTRY: dict[str, type[PlatformAdapter]] = {
     CodeforcesAdapter.platform_id: CodeforcesAdapter,
+    AtCoderAdapter.platform_id: AtCoderAdapter,
+    LuoguAdapter.platform_id: LuoguAdapter,
 }
 ```
 
@@ -299,10 +302,11 @@ class AuthMode(str, Enum):    # NONE（匿名）/ COOKIE（cookie 授权）
 
 ```python
 PlatformSubmission   # 提交记录（§3.2）
-UserInfo             # 绑定验证回执 { handle, avatar? }
+UserInfo             # 绑定验证回执 { handle, display_name?, avatar? }
 RatingPoint          # rating 历史单点 { time, rating, contest_name }（后续增量）
 ContestInfo          # 比赛信息 { contest_id, name, start_time, duration_seconds, url? }
 Credentials          # 凭据 { cookies: dict, headers: dict }
+SyncBatch            # 流式拉取批次 { items, checkpoint, done }
 ```
 
 **异常体系**：
@@ -311,30 +315,31 @@ Credentials          # 凭据 { cookies: dict, headers: dict }
 AdapterError                    # 基类
 ├─ UserNotFoundError            # 绑定验证用户不存在 → service 转 400
 ├─ PlatformError                # 平台故障（网络/限流/格式）→ sync 降级为该账号诊断
+│   └─ HttpStatusError          # 4xx 等不可重试状态码，携带 status_code（如 404 → 用户不存在）
 ├─ AuthExpiredError             # 凭据过期 → sync 标记 error_code="auth_expired"
-└─ CapabilityNotSupportedError  # 调用未声明的能力（契约违约，正常路径不触发）
+├─ CapabilityNotSupportedError  # 调用未声明的能力（契约违约，正常路径不触发）
+└─ BrowserLoginCancelledError   # 浏览器一键登录被用户取消
 ```
 
-**PlatformAdapter 能力方法**（均为**普通方法**，基类默认抛
-`CapabilityNotSupportedError`；能力残缺的平台只实现 capabilities 声明的方法，
-不被迫写空壳）：
+**PlatformAdapter 能力方法**（基类默认抛 `CapabilityNotSupportedError`；能力残缺的
+平台只实现 capabilities 声明的方法，不被迫写空壳）：
 
 | 方法 | 说明 | 能力 |
 | --- | --- | --- |
 | `verify(handle, credentials=None) -> UserInfo` | 绑定验证 | USER_INFO |
-| `fetch_submissions(handle, *, since, credentials=None, full_window_days, full_min_rows, progress_cb=None, resume_checkpoint=None) -> AsyncIterator[SyncBatch]` | 提交明细，**流式逐批产出**（见下）；`since` 为 UTC 秒游标（None 全量），增量语义平台自解释；`resume_checkpoint` 为全量回填断点（平台自解释，来自 `Account.sync_checkpoint`）；`full_window_days`/`full_min_rows` 为上层同步策略（见 §6.3），adapter 不内置；`progress_cb(fetched, total)` 为可选进度回调（total 可知的平台上报，驱动前端进度百分比；未知则不报，前端显示不定态） | SUBMISSIONS |
+| `fetch_submissions(handle, *, since, credentials=None, full_window_days, full_min_rows, progress_cb=None, resume_checkpoint=None) -> AsyncIterator[SyncBatch]` | 提交明细，**流式逐批产出**（见下） | SUBMISSIONS |
+| `fetch_rating_history(handle, credentials=None) -> list[RatingPoint]` | rating 历史（后续增量） | RATING |
+| `fetch_contests() -> list[ContestInfo]` | 比赛信息（平台级，无 handle，未来 contest 功能消费） | CONTESTS |
+| `fetch_submission_verdict(record_id, credentials=None) -> Verdict \| None` | 单条提交的细分结果精化（列表只有 UNAC 的平台拉详情判定）；返回 None = 无法判定保持原样 | REFINE_VERDICT |
 
 **流式契约（SyncBatch）**：`{items, checkpoint, done}`——`items` 为本批提交
 （通常一页）；`checkpoint` 为全量回填断点（增量模式恒为 None），平台自解释
 并附累计条数（如 `{"page": 12, "fetched": 240}`），断点页码/偏移会随新提交
 漂移，靠 store 按 `submission_id` 去重吸收（多拉无代价、不漏）；`done=True`
-表示拉取完成（游标此时才可推进）。**方向差异的约定**：降序平台（CF/洛古）
+表示拉取完成（游标此时才可推进）。**方向差异的约定**：降序平台（CF/洛谷）
 先产最新批次，升序平台（AT kenkoooo）先产最旧批次——中断时降序缺最旧、
 升序缺最新，正确性不受影响；同步开始后出现的新提交一律不追，由下次增量
 兜底（游标语义保证）。
-| `fetch_rating_history(handle, credentials=None) -> list[RatingPoint]` | rating 历史（后续增量） | RATING |
-| `fetch_contests() -> list[ContestInfo]` | 比赛信息（平台级，无 handle，未来 contest 功能消费） | CONTESTS |
-| `fetch_submission_verdict(record_id, credentials=None) -> Verdict \| None` | 单条提交的细分结果精化（列表只有 UNAC 的平台拉详情判定）；返回 None = 无法判定保持原样 | REFINE_VERDICT |
 
 **数据迁移钩子**：`normalize_url(url)`（5f7ffeb8 先例）——历史数据读取时经钩子
 幂等转换为当前口径（默认恒等），平台规则演进无需重新同步。
@@ -359,125 +364,12 @@ AdapterError                    # 基类
 - **传输层例外（洛谷）**：洛谷 WAF 按 TLS/HTTP 指纹区分客户端（实测：同 IP 同
   cookie，curl 通过、httpx 必被挑战），故洛谷 adapter 不用共享 `HttpFetcher`，
   改用 `curl_cffi`（浏览器 TLS 指纹伪装）自带会话，限流/退避模式镜像本层实现，
-  详见 §5.6。
+  详见 [luogu.md](luogu.md)。
 
-### 5.4 Codeforces 适配器（范本解剖）
-
-`adapters/codeforces/` 作为新平台的参考范本：
-
-- **api_models.py**：`CfEnvelope[T]`（泛型信封：status/comment + 类型化 result），
-  `CfUserInfo` / `CfSubmissionRow` / `CfProblem`。外部 JSON 第一时间 `model_validate`；
-  可选字段默认值容错，**必填字段（id、creationTimeSeconds）缺失即校验失败**暴露
-  平台格式变化（creationTimeSeconds 若给默认 0 会静默吞掉增量新提交）。
-- **normalize.py**：纯函数 `map_verdict`（未列出的 verdict 归 UKE，SUBMITTED/TESTING
-  归 JG）、`problem_url`（contestId 位数区分 /contest/ 与 /gym/）、`problem_key`。
-- **fetch_submissions**：`user.status` 分页（单页 1000，最多 200 页护栏）；增量
-  `ts < since` 停止；全量拉到覆盖 `full_window_days` 窗口为止、窗口内不足
-  `full_min_rows` 条时继续拉满；信封 `_check_envelope` / `_should_retry_envelope`
-  （Call limit exceeded 走重试，其余 FAILED 抛 `PlatformError`）。
-
-### 5.5 AtCoder 适配器（kenkoooo API，第二期）
-
-`adapters/atcoder/`，数据源与 CF 形态差异较大，要点：
-
-- **数据源**（均为匿名可取）：
-  - 提交明细：kenkoooo `GET /atcoder-api/v3/user/submissions?user=X&from_second=T`
-    （社区事实标准，**升序**返回、单页上限 500、`from_second` 含边界）；
-  - 题目目录：kenkoooo `/resources/problems.json`（`id → name`，`problem_name` 来源）
-    与 `/resources/problem-models.json`（kenkoooo 模型分，`difficulty` 来源）；
-    adapter 实例内**内存缓存 + 24h TTL，不落盘**（不新增数据目录与 gitignore）；
-  - 绑定验证：官方用户主页 `https://atcoder.jp/users/{handle}` 的 **404 判定**
-    （实测确认：`history/json` 对不存在用户也返回 200 `[]`，kenkoooo v2
-    `user_info` 对不存在用户返回 200 全零，均无法区分；主页 404 是唯一可靠信号）。
-- **失败语义分级**：`problems.json` 失败 → 抛 `PlatformError`（题名为核心展示字段，
-  宁可本次同步降级重试不落库坏数据）；`problem-models.json` 失败或目录缺题 →
-  `difficulty=None` 继续（非关键字段）；目录缺题时 `problem_name` 兜底 `problem_id`。
-- **增量 / 全量**（kenkoooo 只能升序翻页，与 CF 倒序回扫不同）：
-  - 增量：`from_second = since`（含边界，游标当秒重复拉取由 store 按
-    `submission_id` 去重吸收，与 §3.3 语义一致），升序翻页至短页（<500）为止；
-  - 全量：先拉 `full_window_days` 窗口；窗口内不足 `full_min_rows` 条时退到
-    `from_second=0` 拉全部历史（两步策略，不逐段扩展）；
-  - **页间去重与防停滞**：`from_second` 含边界 ⇒ 翻页下一页与上页末条同秒重叠，
-    adapter 内按 `id` 集合去重；单页无新 id 即停（防同秒 ≥500 条死循环）；
-    外加 `MAX_PAGES` 护栏；
-- **verdict 映射**：`AC/WA/TLE/MLE/RE/CE/OLE` 直映射；`WJ/WR/JUDGING` → `JG`
-  （评测中，对齐 CF 的 SUBMITTED/TESTING）；`IE/QLE` 与未知值 → `UKE`；
-- **URL**：`problem_url = https://atcoder.jp/contests/{contest_id}/tasks/{problem_id}`，
-  `problem_key = problem_id`（如 `abc001_a`）；
-- **限流**：`min_interval = 1.0`（kenkoooo 公益接口要求 ≥1s；verify 的 atcoder.jp
-  请求共用同一 platform 限流桶，保守串行）；
-- **net 层依赖**：verify 需区分 404（用户不存在）与其他 4xx（平台故障），
-  依赖 net 层 4xx 抛出的 `HttpStatusError`（`PlatformError` 子类，携带
-  `status_code`）——404 转 `UserNotFoundError`，其余维持 `PlatformError`。
-
-### 5.6 洛谷适配器（cookie 授权 + 反爬对抗范本，第三期）
-
-`adapters/luogu/`，首个 `AuthMode.COOKIE` 平台。以下结论全部来自 2026-08-15
-真实 cookie 实测：
-
-- **数据源**：
-  - 提交明细：`GET /record/list?user=<uid>&page=N&_contentOnly=1`（`_contentOnly=1`
-    返回纯 JSON 信封 `{code, currentData: {records: {result, count, perPage}}}`；
-    不带则返回 SPA 页 + `_feInjection` 内嵌同构数据）。时间**倒序**、perPage=20、
-    倒序回扫（与 CF 同模式：增量 `ts < since` 停止，record `id` 去重）；
-  - 单条精化：`GET /record/{id}?_contentOnly=1` →
-    `record.detail.judgeResult.subtasks[].testCases[].status`（细分 verdict 的唯一
-    来源；实测确认，UNAC 记录的测试点带真实状态码）；
-  - 绑定验证存在性：`GET /api/user/search?keyword=X` **匿名可用**，返回
-    `{uid, name, avatar}`，取精确匹配（用户名不区分大小写或 uid 相等）；
-  - 绑定验证凭据有效性：携凭据试拉 record/list 第 1 页（绑定当下拦住死凭据）；
-  - **难度**：record 内嵌 `problem.difficulty`（0-7 档），无需额外请求。
-- **传输层（关键）**：WAF 按 TLS 指纹区分客户端——实测 httpx（Python 指纹）
-  必被 Spilopelia 挑战拦截，`curl_cffi`（`impersonate="chrome"`）通过。
-  adapter 持有自己的 `curl_cffi.requests.AsyncSession`（不用共享 HttpFetcher；
-  注册表构造签名不变，入参 fetcher 忽略）。凭据经 session 的 cookies 参数应用。
-- **反爬挑战形态与处置**：
-  - `302 + Set-Cookie: C3VK`（`Ws-Action: cc`）→ 客户端 cookie 罐跟随即可通过
-    （curl_cffi 会话自动处理）；
-  - Spilopelia **JS 挑战页**（请求过密时升级出现）→ 非浏览器客户端无法执行 JS，
-    判平台故障：带凭据时按 `AuthExpiredError` 引导重新授权（重导 cookie 是两种
-    情况的共同正确动作）；低频请求（min_interval=5s）可长期避开；
-  - 信封 `code == 401/403` 且消息含「请先登录/用户不可见」→ `AuthExpiredError`；
-  - `403 +「请求频繁」`（限流，非过期）→ adapter 应用层专项重试
-    （4 次、30s 起步指数退避；clist 生产值为 8 次 + 50s 附加延迟，本地酌减）；
-  - 其余 `code != 200` → `PlatformError`。
-- **会话轮换**：服务端会 302 刷新 `__client_id`（轮换不失效，旧值仍可用），
-  会话罐吸收即可；**不回写 secrets.json**（本期 YAGNI，实测旧凭据长期有效）。
-- **归一化**：
-  - `handle = uid`（数字）；verify 归一输入（用户名/uid 均可）并返回
-    `display_name=用户名`、`avatar`；
-  - `submission_id` = record `id`；`problem_key` = `pid`；`problem_name` = `title`；
-  - `problem_url` = `https://www.luogu.com.cn/problem/{pid}`，`contest` 非空时
-    拼 `?contestId={cid}`（clist 格式）；contest 内提交计入统计（对齐 CF gym）；
-  - `difficulty` = record 内嵌 0-7 原始档（int，不归一）；
-  - **verdict 映射**（数字 status 码，官方 `/_lfe/config/auth` 常量表实测校准）：
-    `12→AC`、`6→WA`、`14→UNAC`（Unaccepted：列表口径无细分，细分只在记录
-    详情测试点信息中，逐条拉取成本不可接受——对话确认不做详情级适配）、
-    `2→CE`、`7→RE`、`5→TLE`、`4→MLE`（**注意 4/5 与直觉相反**）、`3→OLE`、
-    `0/1→JG`（等待/评测中）、`11`（UKE）/`21/22/23`（Hack 系列）/未知码 → `UKE`；
-    存量历史 WA（此前 14→WA 口径落盘）不做迁移，重新同步即被新口径覆盖；
-  - **language 数字码**：同一常量表的 `CodeLanguage` 内置映射（如 27=C++20、
-    7=Python 3），未知码兜底空串；
-  - **进度上报**：全量同步时首页信封 `records.count` 即全站总条数，
-    `progress_cb(fetched, total)` 逐页上报真实百分比；增量同步总量不可知，不上报。
-- **二级密码不影响**：二级密码只保护账号安全类敏感操作，登录态读提交记录
-  不触发（对话确认设计假设，架构上有 auth_expired 降级兜底）。
-- **一键登录（browser-login）**：`adapters/luogu/login.py` 用 Playwright
-  （可选依赖组 `browser-login`）拉起**系统 Chrome/Edge** 独立窗口（临时 profile，
-  `channel="chrome"` 兜底 `msedge`，不下载浏览器二进制），用户自行完成登录
-  （图形验证码/**两步验证码**/二级密码等均由用户自然处理）；登录完成判定为
-  双重确认——cookie 罐出现 `_uid`/`__client_id` 只是候选信号（匿名与两步验证
-  中间态也携带 `__client_id`），再经**鉴权探针**（浏览器上下文请求
-  `record/list?_contentOnly=1` 返回 `code==200` 的 JSON，节流到至多 3s 一次）
-  确认完整登录态才抓取 cookie 与 UA 返回；用户关窗 → canceled，超时 3 分钟 →
-  timeout。凭据由 service 暂存（内存，10 分钟 TTL），bind 时消费——
-  **凭据不经前端**。Playwright 未安装时 `/platforms` 的 `browserLogin=false`，
-  前端隐藏一键登录按钮，仅保留方式二手动输入。
-
-### 5.7 新平台接入清单（checklist）
+### 5.4 新平台接入清单（checklist）
 
 1. 调研数据源（官方 API / 第三方 / 非官方 / cookie），确认每项能力可取性与限流，
-   参考 [../cache/platform-api-research.md](../cache/platform-api-research.md)；
+   参考 [../../cache/platform-api-research.md](../../cache/platform-api-research.md)；
 2. `backend/src/adapters/<platform>/` 目录：`__init__.py`（Adapter 类）、
    `api_models.py`（响应模型）、`normalize.py`（归一化纯函数）；
 3. Adapter 声明元数据：`platform_id`（与前端 `PlatformId` 对齐）、`name`、
@@ -492,7 +384,7 @@ AdapterError                    # 基类
 8. 跑 `uv run pytest`、`uv run ruff check src tests`；起服务 curl 全链路。
 
 **cookie 授权平台（洛谷/QOJ）要点**：`AuthMode.COOKIE` + `Credentials` 透传；
-绑定弹窗收集 cookie → `secrets.json` 存储（预留）；同步遇 `AuthExpiredError`
+绑定弹窗收集 cookie → `secrets.json` 存储；同步遇 `AuthExpiredError`
 前端引导重新授权；低频请求 + 专项重试（min_interval 声明更长，必要时单次覆盖
 `max_retries`/`base_backoff`）。
 
@@ -506,10 +398,11 @@ backend/src/
 ├─ routers/activity/router.py  # HTTP 边界：只做参数校验与转发，平台无关
 ├─ services/activity/service.py # 门面：用户组/信息卡/账号 CRUD/绑定验证、触发同步、聚合读取
 └─ modules/activity/
-   ├─ models.py                # Submission / Account（含 display_name）/ Profile / Secrets / SyncStatus 领域模型
+   ├─ models.py                # Submission / Account / Profile / Secrets / SyncStatus 领域模型
    ├─ schemas.py               # API 出入参 DTO（camelCase，与前端 types.ts 对齐）
    ├─ store.py                 # data/user/<userid>/ 读写层 + 用户组目录管理 + secrets.json（原子写、锁）
-   ├─ sync.py                  # 增量同步引擎：游标推进、去重合并、按组隔离、失败隔离
+   ├─ sync.py                  # 同步引擎：流式双模式、游标/断点、去重合并、失败隔离
+   ├─ refine.py                # 精细化同步引擎（UNAC → 细分结果，见 luogu.md）
    └─ aggregate.py             # 纯函数：submissions → 按天聚合/总览统计（无 IO）
 ```
 
@@ -575,56 +468,10 @@ backend/src/
 | GET | `/api/activity/sync/status` | 各账号同步状态（idle/running/error + 上次结果 + errorCode + syncProgress 0~1 可空），前端轮询 |
 | POST | `/api/activity/accounts/{platform}/{handle}/refine` | 启动精细化同步（202；能力缺失 400、进行中 409；仅 REFINE_VERDICT 平台） |
 | DELETE | `/api/activity/accounts/{platform}/{handle}/refine` | 中止精细化同步（204，幂等） |
-| GET | `/api/activity/accounts/{platform}/{handle}/refine` | 精化状态 `{state, done, total, auto}`（state: idle/running/stopped/done；idle 时 total = 当前存量 UNAC 数，供前端预估耗时） |
+| GET | `/api/activity/accounts/{platform}/{handle}/refine` | 精化状态 `{state, done, total, auto}`（state: idle/running/stopped/done；idle 时 total = 当前待精化数，供前端预估耗时） |
 | PATCH | `/api/activity/accounts/{platform}/{handle}` | 更新账号配置 `{refineAuto}`（普通同步完成后自动启动精化） |
 
 错误响应统一由全局异常处理器结构化（`{error: {code, message, detail}}`）。
-
-### 6.5 精细化同步（UNAC refine，第四期）
-
-**背景**：洛古记录列表口径只有 AC/CE/Unaccepted（官方常量 `filterable` 佐证），
-WA/TLE/MLE/RE 细分只存在于记录详情。精化把存量 UNAC 逐条拉详情改写为具体
-结果——只影响提交列表徽章的细分，统计口径（AC vs 非 AC）不受影响。
-
-**规则**：
-
-- 详情 `record/:id` → 全部 subtask 的全部测试点中，**按严重度取最重**
-  （对话确认）：`RE > TLE > MLE > OLE > WA`；
-- 保守规则与 UKE 层级：JG 测试点不参选（评测中/未定态）；无可参选测试点
-  但存在 UKE 测点 → 判 **UKE**（记录确实遭遇评测方故障；实测确认该形态
-  存在：纯 UKE / UKE+AC 混合 / AC 多数+个别 UKE）；全 AC 或无测试点信息
-  → 保持 UNAC 不乱猜；
-- CE 不经精化（列表口径本就区分）；`fetch_submission_verdict` 返回 None
-  表示无法判定，保持原样；
-- **终止保证（防重试循环）**：`Submission.refine_attempted` 标记——详情
-  拉取成功但无法判定时打标，不再重试；待办口径为
-  `verdict == UNAC and not refine_attempted`（曾出现仅 UKE 测点的记录
-  被保守规则无限重试的事故，勿回退）。
-
-**引擎**（`modules/activity/refine.py`，service 持有）：
-
-- 启动时快照存量 UNAC（按 `submitted_at` **升序**，从旧往新），
-  `total` 固定为本轮快照条数（精化途中新增的 UNAC 留下轮，进度不倒退）；
-- **剩余 UNAC 即待办**：中止/中断后无需额外游标，下次启动重扫自动续传；
-  中止为**状态即时翻转**（stop 立即置 stopped，前端即时反馈；在飞的一条
-  最多多完成一次写入，无害；陈旧任务经 current_task 防护不覆写新轮次）；
-  stopped/idle 态的 `total` 按存量剩余实时计算（快照分母中止后即过时）；
-- **与普通同步协同**：每条记录处理前获取该账号的同步锁（SyncEngine 单账号
-  `asyncio.Lock`）——普通同步全程持锁，精化自然暂停，结束后自动继续
-  （移交延迟 ≤ 一条记录）；
-- 与同步共用 adapter 的 5s 限流节奏（`_get_json` 实例级 pacing），不加速
-  WAF 风险；洛谷单条详情复用同一传输层与信封判定；
-- store 新增 `update_verdicts`（按 submission_id 就地改写 verdict，原子写 +
-  同锁串行）——这是"磁盘优先、合并不覆盖旧行"规则的**唯一受控例外**；
-- `Account.refine_auto`（默认关）：普通同步完成后自动启动精化（增量带来的
-  几条新 UNAC 秒级完成）；「已完成」按存量 UNAC 清零计算，不持久化状态。
-
-**前端**：平台视图工具条「同步」按钮右侧的「精细化同步」按钮
-（能力驱动：平台声明 REFINE_VERDICT 且已绑定时挂载），**精化进行中按钮
-右上角显示黄色圆点角标**（与页签同步角标同视觉语言，store 全局轮询
-精化状态驱动）；弹窗三态——
-未开始（功能说明 + 按存量 UNAC×5s 的耗时预估 + 确认）/ 进行中（百分比 +
-中止）/ 已完成（「随同步自动精化」开关）。
 
 ## 7. 前端落地
 
@@ -632,16 +479,18 @@ WA/TLE/MLE/RE 细分只存在于记录详情。精化把存量 UNAC 逐条拉详
 
 ```
 frontend/src/features/activity/
-├─ ActivityPage.vue            # 数据总览页（网址状态同步见 §4.7）
+├─ ActivityPage.vue            # 数据总览页（网址状态同步见 §4.6）
 ├─ api.ts / store.ts / types.ts
 ├─ profile.ts                  # 用户组与信息卡（后端驱动，防抖提交信息卡）
 ├─ model/                      # 纯函数层（vitest 覆盖）
-│  ├─ heatmap.ts / heatmap-grid.ts / bars.ts / echarts-theme.ts / pagination.ts / dates.ts
+│  ├─ heatmap.ts / heatmap-grid.ts / bars.ts / echarts-theme.ts / pagination.ts / dates.ts / refine.ts
 ├─ components/
 │  ├─ UserProfileCard.vue      # 信息卡（头像 / ID / 签名就地编辑）
 │  ├─ UserGroupMenu.vue        # 用户组下拉（新建 / 切换，按钮显示组名）
 │  ├─ UserGroupEditModal.vue   # 编辑用户组（重命名 / 删除 / 平台账号绑定管理）
 │  ├─ AccountBindModal.vue     # 绑定 / 换绑（cookie 平台：一键登录 + cookie 逐字段输入）
+│  ├─ AccountManageModal.vue   # 账号管理（换绑 / 解绑）
+│  ├─ RefineModal.vue          # 精细化同步弹窗（三态，见 luogu.md）
 │  ├─ SyncBar.vue / PlatformTabs.vue（同步中平台黄点角标）
 │  ├─ SyncProgressPanel.vue    # 平台视图右栏同步进行态（进度环 + 百分比 / 不定态）
 │  ├─ StatCards.vue / PassBarChart.vue / ActivityHeatmap.vue / SubmissionList.vue
@@ -686,8 +535,9 @@ frontend/src/features/activity/
 
 - 后端 pytest：`adapters`（net 限流/退避/信封/凭据/单次覆盖、各平台 adapter
   录制 fixture 解析）、`store`（原子写/去重合并/组目录管理/损坏容错）、
-  `aggregate`（口径/时区切天/streak）、`sync`（游标推进/失败隔离/按组隔离/
-  auth_expired 标记）、`service`（用户组 CRUD/组数据隔离/信息卡/绑定同步）；
+  `aggregate`（口径/时区切天/streak）、`sync`（游标推进/断点续传/失败隔离/
+  按组隔离/auth_expired 标记）、`refine`（精化规则/暂停/中止续扫）、
+  `service`（用户组 CRUD/组数据隔离/信息卡/绑定同步）；
   `ruff check src tests`；
 - 前端 vitest：`model/` 纯函数；`typecheck`、`test`、`build`；
 - API 契约：起服务后 `curl http://127.0.0.1:8000/api/diagnostics` 正常返回；
@@ -699,11 +549,13 @@ frontend/src/features/activity/
 
 已按序完成：设计文档 → 依赖与 gitignore → 数据模型与读写层 → adapters 基座 +
 Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡 → 契约扩展与结构清理
-→ AtCoder 适配（net 层状态码错误 + adapter + 录制测试，前端零改动）
-→ 洛谷适配（secrets 凭据框架 + curl_cffi 传输层 + browser-login + 前端凭据 UI）
-（详见 [../../PROGRESS.md](../../PROGRESS.md)）。
+→ AtCoder 适配 → 洛谷适配（secrets 凭据框架 + curl_cffi 传输层 + browser-login +
+前端凭据 UI）→ 流式拉取与断点续传 → 启动时自动同步 → UNAC 精细化同步
+（详见 [../../../PROGRESS.md](../../../PROGRESS.md)）。
 
 ## 10. 既有决策与陷阱（对话确认，勿随意回退）
+
+平台专属的陷阱记录在各平台文档末尾；以下为跨平台约定：
 
 - **增量游标 `ts < since`**：游标当秒提交重复拉取靠 `submission_id` 去重吸收，
   防同秒多提交漏拉；改回 `<=` 会丢数据；
@@ -718,24 +570,6 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
   service 按 capabilities 调用；
 - **用户组删除至少保留一个组**：后端强制，前端按钮禁用联动；
 - **汇总视图同步全部平台前弹确认框**（可能较慢）；平台视图只同步该平台；
-- **kenkoooo `from_second` 含边界且只升序翻页**：AtCoder 增量/全量必须 adapter 内
-  按 id 去重 + 单页无新 id 即停，否则同秒重叠页会死循环（§5.5）；
-- **AtCoder 用户存在性只能看官方主页 404**：`history/json` 与 kenkoooo
-  `user_info` 对不存在用户均返回 200，不能用于绑定验证（实测确认，§5.5）；
-- **题目目录失败语义分级**：`problems.json` 失败抛错重试（题名核心）、
-  `problem-models.json` 失败 difficulty 留空继续（非关键），不反向混淆（§5.5）；
-- **洛谷传输层必须 curl_cffi**：WAF 按 TLS 指纹封 httpx（实测同 IP 同 cookie
-  curl 通过、httpx 必被挑战）；换回共享 HttpFetcher 会导致同步全灭（§5.6）；
-- **洛谷状态码 4=MLE / 5=TLE（与直觉相反）**：映射表以官方 `/_lfe/config/auth`
-  常量为准，勿凭记忆改写；14（Unaccepted）→ UNAC（列表口径结构性无细分，
-  `filterable` 仅 2/12/14 可筛；细分须逐条拉记录详情，成本不可接受，对话确认
-  不做详情级适配），存量 WA 不做迁移、重新同步即覆盖（§3.2/§5.6）；
-- **洛谷 handle = uid，display_name 分离**：用户名可改、uid 稳定；界面显示
-  一律 `displayName ?? handle`；
-- **browser-login 凭据不经前端**：service 内存暂存 + bind 消费；Playwright 为
-  可选依赖组，未安装时降级手动粘贴（§5.6）；
-- **`__client_id` 轮换不回写**：服务端 302 刷新会话但旧值不失效（实测），
-  会话罐吸收即可；若未来失效应答频繁再考虑回写 secrets.json；
 - **流式落盘 + 断点续传**：全量回填按批落盘（每页即存），中断后从
   `Account.sync_checkpoint` 续跑；**游标绝不在中途推进**（增量段中途推进
   游标会把未拉取的较旧区段永久漏掉）；断点页码/偏移随新提交漂移由
@@ -744,15 +578,8 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
 - **同步进度为可选契约**：`progress_cb(fetched, total)` 只有总量可知的平台
   （洛谷 records.count）上报；总量未知的平台不报，前端必须兼容不定态；
 - **同步无全局遮罩**：同步是后台属性，进行态只落在账号按钮 / 平台页签
-  黄点角标 / 平台视图右栏进度面板，不得阻塞其他功能（对话确认）。
-- **精化是 store 合并规则的唯一受控例外**：`update_verdicts` 可按
-  submission_id 就地改写 verdict（仅精化器使用），其余路径维持"磁盘优先、
-  合并不覆盖旧行"；普通同步的 UNAC 行不会被后续同步覆盖回 UNAC 之外的
-  值之外的状态——精化结果落盘即终态（§6.5）；
-- **精化与普通同步共用账号锁**：精化器每条记录处理前必须获取该账号同步锁
-  （普通同步持锁期间精化自然暂停），绕开锁会导致并发写与限流失控（§6.5）。
-- **匿名/两步验证中间态也携带 `__client_id`**：一键登录的完成判定必须
-  cookie 出现 + 鉴权探针双重确认，只看 cookie 会在两步验证码账号上提前
-  关窗抓走半成品会话（§5.6）；
-- **一键登录成功不回填 handle 输入框**：绑定弹窗的 watcher 会把程序化赋值
-  误判为用户改动而清空回执（曾致"登录成功却无反馈、无法绑定"）。
+  黄点角标 / 平台视图右栏进度面板，不得阻塞其他功能（对话确认）；
+- **账号展示名与 API 主键分离**：`handle` 是平台内主键（洛谷为 uid），
+  界面显示一律 `displayName ?? handle`；
+- **凭据与账号元数据分离存储**：secrets.json 永不入 git；browser-login 抓取的
+  凭据由 service 内存暂存 + bind 消费，不经前端。

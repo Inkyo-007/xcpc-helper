@@ -1,7 +1,7 @@
 # 导入 / 导出（transfer）设计
 
-> 状态：已实现。背景与需求优先级见 [../requirements.md](../requirements.md)（"导入 / 导出"），
-> 跨功能公共约定见 [conventions.md](conventions.md)。
+> 状态：已实现。背景与需求优先级见 [../../requirements.md](../../requirements.md)（"导入 / 导出"），
+> 跨功能公共约定见 [../conventions.md](../conventions.md)。
 
 ## 1. 背景与目标
 

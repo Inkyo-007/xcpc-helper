@@ -40,7 +40,7 @@ xcpc-helper/
     └── tests/              # pytest 测试
 ```
 
-模板目录约定与元数据格式详见 [design/template-library.md](design/template-library.md)，各功能设计文档索引见 [design/](design/README.md)。
+模板目录约定与元数据格式详见 [design/template/template-library.md](design/template/template-library.md)，各功能设计文档索引见 [design/](design/README.md)。
 
 ## 部署方式
 
