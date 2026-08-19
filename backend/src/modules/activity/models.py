@@ -30,6 +30,8 @@ class Submission(BaseModel):
     verdict: Verdict
     submitted_at: int  # UTC 秒级时间戳
     language: str
+    # 精化终止标记：详情拉取成功但无法判定时打标，不再重试（防重试循环）
+    refine_attempted: bool = False
 
 
 class Account(BaseModel):

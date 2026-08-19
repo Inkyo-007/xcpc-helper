@@ -206,3 +206,29 @@ async def test_progress_of_idle_reports_remaining(tmp_path):
     p = refine.progress_of(USER, "fake", "demo")
     assert p.state == RefineState.IDLE
     assert p.total == 1  # 仅剩一条 UNAC
+
+
+async def test_unjudgeable_marked_attempted_and_never_retried(tmp_path):
+    """无法判定的记录打 attempted 终止标记：后续轮次不再重试（防重试循环）。
+
+    回归场景：仅 UKE 测点的记录曾被保守规则无限重试（永远"待精化 N 条"）。
+    """
+    adapter = FakeRefineAdapter({"1": Verdict.WA, "2": None})  # 2 无法判定
+    refine, _sync, store = make_env(tmp_path, adapter)
+    seed_unac(store, [("1", 1000), ("2", 2000)])
+
+    refine.start(USER, "fake", "demo")
+    await wait_idle(refine)
+    items, _ = store.load_submissions("fake", "demo")
+    by_id = {s.submission_id: s for s in items}
+    assert by_id["1"].verdict == Verdict.WA
+    assert by_id["2"].verdict == Verdict.UNAC  # 保持 UNAC
+    assert by_id["2"].refine_attempted is True  # 但已打终止标记
+
+    # 再次启动：2 号不再出现在待办（total 只含未尝试过的）
+    refine.start(USER, "fake", "demo")
+    p = await wait_idle(refine)
+    assert adapter.calls.count("2") == 1  # 仅首轮拉过一次
+    assert p.total == 0
+    # idle 口径同样排除 attempted
+    assert refine.progress_of(USER, "fake", "demo").total == 0

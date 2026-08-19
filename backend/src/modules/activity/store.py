@@ -286,7 +286,26 @@ class UserStore:
                 new_verdict = updates.get(s.submission_id)
                 if new_verdict is not None and s.verdict != new_verdict:
                     s.verdict = new_verdict
+                    s.refine_attempted = True
                     changed += 1
             if changed:
                 self._write_submissions(platform, handle, items)
             return changed
+
+    def mark_refine_attempted(
+        self, platform: str, handle: str, submission_ids: list[str]
+    ) -> None:
+        """精化终止标记：详情拉取成功但无法判定的记录打标，不再重试
+        （防重试循环，见 activity.md §6.5）。仅精细化同步使用。"""
+        if not submission_ids:
+            return
+        targets = set(submission_ids)
+        with self._lock:
+            items, _skipped = self.load_submissions(platform, handle)
+            changed = False
+            for s in items:
+                if s.submission_id in targets and not s.refine_attempted:
+                    s.refine_attempted = True
+                    changed = True
+            if changed:
+                self._write_submissions(platform, handle, items)

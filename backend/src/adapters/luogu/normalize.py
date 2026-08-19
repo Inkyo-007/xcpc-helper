@@ -98,19 +98,28 @@ _SEVERITY: dict[Verdict, int] = {
 
 
 def pick_verdict(case_statuses: list[int]) -> Verdict | None:
-    """测试点状态码列表 → 细分 verdict：参选集合中取严重度最重者。
+    """测试点状态码列表 → 细分 verdict。
 
-    无参选测试点（全 AC / 仅 JG/UKE / 空列表）返回 None——调用方保持 UNAC，
-    不乱猜（保守规则，见 activity.md §6.5）。
+    两级判定：
+    1. 参选集合（WA/RE/TLE/MLE/OLE，可归因于用户程序）中取严重度最重者；
+    2. 无参选但存在 UKE 测点 → UKE（记录确实遭遇评测方故障；实测存在
+       纯 UKE / UKE+AC 混合形态，见 activity.md §6.5）；
+    3. 全 AC / 仅 JG / 空列表 → None（保持 UNAC，调用方打 attempted 标记
+       终止重试，防重试循环）。
     """
     best: Verdict | None = None
+    has_uke = False
     for status in case_statuses:
         verdict = _ELIGIBLE.get(status)
         if verdict is None:
+            if status == 11:
+                has_uke = True
             continue
         if best is None or _SEVERITY[verdict] > _SEVERITY[best]:
             best = verdict
-    return best
+    if best is not None:
+        return best
+    return Verdict.UKE if has_uke else None
 
 
 def problem_url(pid: str, contest_id: int | None) -> str:

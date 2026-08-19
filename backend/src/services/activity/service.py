@@ -524,7 +524,11 @@ class ActivityService:
         p = self._refine.progress_of(self._current_group, platform, handle)
         store = self._store()
         items, _skipped = store.load_submissions(platform, handle)
-        remaining = sum(1 for s in items if s.verdict == Verdict.UNAC)
+        remaining = sum(
+            1
+            for s in items
+            if s.verdict == Verdict.UNAC and not s.refine_attempted
+        )
         if p.state.value == "running":
             state, done, total = "running", p.done, p.total
         elif p.state.value == "stopped":

@@ -435,11 +435,13 @@ def test_pick_verdict_severity_priority():
 
 
 def test_pick_verdict_conservative_rules():
-    """保守规则：无可参选测试点返回 None（保持 UNAC 不乱猜）。"""
+    """保守规则与 UKE 层级（实测形态：纯 UKE / UKE+AC 混合判 UKE）。"""
     assert pick_verdict([]) is None  # 无测试点信息
     assert pick_verdict([12, 12]) is None  # 全 AC 但整题 UNAC
     assert pick_verdict([0, 1]) is None  # JG 不参选
-    assert pick_verdict([11]) is None  # UKE 不参选
+    assert pick_verdict([11]) is Verdict.UKE  # 纯 UKE（评测方故障）
+    assert pick_verdict([12, 11, 12]) is Verdict.UKE  # AC 多数 + 个别 UKE
+    assert pick_verdict([11, 6]) is Verdict.WA  # UKE 与用户错误并存取用户错误
     assert pick_verdict([2]) is None  # CE 不经精化
 
 

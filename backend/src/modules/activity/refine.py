@@ -82,7 +82,10 @@ class RefineEngine:
             return current
         store = self._store(user_id)
         items, _ = store.load_submissions(platform, handle)
-        remaining = sum(1 for s in items if s.verdict == Verdict.UNAC)
+        # 待办口径：UNAC 且未尝试过（attempted 为终止标记，防重试循环）
+        remaining = sum(
+            1 for s in items if s.verdict == Verdict.UNAC and not s.refine_attempted
+        )
         return RefineProgress(state=RefineState.IDLE, done=0, total=remaining)
 
     # ===== 启动 / 中止 =====
@@ -140,12 +143,13 @@ class RefineEngine:
             if adapter is None or Capability.REFINE_VERDICT not in adapter.capabilities:
                 raise AdapterError(f"平台 {platform} 不支持精细化同步")
             credentials = store.get_account_credentials(platform, handle)
-            # 快照存量 UNAC（从旧往新；total 固定，途中新增留下轮）
+            # 快照存量 UNAC（从旧往新；total 固定，途中新增留下轮；
+            # attempted 为终止标记不再重试，防重试循环）
             items, _ = store.load_submissions(platform, handle)
             todos = [
                 s.submission_id
                 for s in sorted(items, key=lambda s: s.submitted_at)
-                if s.verdict == Verdict.UNAC
+                if s.verdict == Verdict.UNAC and not s.refine_attempted
             ]
             progress.total = len(todos)
             failures = 0
@@ -177,6 +181,9 @@ class RefineEngine:
                 failures = 0
                 if verdict is not None:
                     store.update_verdicts(platform, handle, {sid: verdict})
+                else:
+                    # 无法判定（保守规则）：打终止标记，不再重试（防重试循环）
+                    store.mark_refine_attempted(platform, handle, [sid])
                 progress.done += 1
             # 快照全部处理完
             progress.state = RefineState.IDLE
