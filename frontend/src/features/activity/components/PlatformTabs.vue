@@ -2,7 +2,7 @@
 /** 汇总 / 单平台分段切换器：汇总 + 全部支持平台（来自后端平台注册表，
  * 与是否绑定无关；未绑定平台的视图用于引导绑定 / 换绑）。
  * 某平台账号同步中时，其页签文本右上角显示黄色圆点角标（不进入
- * 该平台页也可知悉；同步为后台属性，见 activity.md §7.2）。 */
+ * 该平台页也可知悉；同步为后台属性，见 activity/conventions.md）。 */
 
 import { computed } from 'vue'
 import { LayoutGrid } from 'lucide-vue-next'

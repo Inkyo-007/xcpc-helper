@@ -1,4 +1,4 @@
-"""洛谷适配器（cookie 授权 + 反爬对抗，第三期；详见 docs/design/activity.md §5.6）。
+"""洛谷适配器（cookie 授权 + 反爬对抗，第三期；详见 docs/design/activity/luogu.md）。
 
 传输层例外：洛谷 WAF 按 TLS/HTTP 指纹区分客户端（实测同 IP 同 cookie，
 curl 通过、httpx 必被 Spilopelia 挑战），故本 adapter 不用共享
@@ -220,7 +220,7 @@ class LuoguAdapter(PlatformAdapter):
         """拉记录详情，从测试点状态按严重度取最重（RE>TLE>MLE>OLE>WA）。
 
         保守规则：无可参选测试点（全 AC / 仅 JG/UKE / 无测试点信息）返回
-        None，调用方保持 UNAC（见 activity.md §6.5）。
+        None，调用方保持 UNAC（见 activity/luogu.md）。
         """
         if credentials is None:
             raise AuthExpiredError("未配置洛谷凭据，请先绑定账号并授权")

@@ -1,6 +1,6 @@
 """洛谷一键登录（browser-login）：Playwright 拉起系统浏览器，用户自行登录。
 
-设计见 docs/design/activity.md §5.6：
+设计见 docs/design/activity/luogu.md：
 - 复用系统已装浏览器（channel="chrome" 兜底 "msedge"），不下载浏览器二进制；
 - 临时独立 profile（launch() 默认临时用户目录）：不碰用户日常浏览器数据，
   登录态随窗口关闭即焚；

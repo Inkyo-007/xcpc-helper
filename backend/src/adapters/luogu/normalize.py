@@ -103,7 +103,7 @@ def pick_verdict(case_statuses: list[int]) -> Verdict | None:
     两级判定：
     1. 参选集合（WA/RE/TLE/MLE/OLE，可归因于用户程序）中取严重度最重者；
     2. 无参选但存在 UKE 测点 → UKE（记录确实遭遇评测方故障；实测存在
-       纯 UKE / UKE+AC 混合形态，见 activity.md §6.5）；
+       纯 UKE / UKE+AC 混合形态，见 activity/luogu.md）；
     3. 全 AC / 仅 JG / 空列表 → None（保持 UNAC，调用方打 attempted 标记
        终止重试，防重试循环）。
     """

@@ -4,7 +4,7 @@
 - 写操作一律临时文件 + os.replace 原子替换；
 - 同资源并发写用 RLock 串行化；
 - 账号名经 common.validation.validate_name 校验，杜绝路径穿越；
-- JSONL 读入合并去重后整体原子替换（见 activity.md §3.3）；
+- JSONL 读入合并去重后整体原子替换（见 activity/conventions.md）；
 - 单行损坏只跳过不阻断（"诊断不阻断"哲学）；
 - 用户组 = data/user/<user_id>/ 目录（目录名即组名，中文放行），
   创建/重命名同步目录名，删除为物理删除（前端明确提示不可找回）。
@@ -275,7 +275,7 @@ class UserStore:
         """按 submission_id 就地改写 verdict，返回更新条数。
 
         这是"磁盘优先、合并不覆盖旧行"规则的**唯一受控例外**——仅精细化
-        同步（UNAC → 细分结果）使用，见 activity.md §6.5；其余路径不得调用。
+        同步（UNAC → 细分结果）使用，见 activity/luogu.md；其余路径不得调用。
         """
         if not updates:
             return 0
@@ -296,7 +296,7 @@ class UserStore:
         self, platform: str, handle: str, submission_ids: list[str]
     ) -> None:
         """精化终止标记：详情拉取成功但无法判定的记录打标，不再重试
-        （防重试循环，见 activity.md §6.5）。仅精细化同步使用。"""
+        （防重试循环，见 activity/luogu.md）。仅精细化同步使用。"""
         if not submission_ids:
             return
         targets = set(submission_ids)

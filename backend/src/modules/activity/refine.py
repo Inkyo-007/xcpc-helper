@@ -1,4 +1,4 @@
-"""精细化同步引擎：把存量 UNAC 记录逐条拉详情改写为细分结果（activity.md §6.5）。
+"""精细化同步引擎：把存量 UNAC 记录逐条拉详情改写为细分结果（activity/luogu.md）。
 
 规则与纪律：
 - 启动时快照存量 UNAC（按 submitted_at 升序，从旧往新），total 固定为快照

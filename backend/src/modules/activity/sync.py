@@ -1,7 +1,7 @@
 """增量同步引擎：游标推进、断点续传、去重合并、单账号锁、失败隔离（按用户组隔离）。
 
 adapter 流式产出批次（SyncBatch）→ 领域转换（补 platform / handle）→ store
-去重合并。双模式（见 activity.md §3.3 / §6.2）：
+去重合并。双模式（见 activity/conventions.md）：
 
 - **全量/回填模式**（游标为空或断点存在）：每批落盘 + 每批推进断点
   （Account.sync_checkpoint，平台自解释），`done` 时才推进游标并清除断点；
@@ -72,7 +72,7 @@ class SyncEngine:
         self, user_id: str, platform: str, handle: str
     ) -> asyncio.Lock:
         """该账号的同步互斥锁（精化器等协同方逐条获取——普通同步持锁期间
-        精化自然暂停，结束后自动继续，见 activity.md §6.5）。"""
+        精化自然暂停，结束后自动继续，见 activity/luogu.md）。"""
         return self._locks.setdefault((user_id, platform, handle), asyncio.Lock())
 
     def drop_user(self, user_id: str) -> None:

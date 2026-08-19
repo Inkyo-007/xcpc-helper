@@ -32,7 +32,7 @@ class Verdict(str, Enum):
 
     JG 表示评测中（如 Codeforces 的 SUBMITTED / TESTING）；
     UNAC 表示未通过但细分未知（洛谷记录列表口径只有 AC/CE/Unaccepted，
-    WA/TLE/MLE/RE 细分只在记录详情中，见 activity.md §3.2）。
+    WA/TLE/MLE/RE 细分只在记录详情中，见 activity/conventions.md）。
     """
 
     AC = "AC"

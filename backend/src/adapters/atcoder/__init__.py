@@ -1,6 +1,6 @@
 """AtCoder 适配器（kenkoooo API + 官方用户主页验证，匿名可取，第二期）。
 
-数据源（详见 docs/design/activity.md §5.5）：
+数据源（详见 docs/design/activity/atcoder.md）：
 
 - 提交明细：kenkoooo v3 user/submissions（升序、单页 ≤500、from_second 含边界）；
 - 题目目录：kenkoooo problems.json（题名）+ problem-models.json（难度），

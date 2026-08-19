@@ -1,4 +1,4 @@
-/** 热力图档位映射（纯函数）。着色规则见 docs/design/activity.md §4.3：
+/** 热力图档位映射（纯函数）。着色规则见 docs/design/activity/conventions.md：
  * 0 无提交；1 有提交但无 AC（最低档）；2–5 按 AC 数分桶（1 / 2–3 / 4–5 / ≥6）。
  */
 
