@@ -590,10 +590,16 @@ WA/TLE/MLE/RE 细分只存在于记录详情。精化把存量 UNAC 逐条拉详
 
 - 详情 `record/:id` → 全部 subtask 的全部测试点中，**按严重度取最重**
   （对话确认）：`RE > TLE > MLE > OLE > WA`；
-- 保守规则：JG/UKE 测试点不参选（非用户程序错误）；全部参选测试点为空、
-  或测试点全 AC 但整题 UNAC → 保持 UNAC 不乱猜；
+- 保守规则与 UKE 层级：JG 测试点不参选（评测中/未定态）；无可参选测试点
+  但存在 UKE 测点 → 判 **UKE**（记录确实遭遇评测方故障；实测确认该形态
+  存在：纯 UKE / UKE+AC 混合 / AC 多数+个别 UKE）；全 AC 或无测试点信息
+  → 保持 UNAC 不乱猜；
 - CE 不经精化（列表口径本就区分）；`fetch_submission_verdict` 返回 None
-  表示无法判定，保持原样。
+  表示无法判定，保持原样；
+- **终止保证（防重试循环）**：`Submission.refine_attempted` 标记——详情
+  拉取成功但无法判定时打标，不再重试；待办口径为
+  `verdict == UNAC and not refine_attempted`（曾出现仅 UKE 测点的记录
+  被保守规则无限重试的事故，勿回退）。
 
 **引擎**（`modules/activity/refine.py`，service 持有）：
 
