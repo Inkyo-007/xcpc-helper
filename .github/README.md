@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=700&size=42&duration=1&pause=1&color=4A90D9&center=true&vCenter=true&width=435&lines=XCPC+Helper" alt="XCPC Helper" />
+# XCPC Helper
 
-<p align="center" style="color: #888; letter-spacing: 2px; font-size: 13px;">算竞选手的本地辅助工具</p>
+<img src="https://img.shields.io/badge/算竞选手的本地辅助工具-888888?style=flat-square&labelColor=ffffff&color=888888">
 
 <br>
 
