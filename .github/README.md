@@ -7,14 +7,14 @@
       <stop offset="100%" style="stop-color:#76bad9;stop-opacity:1" />
     </linearGradient>
   </defs>
-  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
-        font-family="system-ui, -apple-system, sans-serif"
-        font-size="36" font-weight="700" fill="url(#titleGrad)">
+  <text x="200" y="35"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="36" font-weight="700" fill="url(#titleGrad)" text-anchor="middle">
     XCPC Helper
   </text>
-  <text x="50%" y="72" dominant-baseline="middle" text-anchor="middle"
-        font-family="system-ui, -apple-system, sans-serif"
-        font-size="13" fill="#888" letter-spacing="2">
+  <text x="200" y="65"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="13" fill="#888" letter-spacing="2" text-anchor="middle">
     算竞选手的本地辅助工具
   </text>
 </svg>
