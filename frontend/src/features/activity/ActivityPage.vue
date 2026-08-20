@@ -364,6 +364,9 @@ async function onSync(): Promise<void> {
 
 <style scoped>
 .act-page {
+  --heat-s: 68%;
+  --heat-l: 48%;
+
   flex: 1;
   min-height: 0;
   /* 整页滚动：近期提交等内容较多时由页面承担滚动，不再用内部滚动区 */
@@ -502,23 +505,23 @@ async function onSync(): Promise<void> {
 }
 
 .legend-cell.lv1 {
-  background: hsl(var(--hue) 68% 48% / 0.16);
+  background: hsl(var(--hue) var(--heat-s, 68%) var(--heat-l, 48%) / 0.16);
 }
 
 .legend-cell.lv2 {
-  background: hsl(var(--hue) 68% 48% / 0.42);
+  background: hsl(var(--hue) var(--heat-s, 68%) var(--heat-l, 48%) / 0.42);
 }
 
 .legend-cell.lv3 {
-  background: hsl(var(--hue) 68% 48% / 0.62);
+  background: hsl(var(--hue) var(--heat-s, 68%) var(--heat-l, 48%) / 0.62);
 }
 
 .legend-cell.lv4 {
-  background: hsl(var(--hue) 68% 48% / 0.82);
+  background: hsl(var(--hue) var(--heat-s, 68%) var(--heat-l, 48%) / 0.82);
 }
 
 .legend-cell.lv5 {
-  background: hsl(var(--hue) 68% 48% / 1);
+  background: hsl(var(--hue) var(--heat-s, 68%) var(--heat-l, 48%) / 1);
 }
 
 .act-empty {

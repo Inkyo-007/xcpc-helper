@@ -88,6 +88,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
         :mode-icon="modeIcon"
         :mode-label="modeLabel"
         :hue="hue"
+        :is-dark="isDark"
         @navigate="navigate"
         @toggle="toggleGroup"
         @cycle-theme="cycleMode"

@@ -2,6 +2,8 @@
  * DOM 读取（getComputedStyle / MutationObserver）在组件层完成，这里只负责纯换算。
  */
 
+import { saturationDampen } from '@/app/theme'
+
 export interface ChartThemeVars {
   hue: number
   dark: boolean
@@ -28,12 +30,17 @@ export interface ChartPalette {
 const HEAT_ALPHAS = [0.16, 0.42, 0.62, 0.82, 1]
 
 export function buildPalette(vars: ChartThemeVars): ChartPalette {
-  const lightness = vars.dark ? 62 : 48
+  const light = !vars.dark
+  const lightS = saturationDampen(vars.hue, 68, 330, 18)
+  const darkS = saturationDampen(vars.hue, 68, 330, 12) - 10
+  const s = light ? lightS : Math.max(50, darkS)
+  const l = light ? 48 : 42
+
   // 注意必须用逗号分隔的旧式 hsla() 语法：zrender 的颜色解析器不支持
   // CSS Color 4 的空格/斜杠语法，解析失败会导致依赖颜色换算的场景（如 visualMap）拿不到颜色
-  const heat = (alpha: number) => `hsla(${vars.hue}, 68%, ${lightness}%, ${alpha})`
+  const heat = (alpha: number) => `hsla(${vars.hue}, ${s}%, ${l}%, ${alpha})`
   return {
-    accent: `hsl(${vars.hue}, 68%, ${vars.dark ? 55 : 48}%)`,
+    accent: `hsl(${vars.hue}, ${s}%, ${light ? 48 : 55}%)`,
     text: vars.text,
     faint: vars.faint,
     surface: vars.surface,

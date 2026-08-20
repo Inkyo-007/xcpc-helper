@@ -12,8 +12,9 @@ import {
 function readVars(): ChartThemeVars {
   const el = document.documentElement
   const cs = getComputedStyle(el)
+  const hueRaw = cs.getPropertyValue('--hue').trim()
   return {
-    hue: Number(cs.getPropertyValue('--hue')) || 160,
+    hue: hueRaw === '' ? 160 : Number(hueRaw),
     dark: el.dataset.theme === 'dark',
     text: cs.getPropertyValue('--text').trim(),
     faint: cs.getPropertyValue('--faint').trim(),

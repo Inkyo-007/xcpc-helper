@@ -10,6 +10,7 @@ defineProps<{
   modeIcon: 'sun' | 'moon' | 'monitor'
   modeLabel: string
   hue: number
+  isDark: boolean
 }>()
 
 const emit = defineEmits<{
@@ -80,7 +81,7 @@ function chooseTheme(value: ThemeMode): void {
                   type="button"
                   class="swatch"
                   :class="{ active: h === hue }"
-                  :style="{ background: `hsl(${h} 60% 50%)` }"
+                  :style="{ background: `hsl(${h} ${isDark ? 58 : 60}% ${isDark ? 42 : 50}%)` }"
                   @click="setHue(h)"
                 ></button>
               </template>

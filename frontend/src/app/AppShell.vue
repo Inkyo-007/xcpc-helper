@@ -11,6 +11,7 @@ defineProps<{
   modeIcon: 'sun' | 'moon' | 'monitor'
   modeLabel: string
   hue: number
+  isDark: boolean
 }>()
 
 const emit = defineEmits<{
@@ -37,6 +38,7 @@ const emit = defineEmits<{
         :mode-icon="modeIcon"
         :mode-label="modeLabel"
         :hue="hue"
+        :is-dark="isDark"
         @cycle-theme="emit('cycle-theme')"
         @set-mode="(value) => emit('set-mode', value)"
         @set-hue="(value) => emit('set-hue', value)"
