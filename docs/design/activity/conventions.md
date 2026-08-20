@@ -1,8 +1,8 @@
 # 训练统计聚合（activity）：公共约定
 
-> 状态：已实现（Codeforces / AtCoder / 洛谷三期全链路）。
+> 状态：已实现（Codeforces / AtCoder / 洛谷 / 牛客 四期全链路）。
 > 本文档承载 activity 域的平台无关约定；各平台的适配细节见同目录
-> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md)。
+> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md) / [nowcoder.md](nowcoder.md)。
 > 需求背景见 [../../cache/requirement.md](../../cache/requirement.md)，
 > 平台接口调研见 [../../cache/platform-api-research.md](../../cache/platform-api-research.md)。
 > 改设计必须先改本文档（或对应平台文档）再改代码。
