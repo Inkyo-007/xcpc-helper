@@ -1,8 +1,8 @@
 <div align="center">
 
-# XCPC Helper
+<h1>XCPC Helper</h1>
 
-<img src="https://img.shields.io/badge/算竞选手的本地辅助工具-888888?style=flat-square&labelColor=ffffff&color=888888">
+<p>算竞选手的本地辅助工具</p>
 
 <br>
 
