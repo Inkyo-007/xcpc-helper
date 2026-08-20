@@ -51,11 +51,11 @@
   --muted: #a39c8e;
   --faint: #6e675c;
 
-  --accent: hsl(var(--hue) 56% 24%);
-  --accent-strong: hsl(var(--hue) 60% 32%);
-  --accent-soft: hsl(var(--hue) 60% 30% / 0.22);
-  --accent-softer: hsl(var(--hue) 60% 30% / 0.12);
-  --on-accent: hsl(var(--hue) 60% 97%);
+  --accent: hsl(var(--hue) 58% 42%);
+  --accent-strong: hsl(var(--hue) 62% 36%);
+  --accent-soft: hsl(var(--hue) 55% 45% / 0.18);
+  --accent-softer: hsl(var(--hue) 55% 45% / 0.10);
+  --on-accent: hsl(var(--hue) 40% 94%);
 
   --shadow-pop: 0 10px 32px rgb(0 0 0 / 0.45);
 }

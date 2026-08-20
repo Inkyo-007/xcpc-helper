@@ -11,17 +11,23 @@ dependencies = [
     "pyyaml>=6.0",
     "watchdog>=6.0",
     "python-multipart>=0.0.32",
+    "httpx>=0.28",
+    "curl-cffi>=0.16.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
-    "httpx>=0.28",
     "ruff>=0.12",
 ]
 desktop = [
     "pywebview>=5.4",
+]
+browser-login = [
+    # 洛谷等 cookie 平台的一键登录（拉起系统浏览器，不下载浏览器二进制）；
+    # 可选依赖：未安装时降级为手动粘贴 cookie
+    "playwright>=1.40",
 ]
 
 [tool.uv]

@@ -1,7 +1,7 @@
 {
   "name": "xcpc-helper-frontend",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "engines": {
     "node": ">=20.0.0"
@@ -20,6 +20,7 @@
     "@codemirror/state": "^6.5.0",
     "@codemirror/view": "^6.36.1",
     "@lezer/highlight": "^1.2.1",
+    "echarts": "^6.1.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.17.0",
     "lucide-vue-next": "^0.469.0",

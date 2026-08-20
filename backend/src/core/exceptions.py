@@ -43,6 +43,13 @@ class ConflictError(AppError):
     code = "conflict"
 
 
+class BadGatewayError(AppError):
+    """上游平台故障（502）：本地服务正常，但外部平台请求失败。"""
+
+    status_code = status.HTTP_502_BAD_GATEWAY
+    code = "bad_gateway"
+
+
 def _error_body(code: str, message: str, detail: Any = None) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "detail": detail}}
 

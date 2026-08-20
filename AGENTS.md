@@ -30,4 +30,4 @@
 
 - **会话开始**：先读 [PROGRESS.md](PROGRESS.md) 恢复上下文；
 - **会话结束**：当用户明确会话将结束或指示更新 PROGRESS.md 时，更新 PROGRESS.md（完成/进行/阻塞条目）后再做最终提交；除此之外不得随意编写 PROGRESS.md 的内容。
-- PROGRESS.md 条目必须带上对应的 commit hash，与 git log 互相印证。
+- `PROGRESS.md` 条目必须带上对应的 commit hash，与 git log 互相印证。

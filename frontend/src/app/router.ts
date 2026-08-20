@@ -29,30 +29,9 @@ export const router = createRouter({
       meta: { group: '模板整理', sub: '打印册' },
     },
     {
-      path: '/contest/stress',
-      component: () => import('@/app/PlaceholderPage.vue'),
-      meta: {
-        group: '比赛工具',
-        sub: '对拍器',
-        placeholder: {
-          icon: 'timer',
-          title: '对拍器',
-          hint: '规划中：挂上暴力与正解，随机数据自动对拍。',
-        },
-      },
-    },
-    {
-      path: '/contest/gen',
-      component: () => import('@/app/PlaceholderPage.vue'),
-      meta: {
-        group: '比赛工具',
-        sub: '数据生成',
-        placeholder: {
-          icon: 'timer',
-          title: '数据生成',
-          hint: '规划中：按约束生成随机测试数据。',
-        },
-      },
+      path: '/activity/overview',
+      component: () => import('@/features/activity/ActivityPage.vue'),
+      meta: { group: '训练统计', sub: '数据总览' },
     },
     {
       path: '/settings',

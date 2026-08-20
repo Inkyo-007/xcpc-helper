@@ -34,6 +34,18 @@ class Settings(BaseSettings):
     data_dir: Path = BACKEND_ROOT / "data"
     db_name: str = "index.db"
 
+    # 训练统计：用户数据目录（data/user/<userid>/，第一期固定 default）
+    user_data_dir: Path = BACKEND_ROOT / "data" / "user"
+
+    # 训练统计：全量同步与聚合窗口（对齐前端热力图"近一年"）。
+    # 属功能域配置而非平台策略：经 service → sync 传给 adapter 的
+    # fetch_submissions 参数，adapter 不内置这些值。
+    activity_window_days: int = 370
+    # 全量同步至少拉取的条数：窗口内不足时拉满该数（为 all-time 总量留缓冲）
+    activity_full_min_rows: int = 5000
+    # 应用启动时自动同步当前用户组全部账号（后台执行，失败降级为账号诊断）
+    activity_sync_on_startup: bool = True
+
     # 是否监听 content/ 变更并自动重建索引
     watch_enabled: bool = True
     # 文件变更后的去抖时间（秒），避免频繁重建

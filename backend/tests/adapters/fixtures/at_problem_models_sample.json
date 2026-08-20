@@ -1,0 +1,16 @@
+{
+  "ahc052_a": {
+    "difficulty": 3822,
+    "discrimination": 0.004479398673070138,
+    "irt_loglikelihood": -3.259390070214034,
+    "irt_users": 735,
+    "is_experimental": false
+  },
+  "ahc055_a": {
+    "difficulty": 3884,
+    "discrimination": 0.004479398673070138,
+    "irt_loglikelihood": -3.4371801169509597,
+    "irt_users": 731,
+    "is_experimental": false
+  }
+}

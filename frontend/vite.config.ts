@@ -2,9 +2,15 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
+// 从 package.json 读取版本号，注入为全局常量
+import { version } from './package.json'
+
 export default defineConfig({
   base: '/',
   plugins: [vue()],
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
