@@ -1,23 +1,12 @@
 <div align="center">
 
-<svg width="400" height="80" viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#4a90d9;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#76bad9;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <text x="200" y="35"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
-        font-size="36" font-weight="700" fill="url(#titleGrad)" text-anchor="middle">
-    XCPC Helper
-  </text>
-  <text x="200" y="65"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
-        font-size="13" fill="#888" letter-spacing="2" text-anchor="middle">
-    算竞选手的本地辅助工具
-  </text>
-</svg>
+<div align="center">
+
+<h1>
+  <span style="background: linear-gradient(90deg, #4a90d9, #76bad9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">XCPC Helper</span>
+</h1>
+
+<p style="color: #888; letter-spacing: 2px; font-size: 13px; margin-top: -10px;">算竞选手的本地辅助工具</p>
 
 <br>
 
