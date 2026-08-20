@@ -1,12 +1,8 @@
 <div align="center">
 
-<div align="center">
+<img src="https://readme-typing-svg.demolab.com?font=Inter&weight=700&size=42&duration=1&pause=1&color=4A90D9&center=true&vCenter=true&width=435&lines=XCPC+Helper" alt="XCPC Helper" />
 
-<h1>
-  <span style="background: linear-gradient(90deg, #4a90d9, #76bad9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">XCPC Helper</span>
-</h1>
-
-<p style="color: #888; letter-spacing: 2px; font-size: 13px; margin-top: -10px;">算竞选手的本地辅助工具</p>
+<p align="center" style="color: #888; letter-spacing: 2px; font-size: 13px;">算竞选手的本地辅助工具</p>
 
 <br>
 
