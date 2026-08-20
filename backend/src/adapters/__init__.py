@@ -22,11 +22,13 @@ from adapters.base import (
 from adapters.codeforces import CodeforcesAdapter
 from adapters.luogu import LuoguAdapter
 from adapters.net import HttpFetcher
+from adapters.nowcoder import NowcoderAdapter
 
 REGISTRY: dict[str, type[PlatformAdapter]] = {
     CodeforcesAdapter.platform_id: CodeforcesAdapter,
     AtCoderAdapter.platform_id: AtCoderAdapter,
     LuoguAdapter.platform_id: LuoguAdapter,
+    NowcoderAdapter.platform_id: NowcoderAdapter,
 }
 
 __all__ = [
@@ -40,6 +42,7 @@ __all__ = [
     "HttpFetcher",
     "HttpStatusError",
     "LuoguAdapter",
+    "NowcoderAdapter",
     "PlatformAdapter",
     "PlatformError",
     "PlatformSubmission",

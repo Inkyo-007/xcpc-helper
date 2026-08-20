@@ -82,6 +82,12 @@ const canBrowserLogin = computed(
 /** handle 由某个 cookie 字段兼任时（洛谷 _uid），不单独显示 handle 输入 */
 const handleFromCookie = computed(() => cookieSpec.value?.handleKey ?? null)
 
+/** 匿名平台输入框占位符 */
+const handlePlaceholder = computed(() => {
+  if (platform.value === 'nowcoder') return '输入账号 UID'
+  return '输入平台用户名'
+})
+
 /** 手动输入的凭据（逐字段齐全时给出） */
 const parsedCredentials = computed<AccountCredentials | null>(() => {
   const spec = cookieSpec.value
@@ -233,7 +239,7 @@ const receiptLabel = computed(() =>
         <n-input
           v-model:value="handle"
           size="small"
-          placeholder="输入平台用户名"
+          :placeholder="handlePlaceholder"
           class="bind-handle"
           @keyup.enter="verify"
         />
@@ -302,7 +308,7 @@ const receiptLabel = computed(() =>
         <div class="receipt-body">
           <div class="receipt-handle mono">{{ receiptLabel }}</div>
           <div class="receipt-meta mono">
-            {{ platformName(platform) }} 账号验证通过<template v-if="receipt.displayName">（UID {{ receipt.handle }}）</template>
+            {{ platformName(platform) }} 账号验证通过<template v-if="receipt.displayName && platform !== 'nowcoder'">（UID {{ receipt.handle }}）</template>
           </div>
         </div>
         <BadgeCheck class="receipt-check" :size="17" />

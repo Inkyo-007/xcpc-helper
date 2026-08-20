@@ -257,7 +257,7 @@ class ActivityService:
             raise BadRequestError(f"平台 {payload.platform} 不支持绑定验证")
         handle = payload.handle.strip()
         if not handle:
-            raise BadRequestError("请输入平台用户名")
+            raise BadRequestError("请输入账号标识")
         credentials = (
             Credentials.model_validate(payload.credentials)
             if payload.credentials
@@ -364,7 +364,7 @@ class ActivityService:
         adapter = self._adapter(payload.platform)
         handle = payload.handle.strip()
         if not handle:
-            raise BadRequestError("请输入平台用户名")
+            raise BadRequestError("请输入账号标识")
         credentials = (
             Credentials.model_validate(payload.credentials)
             if payload.credentials

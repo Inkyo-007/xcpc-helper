@@ -12,6 +12,7 @@
 | [activity/codeforces.md](activity/codeforces.md) | activity · Codeforces 适配 | 已实现 |
 | [activity/atcoder.md](activity/atcoder.md) | activity · AtCoder 适配 | 已实现 |
 | [activity/luogu.md](activity/luogu.md) | activity · 洛谷适配（cookie 授权 + 反爬 + UNAC 精化） | 已实现 |
+| [activity/nowcoder.md](activity/nowcoder.md) | activity · 牛客竞赛适配（HTML 解析 + 时区转换） | 已实现 |
 
 ## 状态约定
 
