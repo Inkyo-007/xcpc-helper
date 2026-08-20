@@ -19,6 +19,9 @@ const iconMap = {
   chart: ChartColumn,
 }
 
+/** 从 package.json 动态读取版本号 */
+const appVersion = `v${__APP_VERSION__}`
+
 function isGroupActive(group: NavGroup): boolean {
   if (group.to === props.activePath) return true
   return group.children?.some((child) => child.to === props.activePath) ?? false
@@ -35,7 +38,7 @@ function onGroupClick(group: NavGroup): void {
     <div class="brand">
       <span class="brand-mark"><Code2 :size="17" :stroke-width="2.5" /></span>
       <span class="brand-name">XCPC Helper</span>
-      <span class="brand-ver">v0.2</span>
+      <span class="brand-ver">{{ appVersion }}</span>
     </div>
     <nav class="nav-scroll" aria-label="功能导航">
       <div
