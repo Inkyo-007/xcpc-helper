@@ -92,9 +92,11 @@ class LeetCodeCNAdapter(PlatformAdapter):
                 ) from exc
 
         profile = LcPublicProfileData.model_validate(profile_data)
+        # realName 是更可靠的显示名（username 可能等于 userSlug）
+        display_name = profile.profile.real_name or profile.username or None
         return UserInfo(
             handle=profile.profile.user_slug,
-            display_name=profile.username or None,
+            display_name=display_name,
             avatar=profile.profile.user_avatar or None,
         )
 
