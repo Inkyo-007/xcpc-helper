@@ -93,7 +93,7 @@ Cookie 必需字段：
 ### 字段映射
 
 - `submission_id` = `submissionList.submissions[].id`
-- `problem_key` = `titleSlug`（URL 标识，如 `"two-sum"`）
+- `problem_key` = `frontendId`（官方题号，如 `"1"`、`"2"`）
 - `problem_name` = `userProgressQuestionList.questions[].title`（英文标题）
 - `problem_url` = `https://leetcode.cn/problems/{titleSlug}/`
 - `submitted_at` = `timestamp`（Unix 秒级）

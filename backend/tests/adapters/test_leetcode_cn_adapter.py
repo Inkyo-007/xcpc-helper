@@ -191,8 +191,11 @@ async def test_fetch_full_batch():
         assert len(items) == 3
         assert items[0].submission_id == "1001"
         assert items[0].verdict == Verdict.AC
-        assert items[0].problem_key == "two-sum"
+        assert items[0].problem_key == "1"  # frontendId
+        assert items[0].problem_name == "Two Sum"
         assert items[1].verdict == Verdict.WA
+        assert items[1].problem_key == "2"  # frontendId
+        assert items[1].problem_name == "Add Two Numbers"
         assert items[2].verdict == Verdict.AC
     finally:
         await fetcher.aclose()
@@ -259,8 +262,8 @@ async def test_fetch_incremental_since():
         )
         assert len(items) == 1
         assert items[0].submission_id == "2001"
-        # 增量过滤后只剩 add-two-numbers
-        assert items[0].problem_key == "add-two-numbers"
+        # 增量过滤后只剩 add-two-numbers，problem_key 用 frontendId
+        assert items[0].problem_key == "2"
     finally:
         await fetcher.aclose()
 

@@ -296,10 +296,14 @@ class LeetCodeCNAdapter(PlatformAdapter):
 
     @staticmethod
     def _to_submission(raw: dict, question: LcQuestion) -> PlatformSubmission:
-        """单条提交归一化。"""
+        """单条提交归一化。
+
+        problem_key 使用 frontendId（如 "1"、"2"）而非 titleSlug，
+        避免前端展示为 "two-sum. Two Sum" 的重复感。
+        """
         return PlatformSubmission(
             submission_id=str(raw["id"]),
-            problem_key=question.title_slug,
+            problem_key=question.frontend_id,
             problem_name=question.title,
             problem_url=problem_url(question.title_slug),
             verdict=map_verdict(raw.get("statusDisplay", "")),

@@ -15,6 +15,7 @@
 
 ### 2026-08-24 会话 2
 
+- `c7f15ecb` fix(后端): LeetCode CN 提交 problem_key 改用 frontendId
 - `981fcf1c` feat(前端): activity overview 网址同步增加用户组参数
 - `c0dd42eb` fix(后端): 启动同步改为遍历所有用户组全部账号
 
