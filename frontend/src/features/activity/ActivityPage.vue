@@ -23,7 +23,10 @@ import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
 import { parseDate, toDateStr } from '@/features/activity/model/dates'
 import { pageCount } from '@/features/activity/model/pagination'
 import { useActivity, type PlatformScope } from '@/features/activity/store'
+import { useUserGroups } from '@/features/activity/profile'
 import type { AccountCredentials, BoundAccount, PlatformId } from '@/features/activity/types'
+
+const { currentKey, switchGroup } = useUserGroups()
 
 const {
   accounts,
@@ -84,10 +87,11 @@ const platformUnbound = computed(
     activeAccount.value === null,
 )
 
-/* ---------- 网址状态同步：?platform=<平台>&date=<日期>&page=<页码> ----------
+/* ---------- 网址状态同步：?group=<用户组>&platform=<平台>&date=<日期>&page=<页码> ----------
  * all、无选中日期与第 1 页为缺省值，不出现在网址中；切换平台重置日期
  * 与页码，选中日期切换当日明细时页码回到第 1 页（见 store）；
- * 刷新、浏览器前进/后退与复制链接均能恢复同一视图。 */
+ * 刷新、浏览器前进/后退与复制链接均能恢复同一视图。
+ * 用户组存在中文，使用 encodeURIComponent / decodeURIComponent 编解码。 */
 
 const route = useRoute()
 const router = useRouter()
@@ -101,7 +105,15 @@ const PLATFORM_SCOPES: PlatformScope[] = [
   'nowcoder',
 ]
 
-/** 网址中的平台筛选：非法值回退为汇总（平台页签与绑定状态无关） */
+/** 网址中的用户组：使用 decodeURIComponent 解码以支持中文组名 */
+function queryGroup(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw) return null
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return null
+  }
+}
 function queryPlatform(raw: unknown): PlatformScope {
   if (typeof raw !== 'string' || raw === 'all') return 'all'
   if (!(PLATFORM_SCOPES as string[]).includes(raw)) return 'all'
@@ -123,8 +135,13 @@ function queryDate(raw: unknown): string | null {
 
 onMounted(() => {
   init()
-  // 从网址恢复视图（顺序固定：平台 → 日期 → 页码：
-  // 切平台会重置日期与页码，切日期会把当日明细页码重置回 1）
+  // 从网址恢复视图（顺序固定：用户组 → 平台 → 日期 → 页码：
+  // 切用户组会重置平台/日期/页码，切平台会重置日期与页码）
+  const group = queryGroup(route.query.group)
+  // 用户组恢复需等 ensureLoaded 完成（已知当前组后才判断是否切换）
+  if (group && group !== currentKey.value) {
+    void switchGroup(group)
+  }
   const platform = queryPlatform(route.query.platform)
   if (platform !== 'all') setPlatform(platform)
   const date = queryDate(route.query.date)
@@ -134,12 +151,15 @@ onMounted(() => {
 })
 
 // 状态 → 网址：缺省值不写入，避免无谓的跳转
-watch([activePlatform, selectedDate, listPage], ([platform, date, page]) => {
+watch([activePlatform, selectedDate, listPage, currentKey], ([platform, date, page, group]) => {
   const query: Record<string, string> = {}
+  // 用户组使用 encodeURIComponent 编码以支持中文
+  if (group) query.group = encodeURIComponent(group)
   if (platform !== 'all') query.platform = platform
   if (date) query.date = date
   if (page > 1) query.page = String(page)
   if (
+    query.group === route.query.group &&
     query.platform === route.query.platform &&
     query.date === route.query.date &&
     query.page === route.query.page
@@ -153,6 +173,10 @@ watch([activePlatform, selectedDate, listPage], ([platform, date, page]) => {
 watch(
   () => route.query,
   (query) => {
+    const group = queryGroup(query.group)
+    if (group && group !== currentKey.value) {
+      void switchGroup(group)
+    }
     const platform = queryPlatform(query.platform)
     if (platform !== activePlatform.value) setPlatform(platform)
     const date = queryDate(query.date)
