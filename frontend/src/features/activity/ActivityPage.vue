@@ -230,7 +230,8 @@ async function onUpdateCredentials(
 ): Promise<void> {
   try {
     await updateAccountCredentials(platform, handle, credentials)
-    message.success('凭据已更新，正在重新同步')
+    showCredentialsUpdate.value = false
+    message.success('凭据已更新，同步进行中')
   } catch (e) {
     message.error(e instanceof Error ? e.message : '凭据更新失败，请稍后重试')
   }
