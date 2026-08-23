@@ -102,12 +102,16 @@ async def unbind_account(
 async def update_account_credentials(
     platform: str,
     handle: str,
-    payload: UpdateCredentialsIn,
     service: ServiceDep,
+    payload: UpdateCredentialsIn | None = None,
 ) -> BoundAccountOut:
     from adapters.base import Credentials
 
-    credentials = Credentials.model_validate(payload.credentials)
+    credentials = (
+        Credentials.model_validate(payload.credentials)
+        if payload is not None and payload.credentials
+        else None
+    )
     return await service.update_credentials(platform, handle, credentials)
 
 

@@ -306,7 +306,7 @@ async function unbindAccount(platform: PlatformId, handle: string): Promise<void
 async function updateAccountCredentials(
   platform: PlatformId,
   handle: string,
-  credentials: AccountCredentials,
+  credentials?: AccountCredentials,
 ): Promise<void> {
   await api.updateCredentials(platform, handle, credentials)
   await refreshAccounts()

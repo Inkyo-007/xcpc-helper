@@ -103,13 +103,13 @@ export function fetchBrowserLoginStatus(platform: PlatformId): Promise<ApiBrowse
 export function updateCredentials(
   platform: string,
   handle: string,
-  credentials: AccountCredentials,
+  credentials?: AccountCredentials,
 ): Promise<BoundAccount> {
   const path = `/activity/accounts/${encodeURIComponent(platform)}/${encodeURIComponent(handle)}/credentials`
   return request<BoundAccount>(path, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ credentials }),
+    body: JSON.stringify(credentials ? { credentials } : {}),
   })
 }
 

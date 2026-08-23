@@ -226,7 +226,7 @@ function openRefine(account: BoundAccount): void {
 async function onUpdateCredentials(
   platform: PlatformId,
   handle: string,
-  credentials: AccountCredentials,
+  credentials?: AccountCredentials,
 ): Promise<void> {
   try {
     await updateAccountCredentials(platform, handle, credentials)

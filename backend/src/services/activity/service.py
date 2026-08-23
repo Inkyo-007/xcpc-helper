@@ -415,11 +415,15 @@ class ActivityService:
         self._refine.drop_account(self._current_group, platform, handle)
 
     async def update_credentials(
-        self, platform: str, handle: str, credentials: Credentials
+        self,
+        platform: str,
+        handle: str,
+        credentials: Credentials | None = None,
     ) -> BoundAccountOut:
         """更新已绑定账号的凭据（仅 cookie 平台）：不删数据、不重置游标。
 
         验证新凭据有效性后仅覆盖 secrets.json，保留 submissions 与同步状态。
+        credentials 为 None 时尝试消费 browser-login 暂存凭据。
         """
         adapter = self._adapter(platform)
         handle = handle.strip()
@@ -437,6 +441,15 @@ class ActivityService:
             raise NotFoundError(f"账号未绑定: {platform}/{handle}")
         if adapter.auth != AuthMode.COOKIE:
             raise BadRequestError(f"平台 {platform} 无需凭据更新")
+
+        # credentials 为 None 时尝试消费 browser-login 暂存凭据
+        if credentials is None:
+            credentials = self._take_pending_credentials(platform, handle)
+        if credentials is None:
+            raise BadRequestError(
+                f"平台 {platform} 需要登录凭据（一键登录或粘贴 cookie）"
+            )
+
         # 验证新凭据有效性（存在性 + 凭据试拉）
         try:
             await adapter.verify(handle, credentials)
@@ -448,6 +461,8 @@ class ActivityService:
         store.save_account_secrets(platform, handle, credentials)
         # 清除凭据过期的错误状态，让用户可以立即重新同步
         self._engine.drop_status(self._current_group, platform, handle)
+        # 凭据更新成功后自动触发一次同步
+        asyncio.create_task(self._safe_sync(platform, handle))
         return self._account_out(account)
 
     # ===== 聚合读取 =====

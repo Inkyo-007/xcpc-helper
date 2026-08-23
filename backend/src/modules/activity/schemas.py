@@ -175,4 +175,4 @@ class ProfileUpdateIn(BaseModel):
 class UpdateCredentialsIn(BaseModel):
     """更新账号凭据（仅 cookie 平台）：验证回执的 handle 必须与当前绑定一致。"""
 
-    credentials: dict[str, Any]  # cookie 授权平台必填
+    credentials: dict[str, Any] | None = None  # cookie 授权平台必填（一键登录时由后端消费暂存凭据）

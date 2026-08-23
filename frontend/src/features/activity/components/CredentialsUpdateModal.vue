@@ -41,7 +41,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
-  confirm: [platform: PlatformId, handle: string, credentials: AccountCredentials]
+  confirm: [platform: PlatformId, handle: string, credentials?: AccountCredentials]
 }>()
 
 const { platformName, platformMeta } = useActivity()
@@ -52,6 +52,8 @@ const errorText = ref('')
 const receipt = ref<{ handle: string; displayName: string | null; avatar: string | null } | null>(null)
 /** 回执来源为一键登录时，凭据由后端暂存 */
 const receiptFromLogin = ref(false)
+/** 更新凭据提交中 */
+const updating = ref(false)
 
 /** cookie 平台逐字段输入值 */
 const cookieValues = ref<Record<string, string>>({})
@@ -105,6 +107,7 @@ watch(
       errorText.value = ''
       receipt.value = null
       receiptFromLogin.value = false
+      updating.value = false
       cookieValues.value = {}
       loginWaiting.value = false
     }
@@ -200,20 +203,19 @@ async function browserLogin(): Promise<void> {
 
 function confirm(): void {
   if (!receipt.value || !platform.value) return
-  // 一键登录的凭据由后端暂存，更新时不携带；手动路径携带凭据
+  updating.value = true
   if (receiptFromLogin.value) {
-    // 一键登录凭据在后端暂存，更新接口需要显式凭据——但一键登录的凭据
-    // 在 browser-login 成功后已暂存于后端，这里需要特殊处理。
-    // 实际上 update_credentials 需要显式凭据，所以一键登录路径不适用。
-    // 当前实现：一键登录成功后凭据已暂存，但 update_credentials 接口要求
-    // 显式传入。这里暂时不支持一键登录更新凭据（与绑定不同）。
-    errorText.value = '一键登录暂不支持更新凭据，请使用手动输入方式'
-    return
+    // 一键登录：凭据由后端暂存，更新时不携带显式凭据
+    emit('confirm', platform.value, receipt.value.handle)
+  } else {
+    const creds = parsedCredentials.value
+    if (!creds) {
+      updating.value = false
+      return
+    }
+    emit('confirm', platform.value, receipt.value.handle, creds)
   }
-  const creds = parsedCredentials.value
-  if (!creds) return
-  emit('confirm', platform.value, receipt.value.handle, creds)
-  emit('update:show', false)
+  // 弹窗保持打开显示 loading，由父组件在成功/失败后关闭
 }
 
 const receiptLabel = computed(() =>
@@ -322,10 +324,10 @@ const receiptLabel = computed(() =>
       </div>
     </div>
     <div class="modal-actions">
-      <n-button size="small" quaternary @click="emit('update:show', false)">取消</n-button>
-      <n-button size="small" type="primary" :disabled="!receipt" @click="confirm">
+      <n-button size="small" quaternary :disabled="updating" @click="emit('update:show', false)">取消</n-button>
+      <n-button size="small" type="primary" :loading="updating" :disabled="!receipt || updating" @click="confirm">
         <template #icon><KeyRound :size="14" /></template>
-        确认更新凭据
+        {{ updating ? '更新中…' : '确认更新凭据' }}
       </n-button>
     </div>
   </n-modal>
