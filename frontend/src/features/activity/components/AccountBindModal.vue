@@ -107,11 +107,15 @@ const parsedCredentials = computed<AccountCredentials | null>(() => {
   return { cookies }
 })
 
-/** 实际参与验证/绑定的 handle：cookie 兼任时取对应字段值 */
+/** 实际参与验证/绑定的 handle：cookie 兼任时取对应字段值，否则需要用户手动输入 handle */
 const effectiveHandle = computed(() => {
   if (handleFromCookie.value) return (cookieValues.value[handleFromCookie.value] ?? '').trim()
+  // LeetCode CN 等非 handleKey 平台：用户需手动输入 handle（userSlug）
   return handle.value.trim()
 })
+
+/** 当前是否为需要手动输入 handle 的 cookie 平台（无 handleKey） */
+const needsManualHandle = computed(() => isCookiePlatform.value && !handleFromCookie.value)
 
 watch(
   () => props.show,
@@ -283,7 +287,7 @@ const receiptLabel = computed(() =>
           </template>
           <div class="cookie-guide">
             <template v-if="platform === 'leetcode-cn'">
-              <p>1. 浏览器登录 LeetCode 中文网（leetcode.cn）</p>
+              <p>1. 浏览器登录 LeetCode CN（leetcode.cn）</p>
               <p>2. 按 <code>F12</code> 打开开发者工具，切到「应用 / Application」面板</p>
               <p>3. 左侧展开 Cookies → <code>https://leetcode.cn</code></p>
               <p>4. 复制 <code>LEETCODE_SESSION</code> 与 <code>csrftoken</code> 的「值」填入下方输入框</p>
@@ -297,6 +301,16 @@ const receiptLabel = computed(() =>
             <p class="cookie-guide-note">cookie 仅保存在本机（secrets.json），不会上传到任何地方</p>
           </div>
         </n-popover>
+        <!-- 无 handleKey 的 cookie 平台（如 LeetCode CN）需要手动输入 handle -->
+        <div v-if="needsManualHandle" class="bind-row">
+          <n-input
+            v-model:value="handle"
+            size="small"
+            placeholder="输入 LeetCode CN 用户名（userSlug）"
+            class="bind-handle"
+            @keyup.enter="verify"
+          />
+        </div>
         <div v-for="field in cookieSpec!.keys" :key="field.key" class="cookie-field">
           <span class="cookie-label mono">{{ field.label }}</span>
           <n-input

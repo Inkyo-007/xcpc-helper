@@ -44,7 +44,7 @@ MAX_PAGES = 1000  # 安全护栏
 
 class LeetCodeCNAdapter(PlatformAdapter):
     platform_id = "leetcode-cn"
-    name = "LeetCode 中文网"
+    name = "LeetCode CN"
     capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
     auth = AuthMode.COOKIE
     min_interval = 9.0  # 参考 glsync 实测：60 请求/10 分钟窗口
