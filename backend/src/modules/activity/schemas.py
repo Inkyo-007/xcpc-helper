@@ -170,3 +170,9 @@ class ProfileUpdateIn(BaseModel):
     id: str | None = None
     signature: str | None = None
     avatar: str | None = None
+
+
+class UpdateCredentialsIn(BaseModel):
+    """更新账号凭据（仅 cookie 平台）：验证回执的 handle 必须与当前绑定一致。"""
+
+    credentials: dict[str, Any]  # cookie 授权平台必填

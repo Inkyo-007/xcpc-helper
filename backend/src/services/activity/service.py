@@ -414,6 +414,42 @@ class ActivityService:
         self._engine.drop_status(self._current_group, platform, handle)
         self._refine.drop_account(self._current_group, platform, handle)
 
+    async def update_credentials(
+        self, platform: str, handle: str, credentials: Credentials
+    ) -> BoundAccountOut:
+        """更新已绑定账号的凭据（仅 cookie 平台）：不删数据、不重置游标。
+
+        验证新凭据有效性后仅覆盖 secrets.json，保留 submissions 与同步状态。
+        """
+        adapter = self._adapter(platform)
+        handle = handle.strip()
+        store = self._store()
+        profile = store.load_profile()
+        account = next(
+            (
+                acc
+                for acc in profile.accounts
+                if acc.platform == platform and acc.handle == handle
+            ),
+            None,
+        )
+        if account is None:
+            raise NotFoundError(f"账号未绑定: {platform}/{handle}")
+        if adapter.auth != AuthMode.COOKIE:
+            raise BadRequestError(f"平台 {platform} 无需凭据更新")
+        # 验证新凭据有效性（存在性 + 凭据试拉）
+        try:
+            await adapter.verify(handle, credentials)
+        except AuthExpiredError as exc:
+            raise BadRequestError(str(exc)) from exc
+        except PlatformError as exc:
+            raise BadGatewayError(f"平台暂时不可用：{exc}") from exc
+        # 仅覆盖凭据，不碰账号元数据、不删提交数据、不重置游标
+        store.save_account_secrets(platform, handle, credentials)
+        # 清除凭据过期的错误状态，让用户可以立即重新同步
+        self._engine.drop_status(self._current_group, platform, handle)
+        return self._account_out(account)
+
     # ===== 聚合读取 =====
 
     def _submissions(self, platform: str | None) -> list[Submission]:

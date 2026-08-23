@@ -8,6 +8,7 @@ import { ChartColumn, Link2, MousePointerClick, Plus } from 'lucide-vue-next'
 import { NButton, useMessage } from 'naive-ui'
 import AccountBindModal from '@/features/activity/components/AccountBindModal.vue'
 import AccountManageModal from '@/features/activity/components/AccountManageModal.vue'
+import CredentialsUpdateModal from '@/features/activity/components/CredentialsUpdateModal.vue'
 import RefineModal from '@/features/activity/components/RefineModal.vue'
 import ActivityHeatmap from '@/features/activity/components/ActivityHeatmap.vue'
 import PassBarChart from '@/features/activity/components/PassBarChart.vue'
@@ -43,6 +44,7 @@ const {
   syncNow,
   bindAccount,
   unbindAccount,
+  updateAccountCredentials,
   refreshAll,
   boundOn,
   platformName,
@@ -58,6 +60,9 @@ const showGroupEdit = ref(false)
 /** 账号管理弹窗（换绑 / 解绑）及其目标账号 */
 const showAccountManage = ref(false)
 const managingAccount = ref<BoundAccount | null>(null)
+/** 更新凭据弹窗及其目标账号 */
+const showCredentialsUpdate = ref(false)
+const updatingAccount = ref<BoundAccount | null>(null)
 /** 精细化同步弹窗及其目标账号（REFINE_VERDICT 能力平台） */
 const showRefine = ref(false)
 const refiningAccount = ref<BoundAccount | null>(null)
@@ -206,10 +211,29 @@ function openAccountManage(account: BoundAccount): void {
   showAccountManage.value = true
 }
 
+/** 打开更新凭据弹窗 */
+function openCredentialsUpdate(account: BoundAccount): void {
+  updatingAccount.value = account
+  showCredentialsUpdate.value = true
+}
+
 /** 打开精细化同步弹窗（平台视图精化按钮，能力驱动挂载） */
 function openRefine(account: BoundAccount): void {
   refiningAccount.value = account
   showRefine.value = true
+}
+
+async function onUpdateCredentials(
+  platform: PlatformId,
+  handle: string,
+  credentials: AccountCredentials,
+): Promise<void> {
+  try {
+    await updateAccountCredentials(platform, handle, credentials)
+    message.success('凭据已更新，正在重新同步')
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : '凭据更新失败，请稍后重试')
+  }
 }
 
 /** 手动同步：即时进行态 + 完成/失败提示（快速或无新增同步也有明确反馈） */
@@ -351,6 +375,12 @@ async function onSync(): Promise<void> {
       :account="managingAccount"
       @bind="openBind"
       @unbind="onUnbind"
+      @update-credentials="openCredentialsUpdate"
+    />
+    <CredentialsUpdateModal
+      v-model:show="showCredentialsUpdate"
+      :account="updatingAccount"
+      @confirm="onUpdateCredentials"
     />
     <RefineModal v-model:show="showRefine" :account="refiningAccount" @done="refreshAll" />
     <UserGroupEditModal
