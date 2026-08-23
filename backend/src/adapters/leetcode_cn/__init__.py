@@ -228,29 +228,20 @@ class LeetCodeCNAdapter(PlatformAdapter):
 
         return result
 
-    # ===== 一键登录 =====
+    # ===== 一键登录（已禁用：LeetCode CN 滑块验证无法通过自动化浏览器） =====
 
     def browser_login_available(self) -> bool:
-        """一键登录是否可用（Playwright 可选依赖已安装）。"""
-        from adapters.leetcode_cn import login as login_mod
-
-        return login_mod.playwright_available()
+        """LeetCode CN 不支持一键登录：新设备登录会触发滑块验证，
+        自动化浏览器无法完成。用户请通过手动输入 cookie 授权。"""
+        return False
 
     async def run_browser_login(
         self, timeout: float
     ) -> tuple[Credentials, UserInfo]:
-        """拉起系统浏览器登录窗口，返回抓取的凭据与验证回执。"""
-        from adapters.leetcode_cn import login as login_mod
-
-        credentials = await login_mod.capture_credentials(timeout)
-        # 从 JWT payload 中解析 userSlug
-        user_slug = self._extract_user_slug_from_session(
-            credentials.cookies.get("LEETCODE_SESSION", "")
+        """LeetCode CN 不支持一键登录。"""
+        raise PlatformError(
+            "LeetCode CN 暂不支持一键登录，请使用手动输入 cookie 方式授权"
         )
-        if not user_slug:
-            raise PlatformError("无法从登录会话中解析用户信息")
-        info = await self.verify(user_slug, credentials)
-        return credentials, info
 
     # ===== 内部：GraphQL 请求 =====
 

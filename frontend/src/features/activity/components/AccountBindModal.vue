@@ -259,7 +259,7 @@ const receiptLabel = computed(() =>
         </n-button>
       </div>
 
-      <!-- cookie 平台：两种方式 -->
+      <!-- cookie 平台：两种方式（一键登录 / 手动输入 cookie） -->
       <template v-else>
         <template v-if="canBrowserLogin">
           <div class="bind-way-title">方式一 · 一键登录（推荐）</div>
@@ -277,7 +277,8 @@ const receiptLabel = computed(() =>
           <p class="bind-way-hint">在弹出的浏览器窗口中登录，完成后自动识别账号</p>
         </template>
 
-        <div class="bind-way-title">方式二 · 手动输入 cookie</div>
+        <div v-if="!canBrowserLogin" class="bind-way-title">手动输入 cookie</div>
+        <div v-else class="bind-way-title">方式二 · 手动输入 cookie</div>
         <n-popover trigger="hover" :style="{ maxWidth: '340px' }">
           <template #trigger>
             <span class="cookie-help">
