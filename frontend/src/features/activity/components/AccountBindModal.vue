@@ -302,12 +302,13 @@ const receiptLabel = computed(() =>
           </div>
         </n-popover>
         <!-- 无 handleKey 的 cookie 平台（如 LeetCode CN）需要手动输入 handle -->
-        <div v-if="needsManualHandle" class="bind-row">
+        <div v-if="needsManualHandle" class="cookie-field">
+          <span class="cookie-label mono">UID</span>
           <n-input
             v-model:value="handle"
             size="small"
-            placeholder="输入 LeetCode CN 用户名（userSlug）"
-            class="bind-handle"
+            placeholder="输入 LeetCode CN 账号 UID"
+            class="mono"
             @keyup.enter="verify"
           />
         </div>
