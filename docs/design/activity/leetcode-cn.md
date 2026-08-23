@@ -22,7 +22,7 @@
 - **Batch Query**：一次 GraphQL 请求可包含多个 `submissionList` 查询（别名区分），
   实测 200 题/batch 稳定（~9 秒），1000 题/batch 可达（~35 秒）；
 - `userProfilePublicProfile(userSlug)` 用于验证用户存在性（匿名可用），返回
-  `username`、`siteRanking`、`profile` 等基本信息。
+  `username`、`siteRanking`、`profile`（含 `userSlug`、`realName`、`userAvatar`）等基本信息。
 
 ## 同步策略
 
@@ -34,14 +34,13 @@ Step 1: userProgressQuestionList(skip=0, limit=500)
 
 Step 2: 按 BATCH_SIZE(=200) 分批次调 batch submissionList
         query BatchSubmissions {
-          q0: submissionList(questionSlug: "two-sum", ...) { ... }
-          q1: submissionList(questionSlug: "add-two-numbers", ...) { ... }
+          two_sum: submissionList(questionSlug: "two-sum", ...) { ... }
+          add_two_numbers: submissionList(questionSlug: "add-two-numbers", ...) { ... }
           ...
         }
         → 每批返回 200 题的提交历史
 
-Step 3: 过滤 statusDisplay == "Accepted"（或保留全部，按配置）
-        → 归一化为 PlatformSubmission
+Step 3: 全部提交归一化为 PlatformSubmission（含 WA/TLE/RE 等非 AC 状态）
 ```
 
 ### 增量同步
@@ -104,18 +103,35 @@ Cookie 必需字段：
 ### Handle 与 Display Name
 
 - `handle` = `userSlug`（URL 标识，如 `"yawn_sean"`）
-- `display_name` = `userProfilePublicProfile.username`（如 `"Yawn_Sean"`）
+- `display_name` = `profile.realName`（优先）> `username` > `None`
+  
+  **注意**：`username` 字段不可靠——部分用户未设置自定义用户名时 `username` 等于
+  `userSlug`（如 `kJ8bFHX3u7`），而 `realName` 始终为有效的显示名（如 `"Yx_My"`）。
 
 ## 一键登录（browser-login）
 
-复用洛谷 `login.py` 的架构：
+**已禁用**。LeetCode CN 在新设备/新浏览器环境登录时会强制触发滑块验证
+（"按住滑块滑动到最右边"），自动化浏览器（Playwright/Selenium）因以下原因
+无法通过：
 
-- `adapters/leetcode_cn/login.py` 用 Playwright 拉起系统 Chrome/Edge；
-- 登录 URL：`https://leetcode.cn/accounts/login/`；
-- 鉴权探针：GraphQL `userProgressQuestionList`（`skip=0, limit=1`），确认返回
-  `data.userProgressQuestionList.questions` 非空；
-- 抓取凭据：`LEETCODE_SESSION` + `csrftoken` + `User-Agent`；
-- 超时 3 分钟，关窗 → canceled。
+1. **指纹检测**：`navigator.webdriver = true`、Chrome DevTools Protocol 暴露等
+   自动化特征被识别；
+2. **行为分析**：滑块拖动轨迹缺乏人类生物特征（加速/减速/微抖动）；
+3. **循环失败**：刷新后仍识别为自动化环境，无法跳出验证循环。
+
+**替代方案**：用户在日常浏览器中登录 LeetCode CN 后，通过开发者工具复制
+`LEETCODE_SESSION` 与 `csrftoken` 的值，手动粘贴到绑定弹窗的输入框中。
+
+## 绑定弹窗 UI
+
+LeetCode CN 为无 `handleKey` 的 cookie 平台（不像洛谷 `_uid` 兼任 handle）：
+
+- **需要手动输入 UID**：绑定弹窗显示独立的 UID 输入框（左标签"UID"、右输入框，
+  样式对齐 cookie 字段），提示"输入 LeetCode CN 账号 UID"；
+- **cookie 字段**：`LEETCODE_SESSION`、`csrftoken`；
+- **验证按钮**：需 UID + 两个 cookie 字段全部填齐后才可用；
+- **获取引导**：悬浮提示引导用户从浏览器开发者工具「应用/Application」面板
+  复制 cookie 值。
 
 ## 陷阱备忘
 
@@ -127,4 +143,6 @@ Cookie 必需字段：
 - `recentACSubmissions` 只返回最近 ~20 条且只能查自己：不用于全量同步；
 - `lastSubmittedAt` 为 ISO 8601 字符串（含时区），需解析为 Unix 秒级；
 - `frontendId` 可能为字符串（如 `"面试题 17.16"`），`problem_key` 统一用
-  `titleSlug`。
+  `titleSlug`；
+- **显示名优先用 realName**：`username` 可能等于 `userSlug`，不可靠；
+- **一键登录不可用**：滑块验证无法通过自动化浏览器，用户必须手动输入 cookie。

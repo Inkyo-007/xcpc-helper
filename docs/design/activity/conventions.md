@@ -54,7 +54,7 @@ router / service / modules 主干保持平台无关（不出现 `if platform == 
 1. Codeforces（官方 API，匿名可取，风险最低）——**已实现**
 2. AtCoder（kenkoooo API + 官方用户主页 404 验证，匿名可取）——**已实现**
 3. 洛谷（cookie 授权框架首个实例 + 反爬对抗，QOJ 等后续平台复用同一套）——**已实现**
-4. LeetCode CN + 牛客（GraphQL 路径已探明 / rating 匿名接口）
+4. LeetCode CN + 牛客（GraphQL 路径已探明 / rating 匿名接口）——**已实现**
 5. 长尾平台（评估 ojhunt 依赖或手动导入）
 
 ## 3. 数据模型与存储
@@ -510,10 +510,10 @@ frontend/src/features/activity/
   切换平台页签与使用模板库等其他功能；
 - 平台页签（PlatformTabs）由后端 `/platforms` 返回驱动，前端不硬编码平台清单；
   `types.ts` 的 `PlatformId` 随新平台补充联合类型；
-- **凭据平台 UI**（洛谷）：绑定弹窗按 `auth === 'cookie'` 展开两种方式——
-  「方式一 · 一键登录」（`browserLogin` 可用时，点击后轮询登录会话状态）与
-  「方式二 · 手动输入 cookie」（按平台注册表逐字段输入框：洛谷 `_uid` 兼任
-  handle（即 UID）与 `__client_id`，配「如何获取 cookie？」悬浮引导）；
+- **凭据平台 UI**（洛谷 / LeetCode CN）：绑定弹窗按 `auth === 'cookie'` 展开——
+  洛谷提供「方式一 · 一键登录」（`browserLogin` 可用时）与「方式二 · 手动输入 cookie」；
+  **LeetCode CN 仅支持手动输入 cookie**（滑块验证无法通过自动化浏览器，
+  `browserLogin` 恒为 `false`），需输入 UID + `LEETCODE_SESSION` + `csrftoken`；
   账号展示一律 `displayName ?? handle`；`syncErrorCode === 'auth_expired'` 时
   账号按钮警示态「凭据过期」，点击走换绑路径重新授权，成功后自动触发一次同步；
 - 网址状态同步：`?platform=&date=&page=`（缺省不写入），刷新/前进后退/复制链接可恢复。
@@ -551,6 +551,7 @@ frontend/src/features/activity/
 Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡 → 契约扩展与结构清理
 → AtCoder 适配 → 洛谷适配（secrets 凭据框架 + curl_cffi 传输层 + browser-login +
 前端凭据 UI）→ 流式拉取与断点续传 → 启动时自动同步 → UNAC 精细化同步
+→ LeetCode CN 适配（Cookie + GraphQL Batch Query，无 browser-login）
 （详见 [../../../PROGRESS.md](../../../PROGRESS.md)）。
 
 ## 10. 既有决策与陷阱（对话确认，勿随意回退）

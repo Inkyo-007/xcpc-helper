@@ -13,6 +13,14 @@
 
 ## 最近完成
 
+### 2026-08-16 会话 1
+
+- `e265c8fd` fix(前后端): 禁用 LeetCode CN Playwright 一键登录（滑块验证无法绕过）
+- `e67d8f0a` fix(后端): LeetCode CN verify 优先使用 realName 作为显示名
+- `f06e3194` style(前端): 调整 LeetCode CN 绑定 UID 输入框样式与文案
+- `b5a5b595` fix(前端): 修复 LeetCode CN 手动绑定验证按钮不可用及平台名称
+- `ba19f403` feat(后端): 新增 LeetCode CN 适配器（Cookie 授权 + GraphQL Batch Query）
+
 ### 2026-08-15 会话 2
 
 - `e9738a35` feat(前端): 版本号从 package.json 动态读取
