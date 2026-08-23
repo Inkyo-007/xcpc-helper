@@ -614,7 +614,8 @@ class ActivityService:
     async def sync(self, platform: str | None) -> None:
         if platform is not None:
             self._adapter(platform)
-        profile = self._store().load_profile()
+        store = self._store()
+        profile = store.load_profile()
         targets = [
             (acc.platform, acc.handle)
             for acc in profile.accounts
@@ -623,6 +624,47 @@ class ActivityService:
         for p, h in targets:
             # 兜底包装：任何意外异常都降级为该账号诊断，不让后台任务悬空
             asyncio.create_task(self._safe_sync(p, h))
+
+    async def sync_all_groups(self) -> None:
+        """对所有用户组的全部账号触发同步（启动时用；逐组串行调度账号任务）。
+
+        不同用户组之间共享平台限流（net.py 的 per-platform Lock），
+        为避免同平台多账号并发冲击平台风控，组间采用串行调度：
+        先收集全部组全部目标账号，然后逐组顺序派发，组内各账号仍并行。
+        """
+        groups = activity_store.list_groups(self._settings.user_data_dir)
+        for group in groups:
+            store = activity_store.UserStore(self._settings.user_data_dir, group)
+            profile = store.load_profile()
+            targets = [
+                (group, acc.platform, acc.handle)
+                for acc in profile.accounts
+            ]
+            for g, p, h in targets:
+                asyncio.create_task(self._safe_sync_all_groups(g, p, h))
+
+    async def _safe_sync_all_groups(self, user_id: str, platform: str, handle: str) -> None:
+        """sync_all_groups 专用：在指定用户组上安全同步单个账号。"""
+        try:
+            status = await self._engine.sync_account(user_id, platform, handle)
+        except Exception as exc:  # 兜底降级
+            logger.exception("同步意外异常 [%s/%s/%s]", user_id, platform, handle)
+            self._engine.mark_error(user_id, platform, handle, str(exc))
+            return
+        # 普通同步成功完成后，按账号配置自动启动精细化同步
+        if status.state.value != "idle":
+            return
+        adapter = self._adapters.get(platform)
+        if adapter is None or Capability.REFINE_VERDICT not in adapter.capabilities:
+            return
+        store = activity_store.UserStore(self._settings.user_data_dir, user_id)
+        profile = store.load_profile()
+        account = next(
+            (a for a in profile.accounts if a.platform == platform and a.handle == handle),
+            None,
+        )
+        if account is not None and account.refine_auto:
+            self._refine.start(user_id, platform, handle)
 
     async def _safe_sync(self, platform: str, handle: str) -> None:
         try:

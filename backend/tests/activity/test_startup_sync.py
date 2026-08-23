@@ -1,7 +1,7 @@
 """main.lifespan 启动行为测试：启动时自动同步的开关接线。
 
 不启动真实服务：直接驱动 lifespan 上下文，模板/打印册等无关服务打桩，
-只验证 activity 服务的 sync(None) 是否按配置被触发。
+只验证 activity 服务的 sync_all_groups() 是否按配置被触发。
 """
 
 import main as main_mod
@@ -10,10 +10,10 @@ from core.config import Settings
 
 class _FakeActivityService:
     def __init__(self) -> None:
-        self.sync_calls: list[None] = []
+        self.sync_all_groups_calls: list[None] = []
 
-    async def sync(self, platform) -> None:
-        self.sync_calls.append(platform)
+    async def sync_all_groups(self) -> None:
+        self.sync_all_groups_calls.append(None)
 
     async def aclose(self) -> None:
         pass
@@ -34,7 +34,7 @@ def _patch_infra(monkeypatch, settings: Settings, activity):
 
 
 async def test_startup_triggers_sync_all_accounts(monkeypatch, tmp_path):
-    """默认开启：lifespan 就绪后对全部账号触发一次同步（sync(None)）。"""
+    """默认开启：lifespan 就绪后对所有用户组全部账号触发一次同步（sync_all_groups()）。"""
     settings = Settings(
         user_data_dir=tmp_path / "user",
         watch_enabled=False,
@@ -47,7 +47,7 @@ async def test_startup_triggers_sync_all_accounts(monkeypatch, tmp_path):
     async with main_mod.lifespan(app):
         pass
 
-    assert activity.sync_calls == [None]  # None = 全部账号
+    assert activity.sync_all_groups_calls == [None]  # None = 全部组全部账号
 
 
 async def test_startup_sync_disabled_by_config(monkeypatch, tmp_path):
@@ -64,4 +64,4 @@ async def test_startup_sync_disabled_by_config(monkeypatch, tmp_path):
     async with main_mod.lifespan(app):
         pass
 
-    assert activity.sync_calls == []
+    assert activity.sync_all_groups_calls == []
