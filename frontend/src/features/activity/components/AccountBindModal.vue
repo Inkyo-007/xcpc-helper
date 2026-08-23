@@ -34,6 +34,12 @@ const COOKIE_PLATFORMS: Partial<
     ],
     handleKey: '_uid',
   },
+  'leetcode-cn': {
+    keys: [
+      { key: 'LEETCODE_SESSION', label: 'LEETCODE_SESSION' },
+      { key: 'csrftoken', label: 'csrftoken' },
+    ],
+  },
 }
 
 const props = defineProps<{
@@ -276,10 +282,18 @@ const receiptLabel = computed(() =>
             </span>
           </template>
           <div class="cookie-guide">
-            <p>1. 浏览器登录洛谷（luogu.com.cn）</p>
-            <p>2. 按 <code>F12</code> 打开开发者工具，切到「应用 / Application」面板</p>
-            <p>3. 左侧展开 Cookies → <code>https://www.luogu.com.cn</code></p>
-            <p>4. 复制 <code>_uid</code> 与 <code>__client_id</code> 的「值」填入下方输入框</p>
+            <template v-if="platform === 'leetcode-cn'">
+              <p>1. 浏览器登录 LeetCode 中文网（leetcode.cn）</p>
+              <p>2. 按 <code>F12</code> 打开开发者工具，切到「应用 / Application」面板</p>
+              <p>3. 左侧展开 Cookies → <code>https://leetcode.cn</code></p>
+              <p>4. 复制 <code>LEETCODE_SESSION</code> 与 <code>csrftoken</code> 的「值」填入下方输入框</p>
+            </template>
+            <template v-else>
+              <p>1. 浏览器登录洛谷（luogu.com.cn）</p>
+              <p>2. 按 <code>F12</code> 打开开发者工具，切到「应用 / Application」面板</p>
+              <p>3. 左侧展开 Cookies → <code>https://www.luogu.com.cn</code></p>
+              <p>4. 复制 <code>_uid</code> 与 <code>__client_id</code> 的「值」填入下方输入框</p>
+            </template>
             <p class="cookie-guide-note">cookie 仅保存在本机（secrets.json），不会上传到任何地方</p>
           </div>
         </n-popover>
