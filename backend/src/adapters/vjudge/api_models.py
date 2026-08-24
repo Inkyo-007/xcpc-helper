@@ -1,33 +1,34 @@
 """VJudge API 响应模型。
 
-VJudge /user/submissions 返回 JSON 信封 {data: [...], error: null}，
-data 为二维数组，每行是提交记录的各字段。
+VJudge /status/data 返回 DataTables 格式 JSON：
+{data: [...], recordsTotal: N, recordsFiltered: N, draw: 1}
+data 为对象数组，每个对象是一条提交记录的各字段。
 """
 
 from pydantic import BaseModel, Field
 
 
-class VjSubmissionRow(BaseModel):
-    """单条提交记录（VJudge data 数组的一行）。
-
-    VJudge 返回的数组顺序（从 ojhunt-lite 参考实现确认）：
-    [0] runId, [1] OJId, [2] probNum, [3] result, [4] language,
-    [5] time(ms), [6] memory(KB), [7] length, [8] submitTime(ms), ...
-    """
+class VjSubmissionItem(BaseModel):
+    """单条提交记录（/status/data 响应 data 数组的一项）。"""
 
     run_id: int = Field(alias="runId")
-    oj_id: str = Field(alias="ojId")
+    oj: str
     prob_num: str = Field(alias="probNum")
-    result: str
+    status: str
     language: str
-    time_ms: int = Field(alias="timeMs")
-    memory_kb: int = Field(alias="memoryKb")
-    length: int
-    submit_time_ms: int = Field(alias="submitTimeMs")
+    language_canonical: str = Field(alias="languageCanonical", default="")
+    time: int  # 毫秒级时间戳
+    memory: int
+    runtime: int = Field(alias="runtime", default=0)
+    source_length: int = Field(alias="sourceLength", default=0)
+    user_name: str = Field(alias="userName", default="")
+    user_id: int = Field(alias="userId", default=0)
 
 
-class VjSubmissionsEnvelope(BaseModel):
-    """/user/submissions 响应信封。"""
+class VjStatusDataEnvelope(BaseModel):
+    """/status/data 响应信封（DataTables 格式）。"""
 
-    data: list[list] = Field(default_factory=list)
-    error: dict | None = None
+    data: list[dict] = Field(default_factory=list)
+    records_total: int = Field(alias="recordsTotal", default=0)
+    records_filtered: int = Field(alias="recordsFiltered", default=0)
+    draw: int = 0

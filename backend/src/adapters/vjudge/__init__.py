@@ -1,23 +1,21 @@
-"""VJudge 适配器（Playwright 一键登录 + Cookie 授权）。
+"""VJudge 适配器（匿名模式，/status/data 端点）。
 
 设计见 docs/design/activity/vjudge.md：
-- 使用共享 HttpFetcher（httpx），无 WAF 指纹挑战；
-- Playwright 一键登录抓取双 cookie（JSESSIONID + JSESSlONID）；
-- 游标分页（maxId），pageSize=500，倒序返回；
+- 使用共享 HttpFetcher（httpx）；
+- /status/data 无需登录即可查询用户提交记录；
+- DataTables 分页（start + length），每页最大 100 条，倒序返回；
 - 时间戳为毫秒级，需转秒。
 """
 
 import logging
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
 from adapters.base import (
-    AuthExpiredError,
     AuthMode,
     Capability,
-    Credentials,
     PlatformAdapter,
-    PlatformError,
     PlatformSubmission,
     ProgressCallback,
     SyncBatch,
@@ -30,60 +28,29 @@ from adapters.vjudge.normalize import map_verdict, problem_url
 logger = logging.getLogger("xcpc.adapters.vjudge")
 
 HOSTNAME = "vjudge.net"
-SUBMISSIONS_URL = f"https://{HOSTNAME}/user/submissions"
+STATUS_DATA_URL = f"https://{HOSTNAME}/status/data"
 
-MAX_PAGE_SIZE = 500
-MAX_PAGES = 1000  # 安全护栏
-
-# 提交记录数组的列索引（从 ojhunt-lite 参考实现确认）
-IDX_RUN_ID = 0
-IDX_OJ_ID = 1
-IDX_PROB_NUM = 2
-IDX_RESULT = 3
-IDX_LANGUAGE = 4
-IDX_TIME_MS = 5
-IDX_MEMORY_KB = 6
-IDX_LENGTH = 7
-IDX_SUBMIT_TIME_MS = 8
+PAGE_SIZE = 100  # /status/data 服务端硬限制
 
 
 class VJudgeAdapter(PlatformAdapter):
     platform_id = "vjudge"
     name = "VJudge"
     capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
-    auth = AuthMode.COOKIE
+    auth = AuthMode.NONE
     min_interval = 2.0  # 保守限流
 
-    def __init__(
-        self,
-        fetcher: HttpFetcher,
-        session_factory: Any | None = None,
-    ) -> None:
+    def __init__(self, fetcher: HttpFetcher) -> None:
         self._fetcher = fetcher
 
     # ===== 绑定验证 =====
 
-    async def verify(
-        self, handle: str, credentials: Credentials | None = None
-    ) -> UserInfo:
-        """验证用户存在性（携凭据试拉提交第 1 页判有效性）。
-
-        VJudge 无匿名用户查询接口，必须携带凭据。
-        """
-        if credentials is None:
-            raise AuthExpiredError("VJudge 需要登录凭据，请先完成一键登录")
-
-        data = await self._fetch_submissions_page(handle, None, credentials)
-        if "error" in data and data["error"] is not None:
-            err = data.get("error", {}) or {}
-            err_key = str(err.get("i18nKey", "")).lower()
-            if "not_exist" in err_key or "not_found" in err_key:
-                raise UserNotFoundError(f"VJudge 用户不存在: {handle}")
-            if "login" in err_key or "auth" in err_key:
-                raise AuthExpiredError("VJudge 凭据已过期，请重新登录")
-            raise PlatformError(f"VJudge 返回错误: {data['error']}")
-
-        # 用户存在（返回了 data 数组，即使为空也表示用户存在）
+    async def verify(self, handle: str, credentials: Any | None = None) -> UserInfo:
+        """验证用户存在性（试拉提交第 1 页判有效性）。"""
+        data = await self._fetch_page(handle, start=0)
+        rows = data.get("data", [])
+        if not rows:
+            raise UserNotFoundError(f"VJudge 用户不存在或无任何提交: {handle}")
         return UserInfo(handle=handle, display_name=None)
 
     # ===== 提交拉取 =====
@@ -93,7 +60,7 @@ class VJudgeAdapter(PlatformAdapter):
         handle: str,
         *,
         since: int | None,
-        credentials: Credentials | None = None,
+        credentials: Any | None = None,
         full_window_days: int,
         full_min_rows: int,
         progress_cb: ProgressCallback | None = None,
@@ -101,34 +68,25 @@ class VJudgeAdapter(PlatformAdapter):
     ) -> AsyncIterator[SyncBatch]:
         """按页流式拉取提交（每页一批，按时间倒序）。
 
-        VJudge 无总量字段，不上报进度（progress_cb 为契约参数，本平台忽略）。
+        VJudge 无可靠总量字段，不上报进度（progress_cb 为契约参数，本平台忽略）。
 
         - 增量（since 非空）：遇 ts < since 即停；游标当秒提交重复拉取，
           由 store 层按 submission_id 去重吸收；
         - 全量（since 为空）：拉到覆盖 full_window_days 窗口为止，窗口内
-          不足 full_min_rows 条时继续拉满；断点 = {"max_id": 下一页游标,
+          不足 full_min_rows 条时继续拉满；断点 = {"start": 下一页偏移,
           "fetched": 累计条数}；
-        - 绝对护栏：最多 MAX_PAGES 页。
+        - 不设绝对页数护栏：单个用户提交量实际不会过于多。
         """
-        if credentials is None:
-            raise AuthExpiredError("未配置 VJudge 凭据，请先绑定账号并授权")
-
-        max_id: int | None = None
+        start = 0
         fetched = 0
         if since is None and resume_checkpoint:
-            max_id = resume_checkpoint.get("max_id")
-            fetched = resume_checkpoint.get("fetched", 0)
+            start = int(resume_checkpoint.get("start", 0))
+            fetched = int(resume_checkpoint.get("fetched", 0))
 
-        for _ in range(MAX_PAGES):
-            data = await self._fetch_submissions_page(handle, max_id, credentials)
+        window_start = int(time.time()) - full_window_days * 86400
 
-            if "error" in data and data["error"] is not None:
-                err = data.get("error", {}) or {}
-                err_key = str(err.get("i18nKey", "")).lower()
-                if "login" in err_key or "auth" in err_key:
-                    raise AuthExpiredError("VJudge 凭据已过期，请重新登录")
-                raise PlatformError(f"VJudge 返回错误: {data['error']}")
-
+        while True:
+            data = await self._fetch_page(handle, start=start)
             rows = data.get("data", [])
             if not rows:
                 yield SyncBatch(done=True)
@@ -137,83 +95,55 @@ class VJudgeAdapter(PlatformAdapter):
             batch: list[PlatformSubmission] = []
             hit_old = False
             for row in rows:
-                if len(row) <= IDX_SUBMIT_TIME_MS:
-                    continue
-                ts_sec = int(row[IDX_SUBMIT_TIME_MS]) // 1000
+                ts_sec = int(row["time"]) // 1000
                 if since is not None and ts_sec < since:
                     hit_old = True
                     break
                 batch.append(self._to_submission(row, ts_sec))
 
             fetched += len(batch)
-            done = hit_old or len(rows) < MAX_PAGE_SIZE
 
-            # 更新游标为下一页
-            if rows:
-                max_id = int(rows[-1][IDX_RUN_ID]) - 1
+            # 全量停止条件：已越过窗口起点且累计条数达标
+            last_ts = int(rows[-1]["time"]) // 1000
+            full_done = (
+                since is None
+                and (last_ts < window_start and fetched >= full_min_rows)
+            )
+            done = hit_old or len(rows) < PAGE_SIZE or full_done
+
+            start += len(rows)
 
             yield SyncBatch(
                 items=batch,
                 checkpoint=(
                     None
                     if done or since is not None
-                    else {"max_id": max_id, "fetched": fetched}
+                    else {"start": start, "fetched": fetched}
                 ),
                 done=done,
             )
             if done:
                 return
 
-        yield SyncBatch(done=True)
-
-    # ===== 一键登录 =====
-
-    def browser_login_available(self) -> bool:
-        """一键登录是否可用（Playwright 可选依赖已安装）。"""
-        from adapters.vjudge import login as login_mod
-
-        return login_mod.playwright_available()
-
-    async def run_browser_login(
-        self, timeout: float
-    ) -> tuple[Credentials, UserInfo]:
-        """拉起系统浏览器登录窗口，返回抓取的凭据与验证回执。
-
-        登录成功（双 cookie 出现）后立即用凭据完成验证（存在性 +
-        有效性），失败语义与 verify 相同；用户关窗 / 超时分别抛
-        LoginCancelledError / asyncio.TimeoutError。
-        """
-        from adapters.vjudge import login as login_mod
-
-        # 注意：capture_credentials 需要 handle 参数用于鉴权探针
-        # 但此时用户尚未输入 handle，这是一个设计矛盾
-        # 解决方案：先让用户输入 handle，再启动浏览器登录
-        # 或者：探针使用一个已知存在的测试用户
-        # 这里采用后者：使用 ojhunt-lite 的测试用户名
-        credentials = await login_mod.capture_credentials(
-            "leoloveacm", timeout=timeout
-        )
-        # 验证回执的 handle 需要用户后续提供
-        # 返回空 handle，由调用方在绑定流程中处理
-        return credentials, UserInfo(handle="", display_name=None)
-
     # ===== 内部：HTTP =====
 
-    async def _fetch_submissions_page(
-        self,
-        handle: str,
-        max_id: int | None,
-        credentials: Credentials,
-    ) -> dict:
-        """获取单页提交数据。"""
-        params: dict[str, str] = {"username": handle, "pageSize": str(MAX_PAGE_SIZE)}
-        if max_id is not None:
-            params["maxId"] = str(max_id)
+    async def _fetch_page(self, handle: str, start: int) -> dict:
+        """获取单页提交数据（/status/data）。"""
+        params: dict[str, str] = {
+            "draw": "1",
+            "start": str(start),
+            "length": str(PAGE_SIZE),
+            "un": handle,
+            "OJId": "All",
+            "probNum": "",
+            "res": "all",
+            "language": "",
+            "onlyFollowee": "false",
+        }
 
         return await self._fetcher.get_json(
-            SUBMISSIONS_URL,
+            STATUS_DATA_URL,
             params=params,
-            credentials=credentials,
             platform=self.platform_id,
             min_interval=self.min_interval,
         )
@@ -221,16 +151,16 @@ class VJudgeAdapter(PlatformAdapter):
     # ===== 内部：解析与归一化 =====
 
     @staticmethod
-    def _to_submission(row: list, ts_sec: int) -> PlatformSubmission:
-        oj_id = str(row[IDX_OJ_ID]) if len(row) > IDX_OJ_ID else ""
-        prob_num = str(row[IDX_PROB_NUM]) if len(row) > IDX_PROB_NUM else ""
+    def _to_submission(row: dict, ts_sec: int) -> PlatformSubmission:
+        oj = str(row.get("oj", ""))
+        prob_num = str(row.get("probNum", ""))
         return PlatformSubmission(
-            submission_id=str(row[IDX_RUN_ID]),
-            problem_key=f"{oj_id}-{prob_num}",
+            submission_id=str(row.get("runId", "")),
+            problem_key=f"{oj}-{prob_num}",
             problem_name=prob_num,
-            problem_url=problem_url(oj_id, prob_num),
+            problem_url=problem_url(oj, prob_num),
             difficulty=None,
-            verdict=map_verdict(str(row[IDX_RESULT]) if len(row) > IDX_RESULT else ""),
+            verdict=map_verdict(str(row.get("status", ""))),
             submitted_at=ts_sec,
-            language=str(row[IDX_LANGUAGE]) if len(row) > IDX_LANGUAGE else "",
+            language=str(row.get("languageCanonical", row.get("language", ""))),
         )
