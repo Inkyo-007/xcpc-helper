@@ -40,6 +40,12 @@ const COOKIE_PLATFORMS: Partial<
       { key: 'csrftoken', label: 'csrftoken' },
     ],
   },
+  vjudge: {
+    keys: [
+      { key: 'JSESSIONID', label: 'JSESSIONID' },
+      { key: 'JSESSlONID', label: 'JSESSlONID' },
+    ],
+  },
 }
 
 const props = defineProps<{
@@ -293,6 +299,12 @@ const receiptLabel = computed(() =>
               <p>3. 左侧展开 Cookies → <code>https://leetcode.cn</code></p>
               <p>4. 复制 <code>LEETCODE_SESSION</code> 与 <code>csrftoken</code> 的「值」填入下方输入框</p>
             </template>
+            <template v-else-if="platform === 'vjudge'">
+              <p>1. 浏览器登录 VJudge（vjudge.net）</p>
+              <p>2. 按 <code>F12</code> 打开开发者工具，切到「应用 / Application」面板</p>
+              <p>3. 左侧展开 Cookies → <code>https://vjudge.net</code></p>
+              <p>4. 复制 <code>JSESSIONID</code> 与 <code>JSESSlONID</code> 的「值」填入下方输入框</p>
+            </template>
             <template v-else>
               <p>1. 浏览器登录洛谷（luogu.com.cn）</p>
               <p>2. 按 <code>F12</code> 打开开发者工具，切到「应用 / Application」面板</p>
@@ -302,13 +314,13 @@ const receiptLabel = computed(() =>
             <p class="cookie-guide-note">cookie 仅保存在本机（secrets.json），不会上传到任何地方</p>
           </div>
         </n-popover>
-        <!-- 无 handleKey 的 cookie 平台（如 LeetCode CN）需要手动输入 handle -->
+        <!-- 无 handleKey 的 cookie 平台（如 LeetCode CN / VJudge）需要手动输入 handle -->
         <div v-if="needsManualHandle" class="cookie-field">
-          <span class="cookie-label mono">UID</span>
+          <span class="cookie-label mono">用户名</span>
           <n-input
             v-model:value="handle"
             size="small"
-            placeholder="输入 LeetCode CN 账号 UID"
+            :placeholder="platform === 'vjudge' ? '输入 VJudge 用户名' : '输入 LeetCode CN 账号 UID'"
             class="mono"
             @keyup.enter="verify"
           />

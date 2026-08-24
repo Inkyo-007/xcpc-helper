@@ -103,6 +103,7 @@ const PLATFORM_SCOPES: PlatformScope[] = [
   'luogu',
   'leetcode-cn',
   'nowcoder',
+  'vjudge',
 ]
 
 /** 网址中的用户组：使用 decodeURIComponent 解码以支持中文组名 */

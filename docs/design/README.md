@@ -14,6 +14,7 @@
 | [activity/luogu.md](activity/luogu.md) | activity · 洛谷适配（cookie 授权 + 反爬 + UNAC 精化） | 已实现 |
 | [activity/nowcoder.md](activity/nowcoder.md) | activity · 牛客竞赛适配（HTML 解析 + 时区转换） | 已实现 |
 | [activity/leetcode-cn.md](activity/leetcode-cn.md) | activity · LeetCode CN 适配（Cookie + GraphQL Batch Query） | 已实现 |
+| [activity/vjudge.md](activity/vjudge.md) | activity · VJudge 适配（Playwright 一键登录 + Cookie 授权） | 已实现 |
 
 ## 状态约定
 

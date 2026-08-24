@@ -13,6 +13,10 @@
 
 ## 最近完成
 
+### 2026-08-24 会话 3
+
+- `7f0504dc` feat(后端): 新增 VJudge 适配器（Playwright 一键登录 + Cookie 授权）
+
 ### 2026-08-24 会话 2
 
 - `c7f15ecb` fix(后端): LeetCode CN 提交 problem_key 改用 frontendId
