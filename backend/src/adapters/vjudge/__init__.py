@@ -142,6 +142,7 @@ class VJudgeAdapter(PlatformAdapter):
         }
         # Cloudflare 要求浏览器标识头，否则返回 403 challenge
         headers: dict[str, str] = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             "Referer": "https://vjudge.net/status",
