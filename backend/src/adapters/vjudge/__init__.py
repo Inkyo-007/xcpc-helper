@@ -140,10 +140,18 @@ class VJudgeAdapter(PlatformAdapter):
             "language": "",
             "onlyFollowee": "false",
         }
+        # Cloudflare 要求浏览器标识头，否则返回 403 challenge
+        headers: dict[str, str] = {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            "Referer": "https://vjudge.net/status",
+            "X-Requested-With": "XMLHttpRequest",
+        }
 
         return await self._fetcher.get_json(
             STATUS_DATA_URL,
             params=params,
+            headers=headers,
             platform=self.platform_id,
             min_interval=self.min_interval,
         )
