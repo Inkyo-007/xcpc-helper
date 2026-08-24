@@ -1,7 +1,7 @@
 """VJudge 适配器（匿名模式，/status/data 端点）。
 
 设计见 docs/design/activity/vjudge.md：
-- 使用共享 HttpFetcher（httpx）；
+- 使用共享 HttpFetcher（httpx），请求需携带浏览器标识头（Cloudflare 403 规避）；
 - /status/data 无需登录即可查询用户提交记录；
 - DataTables 分页（start + length），每页最大 100 条，倒序返回；
 - 时间戳为毫秒级，需转秒。

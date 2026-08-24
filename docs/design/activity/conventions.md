@@ -1,8 +1,8 @@
 # 训练统计聚合（activity）：公共约定
 
-> 状态：已实现（Codeforces / AtCoder / 洛谷 / 牛客 四期全链路）。
+> 状态：已实现（Codeforces / AtCoder / 洛谷 / 牛客 / LeetCode CN / VJudge 六平台全链路）。
 > 本文档承载 activity 域的平台无关约定；各平台的适配细节见同目录
-> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md) / [nowcoder.md](nowcoder.md) / [leetcode-cn.md](leetcode-cn.md)。
+> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md) / [nowcoder.md](nowcoder.md) / [leetcode-cn.md](leetcode-cn.md) / [vjudge.md](vjudge.md)。
 > 需求背景见 [../../cache/requirement.md](../../cache/requirement.md)，
 > 平台接口调研见 [../../cache/platform-api-research.md](../../cache/platform-api-research.md)。
 > 改设计必须先改本文档（或对应平台文档）再改代码。
@@ -55,7 +55,8 @@ router / service / modules 主干保持平台无关（不出现 `if platform == 
 2. AtCoder（kenkoooo API + 官方用户主页 404 验证，匿名可取）——**已实现**
 3. 洛谷（cookie 授权框架首个实例 + 反爬对抗，QOJ 等后续平台复用同一套）——**已实现**
 4. LeetCode CN + 牛客（GraphQL 路径已探明 / rating 匿名接口）——**已实现**
-5. 长尾平台（评估 ojhunt 依赖或手动导入）
+5. VJudge（/status/data 匿名端点，Cloudflare 需浏览器标识头）——**已实现**
+6. 长尾平台（评估 ojhunt 依赖或手动导入）
 
 ## 3. 数据模型与存储
 

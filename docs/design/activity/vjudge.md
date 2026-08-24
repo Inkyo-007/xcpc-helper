@@ -22,6 +22,16 @@
 
 VJudge **无 WAF 指纹挑战**，使用共享 `HttpFetcher`（httpx）即可。
 
+**注意**：Cloudflare 对非浏览器标识的请求返回 403 challenge 页面，请求时必须携带以下头：
+
+| 头字段 | 值 |
+|--------|-----|
+| `User-Agent` | `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...` |
+| `Accept` | `application/json, text/javascript, */*; q=0.01` |
+| `Accept-Language` | `zh-CN,zh;q=0.9,en;q=0.8` |
+| `Referer` | `https://vjudge.net/status` |
+| `X-Requested-With` | `XMLHttpRequest` |
+
 ## 同步策略
 
 ### 全量同步
@@ -77,6 +87,7 @@ VJudge `status` 字段 → `Verdict`：
 
 ## 陷阱备忘
 
+- **Cloudflare 403**：必须使用浏览器标识头（User-Agent / Accept / Referer 等），`python-httpx` 默认 UA 会被拦截；
 - **分页大小限制**：`length` 超过 100 仍只返回 100 条；
 - **recordsFiltered 不可靠**：始终返回 `9999999`，不做总量依据；
 - **时间戳为毫秒级**：`time` 需 `/ 1000` 转为 UTC 秒级；
