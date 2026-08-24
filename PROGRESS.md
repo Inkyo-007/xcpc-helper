@@ -16,6 +16,7 @@
 ### 2026-08-24 会话 4
 
 - `27caad86` feat(后端): VJudge 适配器改为匿名模式，使用 /status/data 端点
+- `afd99772` fix(后端): VJudge 请求添加浏览器标识头绕过 Cloudflare 403
 
 ### 2026-08-24 会话 3
 
