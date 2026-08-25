@@ -123,7 +123,7 @@ async def test_fetch_full_pages_until_short():
         # 验证第一条数据
         assert all_batches[0].items[0].submission_id == "100"
         assert all_batches[0].items[0].verdict == Verdict.AC
-        assert all_batches[0].items[0].problem_key == "Codeforces-436B"
+        assert all_batches[0].items[0].problem_key == "Codeforces"
     finally:
         await fetcher.aclose()
 
@@ -286,7 +286,7 @@ def test_to_submission_mapping():
     s = adapter._to_submission(row, now_sec)
     assert isinstance(s, PlatformSubmission)
     assert s.submission_id == "42"
-    assert s.problem_key == "Codeforces-436B"
+    assert s.problem_key == "Codeforces"
     assert s.problem_name == "436B"
     assert s.problem_url == "https://vjudge.net/problem/Codeforces-436B"
     assert s.difficulty is None
