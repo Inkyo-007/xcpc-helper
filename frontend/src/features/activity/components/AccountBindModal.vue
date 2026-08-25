@@ -315,13 +315,13 @@ const receiptLabel = computed(() =>
             <p class="cookie-guide-note">cookie 仅保存在本机（secrets.json），不会上传到任何地方</p>
           </div>
         </n-popover>
-        <!-- 无 handleKey 的 cookie 平台（如 LeetCode CN）需要手动输入 handle -->
+        <!-- 无 handleKey 的 cookie 平台（如 LeetCode CN / QOJ）需要手动输入 handle -->
         <div v-if="needsManualHandle" class="cookie-field">
           <span class="cookie-label mono">用户名</span>
           <n-input
             v-model:value="handle"
             size="small"
-            placeholder="输入 LeetCode CN 账号 UID"
+            :placeholder="platform === 'qoj' ? '输入 QOJ 用户名' : '输入 LeetCode CN 账号 UID'"
             class="mono"
             @keyup.enter="verify"
           />
