@@ -15,6 +15,7 @@
 | [activity/nowcoder.md](activity/nowcoder.md) | activity · 牛客竞赛适配（HTML 解析 + 时区转换） | 已实现 |
 | [activity/leetcode-cn.md](activity/leetcode-cn.md) | activity · LeetCode CN 适配（Cookie + GraphQL Batch Query） | 已实现 |
 | [activity/vjudge.md](activity/vjudge.md) | activity · VJudge 适配（匿名模式，/status/data） | 已实现 |
+| [activity/qoj.md](activity/qoj.md) | activity · QOJ 适配（Cookie 授权 + HTML 解析 + 子任务评分） | 已实现 |
 
 ## 状态约定
 

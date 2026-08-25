@@ -1,6 +1,6 @@
 /** 训练统计（activity）域类型。与后端 schemas 对齐；mock 阶段仅覆盖第一期范围。 */
 
-export type PlatformId = 'codeforces' | 'atcoder' | 'luogu' | 'leetcode-cn' | 'nowcoder' | 'vjudge'
+export type PlatformId = 'codeforces' | 'atcoder' | 'luogu' | 'leetcode-cn' | 'nowcoder' | 'vjudge' | 'qoj'
 
 /** 平台凭据（cookie 授权平台；与后端 adapters.base.Credentials 对齐） */
 export interface AccountCredentials {

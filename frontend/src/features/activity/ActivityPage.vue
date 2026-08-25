@@ -104,6 +104,7 @@ const PLATFORM_SCOPES: PlatformScope[] = [
   'leetcode-cn',
   'nowcoder',
   'vjudge',
+  'qoj',
 ]
 
 /** 网址中的用户组：使用 decodeURIComponent 解码以支持中文组名 */

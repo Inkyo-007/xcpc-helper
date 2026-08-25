@@ -24,6 +24,7 @@ from adapters.leetcode_cn import LeetCodeCNAdapter
 from adapters.luogu import LuoguAdapter
 from adapters.net import HttpFetcher
 from adapters.nowcoder import NowcoderAdapter
+from adapters.qoj import QOJAdapter
 from adapters.vjudge import VJudgeAdapter
 
 REGISTRY: dict[str, type[PlatformAdapter]] = {
@@ -33,6 +34,7 @@ REGISTRY: dict[str, type[PlatformAdapter]] = {
     NowcoderAdapter.platform_id: NowcoderAdapter,
     LeetCodeCNAdapter.platform_id: LeetCodeCNAdapter,
     VJudgeAdapter.platform_id: VJudgeAdapter,
+    QOJAdapter.platform_id: QOJAdapter,
 }
 
 __all__ = [
@@ -51,6 +53,7 @@ __all__ = [
     "PlatformAdapter",
     "PlatformError",
     "PlatformSubmission",
+    "QOJAdapter",
     "SyncBatch",
     "UserInfo",
     "UserNotFoundError",
