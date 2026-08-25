@@ -35,11 +35,15 @@ def map_verdict(raw: str, score: float | None = None, full_score: float | None =
     if "✓" in text:
         return Verdict.AC
 
-    # 情形 B：明确状态文本（2字母缩写）
+    # 情形 B：文本包含 WA → WA（如 "AC, WA"）
+    if "WA" in text:
+        return Verdict.WA
+
+    # 情形 C：明确状态文本（2字母缩写）
     if text in VERDICT_MAP:
         return VERDICT_MAP[text]
 
-    # 情形 C：纯数字 → 子任务评分
+    # 情形 D：纯数字 → 子任务评分
     try:
         num = float(text)
         # 有 data-full 信息时，满分判定 AC

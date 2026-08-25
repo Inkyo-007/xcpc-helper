@@ -334,7 +334,7 @@ class QOJAdapter(PlatformAdapter):
             submission_id=row.submission_id,
             problem_key=row.problem_id,
             problem_name=row.problem_name,
-            problem_url=f"{BASE}/contest/0/problem/{row.problem_id}",
+            problem_url=f"{BASE}/problem/{row.problem_id}",
             difficulty=None,  # QOJ 无难度信息
             verdict=map_verdict(row.result_text, row.score, row.full_score),
             submitted_at=ts_utc,
