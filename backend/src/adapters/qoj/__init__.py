@@ -293,9 +293,17 @@ class QOJAdapter(PlatformAdapter):
             lang_match = _LANG_RE.search(tds[6])
             language = lang_match.group(1).strip() if lang_match else ""
 
-            # 提交时间（第 9 列）
+            # 提交时间（第 9 列）—— 可能包裹在 <small> 标签内
             time_match = _TIME_RE.search(tds[8])
-            timestamp = time_match.group(1).strip() if time_match else ""
+            if time_match:
+                timestamp = time_match.group(1).strip()
+            else:
+                # 兜底：直接清理标签
+                timestamp = _TAG_RE.sub("", tds[8]).strip()
+
+            if not timestamp:
+                logger.debug("QOJ HTML 行时间戳为空，跳过")
+                continue
 
             try:
                 row = QojSubmissionRow(
