@@ -1,8 +1,8 @@
 # 训练统计聚合（activity）：公共约定
 
-> 状态：已实现（Codeforces / AtCoder / 洛谷 / 牛客 / LeetCode CN / VJudge 六平台全链路）。
+> 状态：已实现（Codeforces / AtCoder / 洛谷 / 牛客 / LeetCode CN / VJudge / QOJ 七平台全链路）。
 > 本文档承载 activity 域的平台无关约定；各平台的适配细节见同目录
-> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md) / [nowcoder.md](nowcoder.md) / [leetcode-cn.md](leetcode-cn.md) / [vjudge.md](vjudge.md)。
+> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md) / [nowcoder.md](nowcoder.md) / [leetcode-cn.md](leetcode-cn.md) / [vjudge.md](vjudge.md) / [qoj.md](qoj.md)。
 > 需求背景见 [../../cache/requirement.md](../../cache/requirement.md)，
 > 平台接口调研见 [../../cache/platform-api-research.md](../../cache/platform-api-research.md)。
 > 改设计必须先改本文档（或对应平台文档）再改代码。
@@ -56,7 +56,8 @@ router / service / modules 主干保持平台无关（不出现 `if platform == 
 3. 洛谷（cookie 授权框架首个实例 + 反爬对抗，QOJ 等后续平台复用同一套）——**已实现**
 4. LeetCode CN + 牛客（GraphQL 路径已探明 / rating 匿名接口）——**已实现**
 5. VJudge（/status/data 匿名端点，Cloudflare 需浏览器标识头）——**已实现**
-6. 长尾平台（评估 ojhunt 依赖或手动导入）
+6. QOJ（Cookie 授权 + HTML 解析 + 子任务评分）——**已实现**
+7. 长尾平台（评估 ojhunt 依赖或手动导入）
 
 ## 3. 数据模型与存储
 
@@ -233,13 +234,12 @@ verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**�
   →「确认绑定」→ 自动触发首次同步；
 - 换绑：每平台每用户组只保留一个账号，绑定新账号替换旧账号并删除其本地数据；
 - 解绑：确认后删除该账号本地数据（不可找回）；
-- **更新凭据**（仅 cookie 平台）：凭据过期时，用户可通过「更新凭据」重新录入
+- **更新凭据**（仅 cookie 平台：洛谷 / LeetCode CN / QOJ）：凭据过期时，用户可通过「更新凭据」重新录入
   cookie（验证回执 handle 必须与当前绑定一致），仅覆盖 secrets.json 中的凭据，
   **保留 submissions 与同步游标**，更新成功后自动触发一次同步；
-- 凭据平台（洛谷）：绑定弹窗提供两条路径——「方式一 · 一键登录」（后端
-  Playwright 拉起系统浏览器登录窗口，见 [luogu.md](luogu.md)）与
-  「方式二 · 手动输入 cookie」（逐字段输入框：`_uid`（即平台 UID，兼作 handle）
-  与 `__client_id`，配「如何获取 cookie？」悬浮引导）；
+- 凭据平台（洛谷 / LeetCode CN / QOJ）：绑定弹窗提供两条路径——「方式一 · 一键登录」（后端
+  Playwright 拉起系统浏览器登录窗口，见 [luogu.md](luogu.md) / [qoj.md](qoj.md)）与
+  「方式二 · 手动输入 cookie」（逐字段输入框，配「如何获取 cookie？」悬浮引导）；
   `verify`/同步携带 `credentials`；绑定当下即携凭据试拉验证有效性
   （`AuthExpiredError` 在 verify 路径转 400，不放行死凭据）；
   同步中 `AuthExpiredError` → `syncErrorCode: "auth_expired"` → 账号按钮警示态
@@ -387,7 +387,7 @@ AdapterError                    # 基类
    录样数据；`test_sync` 的 FakeAdapter 模式可直接复用；
 8. 跑 `uv run pytest`、`uv run ruff check src tests`；起服务 curl 全链路。
 
-**cookie 授权平台（洛谷/QOJ）要点**：`AuthMode.COOKIE` + `Credentials` 透传；
+**cookie 授权平台（洛谷 / LeetCode CN / QOJ）要点**：`AuthMode.COOKIE` + `Credentials` 透传；
 绑定弹窗收集 cookie → `secrets.json` 存储；同步遇 `AuthExpiredError`
 前端引导重新授权；低频请求 + 专项重试（min_interval 声明更长，必要时单次覆盖
 `max_retries`/`base_backoff`）。
@@ -518,8 +518,8 @@ frontend/src/features/activity/
   切换平台页签与使用模板库等其他功能；
 - 平台页签（PlatformTabs）由后端 `/platforms` 返回驱动，前端不硬编码平台清单；
   `types.ts` 的 `PlatformId` 随新平台补充联合类型；
-- **凭据平台 UI**（洛谷 / LeetCode CN）：绑定弹窗按 `auth === 'cookie'` 展开——
-  洛谷提供「方式一 · 一键登录」（`browserLogin` 可用时）与「方式二 · 手动输入 cookie」；
+- **凭据平台 UI**（洛谷 / LeetCode CN / QOJ）：绑定弹窗按 `auth === 'cookie'` 展开——
+  洛谷 / QOJ 提供「方式一 · 一键登录」（`browserLogin` 可用时）与「方式二 · 手动输入 cookie」；
   **LeetCode CN 仅支持手动输入 cookie**（滑块验证无法通过自动化浏览器，
   `browserLogin` 恒为 `false`），需输入 UID + `LEETCODE_SESSION` + `csrftoken`；
   账号展示一律 `displayName ?? handle`；`syncErrorCode === 'auth_expired'` 时
@@ -561,6 +561,8 @@ Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡
 → AtCoder 适配 → 洛谷适配（secrets 凭据框架 + curl_cffi 传输层 + browser-login +
 前端凭据 UI）→ 流式拉取与断点续传 → 启动时自动同步 → UNAC 精细化同步
 → LeetCode CN 适配（Cookie + GraphQL Batch Query，无 browser-login）
+→ VJudge 适配（匿名模式，/status/data）
+→ QOJ 适配（Cookie 授权 + HTML 解析 + 子任务评分）
 （详见 [../../../PROGRESS.md](../../../PROGRESS.md)）。
 
 ## 10. 既有决策与陷阱（对话确认，勿随意回退）
