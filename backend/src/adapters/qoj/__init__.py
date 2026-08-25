@@ -49,13 +49,16 @@ CHINA_TZ = timezone(timedelta(hours=8))  # 中国时区 UTC+8
 # HTML 提取正则
 _ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.DOTALL)
 _TD_RE = re.compile(r"<td[^>]*>(.*?)</td>", re.DOTALL)
-# 提交 ID：链接文本如 "#2600866"
-_SID_RE = re.compile(r'href="#/submission/(\d+)">#(\d+)</a>')
-# 题目：链接文本如 "#14809. Chi Fan"
-_PROB_RE = re.compile(r'href="#/contest/(\d+)/problem/(\d+)">#(\d+)\.\s*([^<]*)</a>')
+# 提交 ID：链接文本如 "#2600866"（实际 href 为 /submission/xxx 或 #/submission/xxx）
+_SID_RE = re.compile(r'href="(?:#)?/submission/(\d+)">#(\d+)</a>')
+# 题目：链接文本如 "#14809. Chi Fan"（实际 href 为 /contest/xxx/problem/xxx 或 #/contest/xxx/problem/xxx）
+_PROB_RE = re.compile(r'href="(?:#)?/contest/(\d+)/problem/(\d+)">#(\d+)\.\s*([^<]*)</a>')
 # 结果文本（可能包含 data-score/data-full 属性）
+# 实际格式：<a href="/submission/xxx" class="uoj-score" data-full="100" data-score="100">AC ✓</a>
+# 或旧格式：<span class="uoj-result" data-score="100" data-full="100">AC ✓</span>
 _RESULT_RE = re.compile(
-    r'<span[^>]*class="[^"]*uoj-result[^"]*"[^>]*?(?:data-score="([^"]*)"[^>]*?)?(?:data-full="([^"]*)"[^>]*?)?>(.*?)</span>',
+    r'(?:<a[^>]*class="uoj-score"[^>]*data-full="([^"]*)"[^>]*data-score="([^"]*)"[^>]*>(.*?)</a>'
+    r'|<span[^>]*class="[^"]*uoj-result[^"]*"[^>]*?(?:data-score="([^"]*)"[^>]*?)?(?:data-full="([^"]*)"[^>]*?)?>(.*?)</span>)',
     re.DOTALL,
 )
 # 语言
@@ -262,9 +265,16 @@ class QOJAdapter(PlatformAdapter):
             result_text = ""
             result_match = _RESULT_RE.search(tds[3])
             if result_match:
+                # 优先匹配新格式（uoj-score a 标签）
                 score_str = result_match.group(1)
                 full_str = result_match.group(2)
-                result_text = _TAG_RE.sub("", result_match.group(3)).strip()
+                text = result_match.group(3)
+                # 如果新格式未匹配到，尝试旧格式（uoj-result span 标签）
+                if score_str is None and full_str is None and text is None:
+                    score_str = result_match.group(4)
+                    full_str = result_match.group(5)
+                    text = result_match.group(6)
+                result_text = _TAG_RE.sub("", text).strip() if text else ""
                 if score_str is not None:
                     try:
                         score = float(score_str)
