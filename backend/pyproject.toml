@@ -13,6 +13,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "httpx>=0.28",
     "curl-cffi>=0.16.0",
+    "playwright>=1.40",
 ]
 
 [dependency-groups]
@@ -23,11 +24,6 @@ dev = [
 ]
 desktop = [
     "pywebview>=5.4",
-]
-browser-login = [
-    # 洛谷等 cookie 平台的一键登录（拉起系统浏览器，不下载浏览器二进制）；
-    # 可选依赖：未安装时降级为手动粘贴 cookie
-    "playwright>=1.40",
 ]
 
 [tool.uv]
