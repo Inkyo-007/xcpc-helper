@@ -17,6 +17,7 @@
 
 - `5cfbb6ec` feat(activity): 新增 QOJ 平台适配器
 - `37967a12` fix(前端): AccountBindModal 添加 QOJ cookie 平台注册
+- `b82a8346` fix(后端): QOJ 所有请求统一携带浏览器标识头规避 Cloudflare
 
 ### 2026-08-24 会话 4
 
