@@ -156,17 +156,20 @@ class QOJAdapter(PlatformAdapter):
     ) -> AsyncIterator[SyncBatch]:
         """按页流式拉取提交（每页一批，按时间倒序）。
 
-        QOJ 无总量字段，不上报进度（progress_cb 为契约参数，本平台忽略）。
-
         - 增量（since 非空）：遇 ts < since 即停；游标当秒提交重复拉取，
           由 store 层按 submission_id 去重吸收；
         - 全量（since 为空）：拉到覆盖 full_window_days 窗口为止，窗口内
           不足 full_min_rows 条时继续拉满；断点 = {"page": 下一页页码,
           "fetched": 累计条数}；
+        - 进度上报：全量模式下以 MAX_PAGES * PAGE_SIZE = 50000 为估算总量
+          上报进度（实际可能提前结束）；增量模式不上报进度；
         - 绝对护栏：最多 MAX_PAGES 页。
         """
         if credentials is None:
             raise AuthExpiredError("未配置 QOJ 凭据，请先绑定账号并授权")
+
+        # 估算总量用于进度条（全量模式）
+        estimated_total = MAX_PAGES * PAGE_SIZE  # 50000
 
         page = 1
         fetched = 0
@@ -192,6 +195,11 @@ class QOJAdapter(PlatformAdapter):
 
             fetched += len(batch)
             done = hit_old or len(rows) < PAGE_SIZE
+
+            # 进度上报：仅全量模式（since 为空）
+            if progress_cb is not None and since is None:
+                progress_cb(fetched, estimated_total)
+
             yield SyncBatch(
                 items=batch,
                 checkpoint=(
