@@ -1,8 +1,8 @@
 # 训练统计聚合（activity）：公共约定
 
-> 状态：已实现（Codeforces / AtCoder / 洛谷 / 牛客 四期全链路）。
+> 状态：已实现（Codeforces / AtCoder / 洛谷 / 牛客 / LeetCode CN / VJudge 六平台全链路）。
 > 本文档承载 activity 域的平台无关约定；各平台的适配细节见同目录
-> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md) / [nowcoder.md](nowcoder.md)。
+> [codeforces.md](codeforces.md) / [atcoder.md](atcoder.md) / [luogu.md](luogu.md) / [nowcoder.md](nowcoder.md) / [leetcode-cn.md](leetcode-cn.md) / [vjudge.md](vjudge.md)。
 > 需求背景见 [../../cache/requirement.md](../../cache/requirement.md)，
 > 平台接口调研见 [../../cache/platform-api-research.md](../../cache/platform-api-research.md)。
 > 改设计必须先改本文档（或对应平台文档）再改代码。
@@ -54,8 +54,9 @@ router / service / modules 主干保持平台无关（不出现 `if platform == 
 1. Codeforces（官方 API，匿名可取，风险最低）——**已实现**
 2. AtCoder（kenkoooo API + 官方用户主页 404 验证，匿名可取）——**已实现**
 3. 洛谷（cookie 授权框架首个实例 + 反爬对抗，QOJ 等后续平台复用同一套）——**已实现**
-4. LeetCode CN + 牛客（GraphQL 路径已探明 / rating 匿名接口）
-5. 长尾平台（评估 ojhunt 依赖或手动导入）
+4. LeetCode CN + 牛客（GraphQL 路径已探明 / rating 匿名接口）——**已实现**
+5. VJudge（/status/data 匿名端点，Cloudflare 需浏览器标识头）——**已实现**
+6. 长尾平台（评估 ojhunt 依赖或手动导入）
 
 ## 3. 数据模型与存储
 
@@ -232,6 +233,9 @@ verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**�
   →「确认绑定」→ 自动触发首次同步；
 - 换绑：每平台每用户组只保留一个账号，绑定新账号替换旧账号并删除其本地数据；
 - 解绑：确认后删除该账号本地数据（不可找回）；
+- **更新凭据**（仅 cookie 平台）：凭据过期时，用户可通过「更新凭据」重新录入
+  cookie（验证回执 handle 必须与当前绑定一致），仅覆盖 secrets.json 中的凭据，
+  **保留 submissions 与同步游标**，更新成功后自动触发一次同步；
 - 凭据平台（洛谷）：绑定弹窗提供两条路径——「方式一 · 一键登录」（后端
   Playwright 拉起系统浏览器登录窗口，见 [luogu.md](luogu.md)）与
   「方式二 · 手动输入 cookie」（逐字段输入框：`_uid`（即平台 UID，兼作 handle）
@@ -239,8 +243,8 @@ verdict 徽章配色固定：AC 绿、WA 红、CE 黄、RE 紫、**JG 浅蓝**�
   `verify`/同步携带 `credentials`；绑定当下即携凭据试拉验证有效性
   （`AuthExpiredError` 在 verify 路径转 400，不放行死凭据）；
   同步中 `AuthExpiredError` → `syncErrorCode: "auth_expired"` → 账号按钮警示态
-  「凭据过期」→ 点击走换绑路径重新授权 → 自动触发一次增量同步。
-  过期不影响本地已有数据，游标不动，重授权后从原游标继续增量。
+  「凭据过期」→ 点击打开账号管理弹窗 → 选择「更新凭据」重新授权 → 验证通过
+  后自动触发一次同步。过期不影响本地已有数据，游标不动，重授权后从原游标继续增量。
 
 ### 4.5 图表主题桥接
 
@@ -422,7 +426,9 @@ backend/src/
 - **信息卡**：读写当前组 `profile.json`（ID 与组名分离，avatar 显式 null 清除、
   上限 500k 字符）；
 - **账号**：绑定（cookie 平台凭据必填并落 secrets.json、换绑删旧含凭据、
-  展示名 display_name 随绑定持久化）、解绑、验证（能力校验 + `credentials` 透传，
+  展示名 display_name 随绑定持久化）、解绑、**更新凭据**（仅覆盖 secrets.json，
+  保留 submissions 与游标；验证新凭据有效性；校验回执 handle 与当前绑定一致）、
+  验证（能力校验 + `credentials` 透传，
   `UserNotFoundError → 400`、`AuthExpiredError → 400`、`PlatformError → 502`）；
 - **凭据**：secrets.json 读写清理（store 层）；browser-login 会话编排
   （启动/状态轮询/暂存凭据 10 分钟 TTL，bind 消费，凭据不经前端）；
@@ -459,6 +465,7 @@ backend/src/
 | GET | `/api/activity/platforms` | 平台元数据（id/名称/capabilities/auth/browserLogin）+ 已绑定账号（含 displayName）及同步状态 |
 | POST | `/api/activity/accounts/verify` | 校验 `{platform, handle, credentials?}`；用户不存在/凭据无效 400，平台故障 502；cookie 平台凭据必填 |
 | POST | `/api/activity/accounts` | 绑定 `{platform, handle, displayName?, credentials?}`（换绑删旧；cookie 平台凭据必填或消费 browser-login 暂存），自动触发首次同步（201） |
+| PUT | `/api/activity/accounts/{platform}/{handle}/credentials` | 更新已绑定账号的凭据（仅 cookie 平台）：验证新凭据有效性后仅覆盖 secrets.json，保留 submissions 与游标，成功后清除错误状态并返回账号信息 |
 | POST | `/api/activity/platforms/{platform}/browser-login` | 启动浏览器一键登录会话（202；仅 cookie 平台且服务端具备 Playwright；单会话互斥） |
 | GET | `/api/activity/platforms/{platform}/browser-login/status` | 登录会话状态（waiting/success/canceled/timeout/error + 成功后回执 handle/displayName/avatar），前端轮询 |
 | DELETE | `/api/activity/accounts/{platform}/{handle}` | 解绑并删除该账号本地数据（204） |
@@ -489,7 +496,8 @@ frontend/src/features/activity/
 │  ├─ UserGroupMenu.vue        # 用户组下拉（新建 / 切换，按钮显示组名）
 │  ├─ UserGroupEditModal.vue   # 编辑用户组（重命名 / 删除 / 平台账号绑定管理）
 │  ├─ AccountBindModal.vue     # 绑定 / 换绑（cookie 平台：一键登录 + cookie 逐字段输入）
-│  ├─ AccountManageModal.vue   # 账号管理（换绑 / 解绑）
+│  ├─ AccountManageModal.vue   # 账号管理（更新凭据 / 换绑 / 解绑）
+│  ├─ CredentialsUpdateModal.vue # 更新凭据弹窗（cookie 平台：验证回执 handle 必须与当前绑定一致）
 │  ├─ RefineModal.vue          # 精细化同步弹窗（三态，见 luogu.md）
 │  ├─ SyncBar.vue / PlatformTabs.vue（同步中平台黄点角标）
 │  ├─ SyncProgressPanel.vue    # 平台视图右栏同步进行态（进度环 + 百分比 / 不定态）
@@ -510,12 +518,13 @@ frontend/src/features/activity/
   切换平台页签与使用模板库等其他功能；
 - 平台页签（PlatformTabs）由后端 `/platforms` 返回驱动，前端不硬编码平台清单；
   `types.ts` 的 `PlatformId` 随新平台补充联合类型；
-- **凭据平台 UI**（洛谷）：绑定弹窗按 `auth === 'cookie'` 展开两种方式——
-  「方式一 · 一键登录」（`browserLogin` 可用时，点击后轮询登录会话状态）与
-  「方式二 · 手动输入 cookie」（按平台注册表逐字段输入框：洛谷 `_uid` 兼任
-  handle（即 UID）与 `__client_id`，配「如何获取 cookie？」悬浮引导）；
+- **凭据平台 UI**（洛谷 / LeetCode CN）：绑定弹窗按 `auth === 'cookie'` 展开——
+  洛谷提供「方式一 · 一键登录」（`browserLogin` 可用时）与「方式二 · 手动输入 cookie」；
+  **LeetCode CN 仅支持手动输入 cookie**（滑块验证无法通过自动化浏览器，
+  `browserLogin` 恒为 `false`），需输入 UID + `LEETCODE_SESSION` + `csrftoken`；
   账号展示一律 `displayName ?? handle`；`syncErrorCode === 'auth_expired'` 时
-  账号按钮警示态「凭据过期」，点击走换绑路径重新授权，成功后自动触发一次同步；
+  账号按钮警示态「凭据过期」，点击打开账号管理弹窗，选择「更新凭据」重新授权
+  （验证回执 handle 必须与当前绑定一致），成功后自动触发一次同步；
 - 网址状态同步：`?platform=&date=&page=`（缺省不写入），刷新/前进后退/复制链接可恢复。
 
 ### 7.3 用户组与信息卡（profile.ts）
@@ -551,6 +560,7 @@ frontend/src/features/activity/
 Codeforces → 同步引擎与 API → 前端接入 → 多用户组与信息卡 → 契约扩展与结构清理
 → AtCoder 适配 → 洛谷适配（secrets 凭据框架 + curl_cffi 传输层 + browser-login +
 前端凭据 UI）→ 流式拉取与断点续传 → 启动时自动同步 → UNAC 精细化同步
+→ LeetCode CN 适配（Cookie + GraphQL Batch Query，无 browser-login）
 （详见 [../../../PROGRESS.md](../../../PROGRESS.md)）。
 
 ## 10. 既有决策与陷阱（对话确认，勿随意回退）

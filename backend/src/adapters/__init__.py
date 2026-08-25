@@ -20,15 +20,19 @@ from adapters.base import (
     Verdict,
 )
 from adapters.codeforces import CodeforcesAdapter
+from adapters.leetcode_cn import LeetCodeCNAdapter
 from adapters.luogu import LuoguAdapter
 from adapters.net import HttpFetcher
 from adapters.nowcoder import NowcoderAdapter
+from adapters.vjudge import VJudgeAdapter
 
 REGISTRY: dict[str, type[PlatformAdapter]] = {
     CodeforcesAdapter.platform_id: CodeforcesAdapter,
     AtCoderAdapter.platform_id: AtCoderAdapter,
     LuoguAdapter.platform_id: LuoguAdapter,
     NowcoderAdapter.platform_id: NowcoderAdapter,
+    LeetCodeCNAdapter.platform_id: LeetCodeCNAdapter,
+    VJudgeAdapter.platform_id: VJudgeAdapter,
 }
 
 __all__ = [
@@ -41,6 +45,7 @@ __all__ = [
     "Credentials",
     "HttpFetcher",
     "HttpStatusError",
+    "LeetCodeCNAdapter",
     "LuoguAdapter",
     "NowcoderAdapter",
     "PlatformAdapter",
@@ -49,5 +54,6 @@ __all__ = [
     "SyncBatch",
     "UserInfo",
     "UserNotFoundError",
+    "VJudgeAdapter",
     "Verdict",
 ]

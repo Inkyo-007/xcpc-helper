@@ -6,7 +6,7 @@
  * · 解绑账号：确认后删除该账号全部本地数据（提交记录与凭据，不可找回）。 */
 
 import { ref, watch } from 'vue'
-import { Link2, Unlink } from 'lucide-vue-next'
+import { KeyRound, Link2, Unlink } from 'lucide-vue-next'
 import { NButton, NModal } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
 import { accountLabel, useActivity } from '@/features/activity/store'
@@ -22,6 +22,7 @@ const emit = defineEmits<{
   'update:show': [value: boolean]
   bind: [platform: PlatformId]
   unbind: [platform: PlatformId, handle: string]
+  'update-credentials': [account: BoundAccount]
 }>()
 
 const { platformName } = useActivity()
@@ -69,6 +70,24 @@ function confirmUnbind(): void {
             <span class="acct-handle mono">{{ accountLabel(account) }}</span>
           </span>
           <span class="acct-hint" :class="account.syncState">{{ stateLabel(account) }}</span>
+        </div>
+      </div>
+
+      <div class="acct-row">
+        <div class="acct-desc">
+          <span class="acct-title">更新凭据</span>
+          <span class="acct-hint">重新录入 cookie 等登录凭据，保留已有数据</span>
+        </div>
+        <div class="acct-action">
+          <NButton
+            size="small"
+            secondary
+            type="warning"
+            @click="emit('update:show', false); emit('update-credentials', account)"
+          >
+            <template #icon><KeyRound :size="14" /></template>
+            更新凭据
+          </NButton>
         </div>
       </div>
 

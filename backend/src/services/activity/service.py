@@ -414,6 +414,57 @@ class ActivityService:
         self._engine.drop_status(self._current_group, platform, handle)
         self._refine.drop_account(self._current_group, platform, handle)
 
+    async def update_credentials(
+        self,
+        platform: str,
+        handle: str,
+        credentials: Credentials | None = None,
+    ) -> BoundAccountOut:
+        """更新已绑定账号的凭据（仅 cookie 平台）：不删数据、不重置游标。
+
+        验证新凭据有效性后仅覆盖 secrets.json，保留 submissions 与同步状态。
+        credentials 为 None 时尝试消费 browser-login 暂存凭据。
+        """
+        adapter = self._adapter(platform)
+        handle = handle.strip()
+        store = self._store()
+        profile = store.load_profile()
+        account = next(
+            (
+                acc
+                for acc in profile.accounts
+                if acc.platform == platform and acc.handle == handle
+            ),
+            None,
+        )
+        if account is None:
+            raise NotFoundError(f"账号未绑定: {platform}/{handle}")
+        if adapter.auth != AuthMode.COOKIE:
+            raise BadRequestError(f"平台 {platform} 无需凭据更新")
+
+        # credentials 为 None 时尝试消费 browser-login 暂存凭据
+        if credentials is None:
+            credentials = self._take_pending_credentials(platform, handle)
+        if credentials is None:
+            raise BadRequestError(
+                f"平台 {platform} 需要登录凭据（一键登录或粘贴 cookie）"
+            )
+
+        # 验证新凭据有效性（存在性 + 凭据试拉）
+        try:
+            await adapter.verify(handle, credentials)
+        except AuthExpiredError as exc:
+            raise BadRequestError(str(exc)) from exc
+        except PlatformError as exc:
+            raise BadGatewayError(f"平台暂时不可用：{exc}") from exc
+        # 仅覆盖凭据，不碰账号元数据、不删提交数据、不重置游标
+        store.save_account_secrets(platform, handle, credentials)
+        # 清除凭据过期的错误状态，让用户可以立即重新同步
+        self._engine.drop_status(self._current_group, platform, handle)
+        # 凭据更新成功后自动触发一次同步
+        asyncio.create_task(self._safe_sync(platform, handle))
+        return self._account_out(account)
+
     # ===== 聚合读取 =====
 
     def _submissions(self, platform: str | None) -> list[Submission]:
@@ -563,7 +614,8 @@ class ActivityService:
     async def sync(self, platform: str | None) -> None:
         if platform is not None:
             self._adapter(platform)
-        profile = self._store().load_profile()
+        store = self._store()
+        profile = store.load_profile()
         targets = [
             (acc.platform, acc.handle)
             for acc in profile.accounts
@@ -572,6 +624,47 @@ class ActivityService:
         for p, h in targets:
             # 兜底包装：任何意外异常都降级为该账号诊断，不让后台任务悬空
             asyncio.create_task(self._safe_sync(p, h))
+
+    async def sync_all_groups(self) -> None:
+        """对所有用户组的全部账号触发同步（启动时用；逐组串行调度账号任务）。
+
+        不同用户组之间共享平台限流（net.py 的 per-platform Lock），
+        为避免同平台多账号并发冲击平台风控，组间采用串行调度：
+        先收集全部组全部目标账号，然后逐组顺序派发，组内各账号仍并行。
+        """
+        groups = activity_store.list_groups(self._settings.user_data_dir)
+        for group in groups:
+            store = activity_store.UserStore(self._settings.user_data_dir, group)
+            profile = store.load_profile()
+            targets = [
+                (group, acc.platform, acc.handle)
+                for acc in profile.accounts
+            ]
+            for g, p, h in targets:
+                asyncio.create_task(self._safe_sync_all_groups(g, p, h))
+
+    async def _safe_sync_all_groups(self, user_id: str, platform: str, handle: str) -> None:
+        """sync_all_groups 专用：在指定用户组上安全同步单个账号。"""
+        try:
+            status = await self._engine.sync_account(user_id, platform, handle)
+        except Exception as exc:  # 兜底降级
+            logger.exception("同步意外异常 [%s/%s/%s]", user_id, platform, handle)
+            self._engine.mark_error(user_id, platform, handle, str(exc))
+            return
+        # 普通同步成功完成后，按账号配置自动启动精细化同步
+        if status.state.value != "idle":
+            return
+        adapter = self._adapters.get(platform)
+        if adapter is None or Capability.REFINE_VERDICT not in adapter.capabilities:
+            return
+        store = activity_store.UserStore(self._settings.user_data_dir, user_id)
+        profile = store.load_profile()
+        account = next(
+            (a for a in profile.accounts if a.platform == platform and a.handle == handle),
+            None,
+        )
+        if account is not None and account.refine_auto:
+            self._refine.start(user_id, platform, handle)
 
     async def _safe_sync(self, platform: str, handle: str) -> None:
         try:

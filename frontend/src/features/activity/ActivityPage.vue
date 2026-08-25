@@ -8,6 +8,7 @@ import { ChartColumn, Link2, MousePointerClick, Plus } from 'lucide-vue-next'
 import { NButton, useMessage } from 'naive-ui'
 import AccountBindModal from '@/features/activity/components/AccountBindModal.vue'
 import AccountManageModal from '@/features/activity/components/AccountManageModal.vue'
+import CredentialsUpdateModal from '@/features/activity/components/CredentialsUpdateModal.vue'
 import RefineModal from '@/features/activity/components/RefineModal.vue'
 import ActivityHeatmap from '@/features/activity/components/ActivityHeatmap.vue'
 import PassBarChart from '@/features/activity/components/PassBarChart.vue'
@@ -22,7 +23,10 @@ import { monthlySolved, weeklySolved } from '@/features/activity/model/bars'
 import { parseDate, toDateStr } from '@/features/activity/model/dates'
 import { pageCount } from '@/features/activity/model/pagination'
 import { useActivity, type PlatformScope } from '@/features/activity/store'
+import { useUserGroups } from '@/features/activity/profile'
 import type { AccountCredentials, BoundAccount, PlatformId } from '@/features/activity/types'
+
+const { currentKey, switchGroup } = useUserGroups()
 
 const {
   accounts,
@@ -43,6 +47,7 @@ const {
   syncNow,
   bindAccount,
   unbindAccount,
+  updateAccountCredentials,
   refreshAll,
   boundOn,
   platformName,
@@ -58,6 +63,9 @@ const showGroupEdit = ref(false)
 /** 账号管理弹窗（换绑 / 解绑）及其目标账号 */
 const showAccountManage = ref(false)
 const managingAccount = ref<BoundAccount | null>(null)
+/** 更新凭据弹窗及其目标账号 */
+const showCredentialsUpdate = ref(false)
+const updatingAccount = ref<BoundAccount | null>(null)
 /** 精细化同步弹窗及其目标账号（REFINE_VERDICT 能力平台） */
 const showRefine = ref(false)
 const refiningAccount = ref<BoundAccount | null>(null)
@@ -79,10 +87,11 @@ const platformUnbound = computed(
     activeAccount.value === null,
 )
 
-/* ---------- 网址状态同步：?platform=<平台>&date=<日期>&page=<页码> ----------
+/* ---------- 网址状态同步：?group=<用户组>&platform=<平台>&date=<日期>&page=<页码> ----------
  * all、无选中日期与第 1 页为缺省值，不出现在网址中；切换平台重置日期
  * 与页码，选中日期切换当日明细时页码回到第 1 页（见 store）；
- * 刷新、浏览器前进/后退与复制链接均能恢复同一视图。 */
+ * 刷新、浏览器前进/后退与复制链接均能恢复同一视图。
+ * 用户组存在中文，使用 encodeURIComponent / decodeURIComponent 编解码。 */
 
 const route = useRoute()
 const router = useRouter()
@@ -94,9 +103,18 @@ const PLATFORM_SCOPES: PlatformScope[] = [
   'luogu',
   'leetcode-cn',
   'nowcoder',
+  'vjudge',
 ]
 
-/** 网址中的平台筛选：非法值回退为汇总（平台页签与绑定状态无关） */
+/** 网址中的用户组：使用 decodeURIComponent 解码以支持中文组名 */
+function queryGroup(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw) return null
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return null
+  }
+}
 function queryPlatform(raw: unknown): PlatformScope {
   if (typeof raw !== 'string' || raw === 'all') return 'all'
   if (!(PLATFORM_SCOPES as string[]).includes(raw)) return 'all'
@@ -118,8 +136,13 @@ function queryDate(raw: unknown): string | null {
 
 onMounted(() => {
   init()
-  // 从网址恢复视图（顺序固定：平台 → 日期 → 页码：
-  // 切平台会重置日期与页码，切日期会把当日明细页码重置回 1）
+  // 从网址恢复视图（顺序固定：用户组 → 平台 → 日期 → 页码：
+  // 切用户组会重置平台/日期/页码，切平台会重置日期与页码）
+  const group = queryGroup(route.query.group)
+  // 用户组恢复需等 ensureLoaded 完成（已知当前组后才判断是否切换）
+  if (group && group !== currentKey.value) {
+    void switchGroup(group)
+  }
   const platform = queryPlatform(route.query.platform)
   if (platform !== 'all') setPlatform(platform)
   const date = queryDate(route.query.date)
@@ -129,12 +152,15 @@ onMounted(() => {
 })
 
 // 状态 → 网址：缺省值不写入，避免无谓的跳转
-watch([activePlatform, selectedDate, listPage], ([platform, date, page]) => {
+watch([activePlatform, selectedDate, listPage, currentKey], ([platform, date, page, group]) => {
   const query: Record<string, string> = {}
+  // 用户组使用 encodeURIComponent 编码以支持中文
+  if (group) query.group = encodeURIComponent(group)
   if (platform !== 'all') query.platform = platform
   if (date) query.date = date
   if (page > 1) query.page = String(page)
   if (
+    query.group === route.query.group &&
     query.platform === route.query.platform &&
     query.date === route.query.date &&
     query.page === route.query.page
@@ -148,6 +174,10 @@ watch([activePlatform, selectedDate, listPage], ([platform, date, page]) => {
 watch(
   () => route.query,
   (query) => {
+    const group = queryGroup(query.group)
+    if (group && group !== currentKey.value) {
+      void switchGroup(group)
+    }
     const platform = queryPlatform(query.platform)
     if (platform !== activePlatform.value) setPlatform(platform)
     const date = queryDate(query.date)
@@ -206,10 +236,30 @@ function openAccountManage(account: BoundAccount): void {
   showAccountManage.value = true
 }
 
+/** 打开更新凭据弹窗 */
+function openCredentialsUpdate(account: BoundAccount): void {
+  updatingAccount.value = account
+  showCredentialsUpdate.value = true
+}
+
 /** 打开精细化同步弹窗（平台视图精化按钮，能力驱动挂载） */
 function openRefine(account: BoundAccount): void {
   refiningAccount.value = account
   showRefine.value = true
+}
+
+async function onUpdateCredentials(
+  platform: PlatformId,
+  handle: string,
+  credentials?: AccountCredentials,
+): Promise<void> {
+  try {
+    await updateAccountCredentials(platform, handle, credentials)
+    showCredentialsUpdate.value = false
+    message.success('凭据已更新，同步进行中')
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : '凭据更新失败，请稍后重试')
+  }
 }
 
 /** 手动同步：即时进行态 + 完成/失败提示（快速或无新增同步也有明确反馈） */
@@ -351,6 +401,12 @@ async function onSync(): Promise<void> {
       :account="managingAccount"
       @bind="openBind"
       @unbind="onUnbind"
+      @update-credentials="openCredentialsUpdate"
+    />
+    <CredentialsUpdateModal
+      v-model:show="showCredentialsUpdate"
+      :account="updatingAccount"
+      @confirm="onUpdateCredentials"
     />
     <RefineModal v-model:show="showRefine" :account="refiningAccount" @done="refreshAll" />
     <UserGroupEditModal

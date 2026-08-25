@@ -1,29 +1,20 @@
 <script setup lang="ts">
-/** 绑定平台账号弹窗：顶部提示「你正在绑定 <平台> 账号」→ 验证回执 → 确认绑定。
- * 平台由入口锁定（平台视图账号按钮 / 编辑用户组弹窗逐行入口），弹窗内不再
- * 提供平台切换；空状态入口（platform 为 null）回落为平台列表首个，用户可
- * 先点平台页签再绑定以选择平台。
+/** 更新凭据弹窗（仅 cookie 平台）：复用绑定弹窗的验证流程，但强制校验
+ * 回执 handle 与当前绑定账号一致，不一致则拒绝更新。
  *
- * cookie 授权平台（洛谷等，auth === 'cookie'）提供两种绑定方式：
- * · 方式一 · 一键登录（browserLogin 可用时，推荐）：后端拉起系统浏览器
- *   登录窗口，用户自行登录，本弹窗轮询会话状态，成功后直接给出回执
- *   （凭据由后端暂存，不经前端，确认绑定时消费）；
- * · 方式二 · 手动输入 cookie：按平台注册表逐字段引导输入（洛谷为 _uid
- *   与 __client_id；_uid 即平台 UID，兼作 API 主键 handle），配有
- *   「如何获取 cookie？」悬浮引导；验证时携带凭据（后端同时校验用户
- *   存在性与凭据有效性）。
+ * 更新方式与绑定一致：洛谷支持一键登录（Playwright）与手动输入 cookie；
+ * LeetCode CN 仅支持手动输入 cookie（无 browser-login）。
+ * 更新成功后仅覆盖 secrets.json 凭据，保留 submissions 与同步游标。
  */
 
 import { computed, ref, watch } from 'vue'
-import { BadgeCheck, CircleHelp, Globe, Link2, Search } from 'lucide-vue-next'
+import { BadgeCheck, CircleHelp, Globe, KeyRound, Search } from 'lucide-vue-next'
 import { NButton, NInput, NModal, NPopover } from 'naive-ui'
 import { startBrowserLogin, fetchBrowserLoginStatus, verifyAccount } from '@/features/activity/api'
 import { useActivity } from '@/features/activity/store'
-import type { AccountCredentials, PlatformId } from '@/features/activity/types'
+import type { AccountCredentials, BoundAccount, PlatformId } from '@/features/activity/types'
 
-/** cookie 平台注册表（前端平台知识，与后端 adapter 对齐）：
- * keys 为需录入的 cookie 字段；handleKey 表示该字段值即平台 API 主键
- * （洛谷 _uid 即 UID），此时不再单独要求输入 handle。 */
+/** cookie 平台注册表（与 AccountBindModal 对齐） */
 const COOKIE_PLATFORMS: Partial<
   Record<PlatformId, { keys: { key: string; label: string }[]; handleKey?: string }>
 > = {
@@ -44,56 +35,46 @@ const COOKIE_PLATFORMS: Partial<
 
 const props = defineProps<{
   show: boolean
-  /** 入口锁定的平台；null（空状态入口）回落为平台列表首个 */
-  platform?: PlatformId | null
+  /** 目标账号（凭据过期/需更新的账号） */
+  account: BoundAccount | null
 }>()
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
-  bind: [
-    platform: PlatformId,
-    handle: string,
-    opts: { displayName?: string | null; credentials?: AccountCredentials },
-  ]
+  confirm: [platform: PlatformId, handle: string, credentials?: AccountCredentials]
 }>()
 
-const { platforms, platformName, platformMeta, isBound, boundOn } = useActivity()
+const { platformName, platformMeta } = useActivity()
 
-const platform = ref<PlatformId>(props.platform ?? platforms.value[0]?.id ?? 'codeforces')
-const handle = ref('')
 const verifying = ref(false)
 const errorText = ref('')
-/** 验证成功的回执（真实接口返回的平台内用户信息） */
+/** 验证成功的回执 */
 const receipt = ref<{ handle: string; displayName: string | null; avatar: string | null } | null>(null)
-/** 回执来源为一键登录时，凭据由后端暂存，bind 不再携带 credentials */
+/** 回执来源为一键登录时，凭据由后端暂存 */
 const receiptFromLogin = ref(false)
+/** 更新凭据提交中 */
+const updating = ref(false)
 
-/** cookie 平台逐字段输入值（键即 cookie 名） */
+/** cookie 平台逐字段输入值 */
 const cookieValues = ref<Record<string, string>>({})
-/** 一键登录等待中（后端登录窗口打开，轮询会话状态） */
+/** 一键登录等待中 */
 const loginWaiting = ref(false)
 
-/** 当前所选平台是否已有绑定账号：有则本次为换绑 */
-const rebinding = computed(() => boundOn(platform.value) !== null)
+const platform = computed<PlatformId | null>(() => props.account?.platform ?? null)
 
-/** 当前平台的 cookie 注册表项（非 cookie 平台为 null） */
-const cookieSpec = computed(() => COOKIE_PLATFORMS[platform.value] ?? null)
+const cookieSpec = computed(() =>
+  platform.value ? (COOKIE_PLATFORMS[platform.value] ?? null) : null,
+)
 const isCookiePlatform = computed(
-  () => platformMeta(platform.value)?.auth === 'cookie' && cookieSpec.value !== null,
+  () =>
+    platform.value !== null &&
+    platformMeta(platform.value)?.auth === 'cookie' &&
+    cookieSpec.value !== null,
 )
-/** 一键登录可用（后端具备浏览器登录能力） */
 const canBrowserLogin = computed(
-  () => isCookiePlatform.value && platformMeta(platform.value)?.browserLogin === true,
+  () => isCookiePlatform.value && platformMeta(platform.value!)?.browserLogin === true,
 )
-/** handle 由某个 cookie 字段兼任时（洛谷 _uid），不单独显示 handle 输入 */
 const handleFromCookie = computed(() => cookieSpec.value?.handleKey ?? null)
-
-/** 匿名平台输入框占位符 */
-const handlePlaceholder = computed(() => {
-  if (platform.value === 'nowcoder') return '输入账号 UID'
-  if (platform.value === 'vjudge') return '输入 VJudge 用户名'
-  return '输入平台用户名'
-})
 
 /** 手动输入的凭据（逐字段齐全时给出） */
 const parsedCredentials = computed<AccountCredentials | null>(() => {
@@ -108,33 +89,32 @@ const parsedCredentials = computed<AccountCredentials | null>(() => {
   return { cookies }
 })
 
-/** 实际参与验证/绑定的 handle：cookie 兼任时取对应字段值，否则需要用户手动输入 handle */
+/** 实际参与验证的 handle */
 const effectiveHandle = computed(() => {
   if (handleFromCookie.value) return (cookieValues.value[handleFromCookie.value] ?? '').trim()
-  // LeetCode CN 等非 handleKey 平台：用户需手动输入 handle（userSlug）
-  return handle.value.trim()
+  // LeetCode CN 需手动输入 handle
+  return cookieValues.value['__handle__']?.trim() ?? ''
 })
 
-/** 当前是否为需要手动输入 handle 的 cookie 平台（无 handleKey） */
+/** 当前是否为需要手动输入 handle 的 cookie 平台 */
 const needsManualHandle = computed(() => isCookiePlatform.value && !handleFromCookie.value)
 
 watch(
   () => props.show,
   (show) => {
     if (show) {
-      platform.value = props.platform ?? platforms.value[0]?.id ?? 'codeforces'
-      handle.value = ''
       verifying.value = false
       errorText.value = ''
       receipt.value = null
       receiptFromLogin.value = false
+      updating.value = false
       cookieValues.value = {}
       loginWaiting.value = false
     }
   },
 )
 
-watch([platform, handle, cookieValues], () => {
+watch([cookieValues], () => {
   errorText.value = ''
   receipt.value = null
   receiptFromLogin.value = false
@@ -143,7 +123,6 @@ watch([platform, handle, cookieValues], () => {
 const canVerify = computed(() => {
   if (verifying.value || loginWaiting.value) return false
   if (!effectiveHandle.value) return false
-  // cookie 平台手动路径：逐字段填齐才可验证
   if (isCookiePlatform.value) return parsedCredentials.value !== null
   return true
 })
@@ -151,10 +130,7 @@ const canVerify = computed(() => {
 async function verify(): Promise<void> {
   const name = effectiveHandle.value
   if (!name) return
-  if (isBound(platform.value, name)) {
-    errorText.value = '该账号已绑定，无需重复添加'
-    return
-  }
+  if (!platform.value) return
   verifying.value = true
   errorText.value = ''
   try {
@@ -163,6 +139,12 @@ async function verify(): Promise<void> {
       name,
       parsedCredentials.value ?? undefined,
     )
+    // 强制校验：回执 handle 必须与当前绑定账号一致
+    if (res.handle !== props.account?.handle) {
+      errorText.value = `验证通过但账号不一致：当前绑定为 ${props.account?.handle}，新凭据对应 ${res.handle}，请确认登录了正确的账号`
+      receipt.value = null
+      return
+    }
     receipt.value = { handle: res.handle, displayName: res.displayName, avatar: res.avatar }
   } catch (e) {
     errorText.value = e instanceof Error ? e.message : '验证失败，请稍后重试'
@@ -171,26 +153,30 @@ async function verify(): Promise<void> {
   }
 }
 
-/** 一键登录：后端拉起系统浏览器登录窗口，轮询会话状态至结束 */
+/** 一键登录 */
 async function browserLogin(): Promise<void> {
+  if (!platform.value) return
   errorText.value = ''
   receipt.value = null
   loginWaiting.value = true
   try {
     await startBrowserLogin(platform.value)
-    // 轮询至终态（后端会话超时 3 分钟，前端留足余量）
     const deadline = Date.now() + 200_000
     while (Date.now() < deadline) {
       const status = await fetchBrowserLoginStatus(platform.value)
       if (status.state === 'success' && status.handle) {
+        // 强制校验
+        if (status.handle !== props.account?.handle) {
+          errorText.value = `登录成功但账号不一致：当前绑定为 ${props.account?.handle}，新凭据对应 ${status.handle}，请确认登录了正确的账号`
+          receipt.value = null
+          return
+        }
         receipt.value = {
           handle: status.handle,
           displayName: status.displayName,
           avatar: status.avatar,
         }
         receiptFromLogin.value = true
-        // 注意：不要回填 handle 输入框——watcher 会把程序化赋值误判为
-        // 用户改动而清空回执（曾致"登录成功却无反馈、无法绑定"）
         return
       }
       if (status.state === 'canceled') {
@@ -216,16 +202,22 @@ async function browserLogin(): Promise<void> {
 }
 
 function confirm(): void {
-  if (!receipt.value) return
-  emit('bind', platform.value, receipt.value.handle, {
-    displayName: receipt.value.displayName,
-    // 一键登录的凭据由后端暂存消费；手动输入路径携带逐字段凭据
-    credentials: receiptFromLogin.value ? undefined : (parsedCredentials.value ?? undefined),
-  })
-  emit('update:show', false)
+  if (!receipt.value || !platform.value) return
+  updating.value = true
+  if (receiptFromLogin.value) {
+    // 一键登录：凭据由后端暂存，更新时不携带显式凭据
+    emit('confirm', platform.value, receipt.value.handle)
+  } else {
+    const creds = parsedCredentials.value
+    if (!creds) {
+      updating.value = false
+      return
+    }
+    emit('confirm', platform.value, receipt.value.handle, creds)
+  }
+  // 弹窗保持打开显示 loading，由父组件在成功/失败后关闭
 }
 
-/** 回执展示名：优先 displayName（洛谷用户名），空回退 handle */
 const receiptLabel = computed(() =>
   receipt.value ? (receipt.value.displayName ?? receipt.value.handle) : '',
 )
@@ -235,33 +227,19 @@ const receiptLabel = computed(() =>
   <n-modal
     :show="show"
     preset="card"
-    :title="rebinding ? '换绑平台账号' : '绑定平台账号'"
+    title="更新登录凭据"
     class="create-modal"
     :style="{ width: 'min(460px, calc(100vw - 40px))' }"
-    @update:show="emit('update:show', false)"
+    @update:show="emit('update:show', $event)"
   >
     <div class="bind-form">
       <p class="bind-target">
-        你正在{{ rebinding ? '换绑' : '绑定' }} <b>{{ platformName(platform) }}</b> 账号
+        正在更新 <b>{{ account ? platformName(account.platform) : '' }}</b> 账号
+        <span class="mono">{{ account ? account.handle : '' }}</span> 的凭据
       </p>
+      <p class="bind-hint">更新后保留已有训练数据，仅替换登录凭据</p>
 
-      <!-- 匿名平台：用户名 + 验证 -->
-      <div v-if="!isCookiePlatform" class="bind-row">
-        <n-input
-          v-model:value="handle"
-          size="small"
-          :placeholder="handlePlaceholder"
-          class="bind-handle"
-          @keyup.enter="verify"
-        />
-        <n-button size="small" :loading="verifying" :disabled="!canVerify" @click="verify">
-          <template #icon><Search :size="14" /></template>
-          验证
-        </n-button>
-      </div>
-
-      <!-- cookie 平台：两种方式（一键登录 / 手动输入 cookie） -->
-      <template v-else>
+      <template v-if="isCookiePlatform">
         <template v-if="canBrowserLogin">
           <div class="bind-way-title">方式一 · 一键登录（推荐）</div>
           <n-button
@@ -275,7 +253,7 @@ const receiptLabel = computed(() =>
             <template #icon><Globe :size="14" /></template>
             {{ loginWaiting ? '等待浏览器中登录…' : '打开浏览器登录' }}
           </n-button>
-          <p class="bind-way-hint">在弹出的浏览器窗口中登录，完成后自动识别账号</p>
+          <p class="bind-way-hint">在弹出的浏览器窗口中登录同一账号，完成后自动识别</p>
         </template>
 
         <div v-if="!canBrowserLogin" class="bind-way-title">手动输入 cookie</div>
@@ -305,9 +283,9 @@ const receiptLabel = computed(() =>
         </n-popover>
         <!-- 无 handleKey 的 cookie 平台（如 LeetCode CN）需要手动输入 handle -->
         <div v-if="needsManualHandle" class="cookie-field">
-          <span class="cookie-label mono">用户名</span>
+          <span class="cookie-label mono">UID</span>
           <n-input
-            v-model:value="handle"
+            v-model:value="cookieValues['__handle__']"
             size="small"
             placeholder="输入 LeetCode CN 账号 UID"
             class="mono"
@@ -339,17 +317,17 @@ const receiptLabel = computed(() =>
         <div class="receipt-body">
           <div class="receipt-handle mono">{{ receiptLabel }}</div>
           <div class="receipt-meta mono">
-            {{ platformName(platform) }} 账号验证通过<template v-if="receipt.displayName && platform !== 'nowcoder'">（UID {{ receipt.handle }}）</template>
+            账号验证通过，凭据有效
           </div>
         </div>
         <BadgeCheck class="receipt-check" :size="17" />
       </div>
     </div>
     <div class="modal-actions">
-      <n-button size="small" quaternary @click="emit('update:show', false)">取消</n-button>
-      <n-button size="small" type="primary" :disabled="!receipt" @click="confirm">
-        <template #icon><Link2 :size="14" /></template>
-        {{ rebinding ? '确认换绑' : '确认绑定' }}
+      <n-button size="small" quaternary :disabled="updating" @click="emit('update:show', false)">取消</n-button>
+      <n-button size="small" type="primary" :loading="updating" :disabled="!receipt || updating" @click="confirm">
+        <template #icon><KeyRound :size="14" /></template>
+        {{ updating ? '更新中…' : '确认更新凭据' }}
       </n-button>
     </div>
   </n-modal>
@@ -372,15 +350,16 @@ const receiptLabel = computed(() =>
   color: var(--text);
 }
 
+.bind-hint {
+  margin: -6px 0 0;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
 .bind-row {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.bind-handle {
-  flex: 1;
-  min-width: 0;
 }
 
 .bind-way-title {

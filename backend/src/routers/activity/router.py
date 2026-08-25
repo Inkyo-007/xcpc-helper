@@ -23,6 +23,7 @@ from modules.activity.schemas import (
     RefineStatusOut,
     SubmissionsOut,
     SyncIn,
+    UpdateCredentialsIn,
     VerifyIn,
     VerifyOut,
 )
@@ -95,6 +96,23 @@ async def unbind_account(
     platform: str, handle: str, service: ServiceDep
 ) -> None:
     service.unbind(platform, handle)
+
+
+@router.put("/accounts/{platform}/{handle}/credentials", response_model=BoundAccountOut)
+async def update_account_credentials(
+    platform: str,
+    handle: str,
+    service: ServiceDep,
+    payload: UpdateCredentialsIn | None = None,
+) -> BoundAccountOut:
+    from adapters.base import Credentials
+
+    credentials = (
+        Credentials.model_validate(payload.credentials)
+        if payload is not None and payload.credentials
+        else None
+    )
+    return await service.update_credentials(platform, handle, credentials)
 
 
 # ===== 浏览器一键登录（cookie 平台） =====

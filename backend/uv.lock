@@ -1116,6 +1116,7 @@ dependencies = [
     { name = "curl-cffi" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "playwright" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-multipart" },
@@ -1125,9 +1126,6 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-browser-login = [
-    { name = "playwright" },
-]
 desktop = [
     { name = "pywebview" },
 ]
@@ -1142,6 +1140,7 @@ requires-dist = [
     { name = "curl-cffi", specifier = ">=0.16.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.28" },
+    { name = "playwright", specifier = ">=1.40" },
     { name = "pydantic", specifier = ">=2.10" },
     { name = "pydantic-settings", specifier = ">=2.7" },
     { name = "python-multipart", specifier = ">=0.0.32" },
@@ -1151,7 +1150,6 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-browser-login = [{ name = "playwright", specifier = ">=1.40" }]
 desktop = [{ name = "pywebview", specifier = ">=5.4" }]
 dev = [
     { name = "pytest", specifier = ">=8.3" },

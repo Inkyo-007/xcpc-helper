@@ -100,6 +100,19 @@ export function fetchBrowserLoginStatus(platform: PlatformId): Promise<ApiBrowse
   return request<ApiBrowserLoginStatus>(`/activity/platforms/${platform}/browser-login/status`)
 }
 
+export function updateCredentials(
+  platform: string,
+  handle: string,
+  credentials?: AccountCredentials,
+): Promise<BoundAccount> {
+  const path = `/activity/accounts/${encodeURIComponent(platform)}/${encodeURIComponent(handle)}/credentials`
+  return request<BoundAccount>(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials ? { credentials } : {}),
+  })
+}
+
 export function unbindAccount(platform: string, handle: string): Promise<void> {
   const path = `/activity/accounts/${encodeURIComponent(platform)}/${encodeURIComponent(handle)}`
   return request<void>(path, { method: 'DELETE' })

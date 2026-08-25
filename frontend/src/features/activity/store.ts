@@ -302,6 +302,17 @@ async function unbindAccount(platform: PlatformId, handle: string): Promise<void
   await refreshAll()
 }
 
+/** 更新已绑定账号的凭据（仅 cookie 平台）：不删数据、不重置游标 */
+async function updateAccountCredentials(
+  platform: PlatformId,
+  handle: string,
+  credentials?: AccountCredentials,
+): Promise<void> {
+  await api.updateCredentials(platform, handle, credentials)
+  await refreshAccounts()
+  pollInBackground()
+}
+
 /** 当前平台绑定的账号（每平台至多一个） */
 function boundOn(platform: PlatformId): BoundAccount | null {
   return accounts.value.find((a) => a.platform === platform) ?? null
@@ -386,6 +397,7 @@ export function useActivity() {
     syncNow,
     bindAccount,
     unbindAccount,
+    updateAccountCredentials,
     refreshAll,
     boundOn,
     isBound,
