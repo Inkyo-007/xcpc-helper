@@ -20,6 +20,7 @@
 - `b82a8346` fix(后端): QOJ 所有请求统一携带浏览器标识头规避 Cloudflare
 - `53953f48` fix(QOJ): 禁用一键登录并修复 handle/cookie 分离绑定
 - `be9a753f` fix(前端): QOJ 绑定输入框添加平台专属占位符提示
+- `9b220aef` fix(后端): QOJ HTML 解析正则匹配真实页面格式
 
 ### 2026-08-24 会话 4
 
