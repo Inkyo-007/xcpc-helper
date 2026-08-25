@@ -165,7 +165,7 @@ class VJudgeAdapter(PlatformAdapter):
         prob_num = str(row.get("probNum", ""))
         return PlatformSubmission(
             submission_id=str(row.get("runId", "")),
-            problem_key=f"{oj}-{prob_num}",
+            problem_key=oj,
             problem_name=prob_num,
             problem_url=problem_url(oj, prob_num),
             difficulty=None,
