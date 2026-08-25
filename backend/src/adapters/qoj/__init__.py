@@ -86,10 +86,11 @@ class QOJAdapter(PlatformAdapter):
         2. 从页面提取 data-nickname 作为展示名；
         3. 如有凭据，试拉 /submissions 确认有效性。
         """
-        # 步骤 1：存在性验证
+        # 步骤 1：存在性验证（携带浏览器标识头规避 Cloudflare）
         resp = await self._fetcher.request(
             "GET",
             PROFILE_URL.format(handle=handle),
+            headers=self._browser_headers(),
             platform=self.platform_id,
             min_interval=self.min_interval,
         )
@@ -123,6 +124,7 @@ class QOJAdapter(PlatformAdapter):
                 "GET",
                 SUBMISSIONS_URL,
                 params={"submitter": handle, "page": "1"},
+                headers=self._browser_headers(),
                 credentials=credentials,
                 platform=self.platform_id,
                 min_interval=self.min_interval,
@@ -208,22 +210,25 @@ class QOJAdapter(PlatformAdapter):
         self, handle: str, page: int, credentials: Credentials
     ) -> str:
         """获取提交记录页面 HTML。"""
-        # Cloudflare 要求浏览器标识头
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-        }
         resp = await self._fetcher.request(
             "GET",
             SUBMISSIONS_URL,
             params={"submitter": handle, "page": str(page)},
-            headers=headers,
+            headers=self._browser_headers(),
             credentials=credentials,
             platform=self.platform_id,
             min_interval=self.min_interval,
         )
         return resp.text
+
+    @staticmethod
+    def _browser_headers() -> dict[str, str]:
+        """浏览器标识头（Cloudflare 403 规避）。"""
+        return {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        }
 
     # ===== 内部：解析 =====
 
