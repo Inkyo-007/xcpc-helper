@@ -44,7 +44,7 @@ const COOKIE_PLATFORMS: Partial<
     keys: [
       { key: 'UOJSESSID', label: 'UOJSESSID' },
     ],
-    handleKey: 'UOJSESSID',
+    // QOJ 无 handleKey：用户需手动输入平台用户名，cookie 仅用于授权
   },
 }
 

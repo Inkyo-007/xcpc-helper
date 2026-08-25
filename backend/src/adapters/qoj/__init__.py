@@ -323,25 +323,14 @@ class QOJAdapter(PlatformAdapter):
             language=row.language,
         )
 
-    # ===== 一键登录（browser-login，可选依赖 Playwright） =====
+    # ===== 一键登录（已禁用：QOJ Cloudflare 托管挑战无法通过真实浏览器） =====
 
     def browser_login_available(self) -> bool:
-        """一键登录是否可用（Playwright 可选依赖已安装）。"""
-        from adapters.qoj import login as login_mod
-
-        return login_mod.playwright_available()
+        """一键登录已禁用（Cloudflare 托管挑战无法绕过）。"""
+        return False
 
     async def run_browser_login(
         self, timeout: float
     ) -> tuple[Credentials, UserInfo]:
-        """拉起系统浏览器登录窗口，返回抓取的凭据与验证回执。
-
-        登录成功（UOJSESSID 出现）后立即用凭据完成验证（存在性 +
-        有效性），失败语义与 verify 相同；用户关窗 / 超时分别抛
-        LoginCancelledError / asyncio.TimeoutError。
-        """
-        from adapters.qoj import login as login_mod
-
-        credentials = await login_mod.capture_credentials(timeout)
-        info = await self.verify(credentials.cookies.get("uoj_username", ""), credentials)
-        return credentials, info
+        """一键登录已禁用。"""
+        raise PlatformError("QOJ 一键登录已禁用，请使用手动输入 cookie 方式绑定")
