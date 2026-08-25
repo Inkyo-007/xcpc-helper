@@ -13,6 +13,10 @@
 
 ## 最近完成
 
+### 2026-08-25 会话 5
+
+- `5cfbb6ec` feat(activity): 新增 QOJ 平台适配器
+
 ### 2026-08-24 会话 4
 
 - `27caad86` feat(后端): VJudge 适配器改为匿名模式，使用 /status/data 端点
