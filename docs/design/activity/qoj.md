@@ -55,6 +55,7 @@ QOJ 部分题目采用子任务评分制，列表页显示**实际获得分数**
 | 情形 | 处理方式 |
 |------|---------|
 | 文本以 `✓` 结尾（如 `100 ✓`、`110 ✓`） | AC（满分通过） |
+| 文本为 `AC, WA`（通常是通过后被 Hack） | WA |
 | 文本为纯数字且 `data-score == data-full` | AC（满分通过） |
 | 文本为纯数字且 `data-score < data-full` | UNAC（未通过，子任务部分得分） |
 | 文本为纯数字且 `data-score == 0` | UNAC（零分，无法区分 WA/RE/TL） |
@@ -73,11 +74,7 @@ QOJ 部分题目采用子任务评分制，列表页显示**实际获得分数**
 
 ### 方式一 · 一键登录（Playwright）
 
-`adapters/qoj/login.py` 用 Playwright（可选依赖组 `browser-login`）拉起**系统 Chrome/Edge** 独立窗口（临时 profile，`channel="chrome"` 兜底 `msedge`，不下载浏览器二进制），导航到 `http://qoj.ac/login`。
-
-用户自行完成登录——QOJ 无 CAPTCHA / 滑块验证 / 图形验证码（普通用户），标准表单登录。密码 MD5 哈希由页面 JS 自动处理，Playwright 只需填充用户名密码并提交。
-
-登录完成判定为**双重确认**：cookie 罐出现 `UOJSESSID` 只是候选信号，再经鉴权探针（浏览器上下文请求 `/submissions?submitter=<handle>&page=1` 返回数据页而非登录页重定向，节流到至多 3s 一次）确认完整登录态才抓取 `UOJSESSID` 与 UA 返回。用户关窗 → canceled，超时 3 分钟 → timeout。凭据由 service 暂存（内存，10 分钟 TTL），bind 时消费——**凭据不经前端**。Playwright 未安装时 `/platforms` 的 `browserLogin=false`，前端隐藏一键登录按钮，仅保留方式二手动输入。
+**UPDATE：已禁用**，几乎必然触发 cloudflare 验证，无法通过。
 
 ### 方式二 · 手动输入 cookie
 
