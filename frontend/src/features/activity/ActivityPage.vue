@@ -33,7 +33,6 @@ const {
   activePlatform,
   selectedDate,
   listPage,
-  syncing,
   mergedDaily,
   totals,
   entries,
@@ -290,7 +289,6 @@ async function onSync(): Promise<void> {
       />
       <SyncBar
         :last-sync-label="lastSyncLabel"
-        :syncing="syncing"
         :accounts="accounts"
         :active-platform="activePlatform"
         @sync="onSync"

@@ -15,7 +15,6 @@ import type { BoundAccount, PlatformId } from '@/features/activity/types'
 
 const props = defineProps<{
   lastSyncLabel: string
-  syncing: boolean
   accounts: BoundAccount[]
   activePlatform: PlatformScope
 }>()
@@ -46,6 +45,14 @@ const authExpired = computed(
 )
 /** 该平台账号同步中（首次全量可能数分钟）：按钮显示进行态 */
 const accountSyncing = computed(() => platformAccount.value?.syncState === 'running')
+
+/** 当前视图下的同步按钮是否应显示进行态 */
+const isSyncing = computed(() => {
+  if (props.activePlatform === 'all') {
+    return props.accounts.some((a) => a.syncState === 'running')
+  }
+  return platformAccount.value?.syncState === 'running'
+})
 
 /** 精细化同步入口可见：平台视图 + 平台声明 refine_verdict 能力 + 已绑定 */
 const canRefine = computed(() => {
@@ -84,8 +91,8 @@ function confirmSyncAll(): void {
         <button
           type="button"
           class="tool-icon-btn"
-          :class="{ spinning: syncing }"
-          :disabled="syncing || accounts.length === 0"
+          :class="{ spinning: isSyncing }"
+          :disabled="isSyncing || accounts.length === 0"
           aria-label="立即同步"
           @click="onSyncClick"
         >
