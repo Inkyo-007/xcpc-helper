@@ -30,10 +30,8 @@ const selectedDate = ref<string | null>(null)
 const recentPage = ref(1)
 /** 当日明细列表的分页页码（从 1 起；与近期提交各自独立，切换日期时重置） */
 const dayPage = ref(1)
-/** 任一账号同步中或刚触发（驱动同步按钮转圈 / 平台页签角标 / 平台视图进度面板；
- * 同步为纯后台属性，不再有全局遮罩）。syncFiring 覆盖"刚点击、首轮状态尚未
- * 合并"的窗口期，让快速完成的同步也有即时反馈。 */
-const syncFiring = ref(false)
+/** 按平台跟踪同步触发状态，避免平台间互相阻塞 */
+const syncFiringMap = ref<Record<string, boolean>>({})
 
 /** 当前平台视图是否有账号在同步中 */
 const platformSyncing = computed(() => {
@@ -50,7 +48,11 @@ const anySyncing = computed(() =>
 
 /** 当前平台视图的同步按钮是否应显示进行态 */
 const syncing = computed(
-  () => syncFiring.value || (activePlatform.value === 'all' ? anySyncing.value : platformSyncing.value),
+  () => {
+    const platformKey = activePlatform.value
+    const isFiring = platformKey === 'all' ? Object.values(syncFiringMap.value).some(Boolean) : syncFiringMap.value[platformKey]
+    return isFiring || (platformKey === 'all' ? anySyncing.value : platformSyncing.value)
+  },
 )
 const initialized = ref(false)
 
@@ -285,17 +287,18 @@ function setListPage(page: number): void {
  * 返回本次同步范围内仍处于错误状态的账号列表（供调用方给出完成/警告提示）。
  * 引擎按账号串行去重，重复触发安全。 */
 async function syncNow(): Promise<BoundAccount[]> {
-  if (syncFiring.value) return []
-  syncFiring.value = true
+  const platformKey = activePlatform.value
+  if (syncFiringMap.value[platformKey]) return []
+  syncFiringMap.value = { ...syncFiringMap.value, [platformKey]: true }
   try {
-    await api.triggerSync(activePlatform.value === 'all' ? undefined : activePlatform.value)
+    await api.triggerSync(platformKey === 'all' ? undefined : platformKey)
     const statuses = await watchSyncUntilIdle()
     const scope = activePlatform.value
     return statuses.filter(
       (s) => (scope === 'all' || s.platform === scope) && s.syncState === 'error',
     )
   } finally {
-    syncFiring.value = false
+    syncFiringMap.value = { ...syncFiringMap.value, [platformKey]: false }
   }
 }
 
