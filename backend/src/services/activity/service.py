@@ -215,6 +215,7 @@ class ActivityService:
                     capabilities=sorted(adapter.capabilities, key=lambda c: c.value),
                     auth=adapter.auth.value,
                     browserLogin=self._browser_login_available(adapter),
+                    homepageUrl=adapter.homepage_url,
                     account=self._account_out(account) if account else None,
                 )
             )

@@ -100,6 +100,7 @@ async function refreshAccounts(): Promise<void> {
       name: p.name,
       auth: p.auth,
       browserLogin: p.browserLogin,
+      homepageUrl: p.homepageUrl,
       capabilities: p.capabilities,
     }))
     accounts.value = res.platforms

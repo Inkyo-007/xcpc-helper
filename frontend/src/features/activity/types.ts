@@ -15,6 +15,8 @@ export interface PlatformMeta {
   auth: 'none' | 'cookie'
   /** 一键登录可用（cookie 平台且服务端具备浏览器登录能力） */
   browserLogin: boolean
+  /** 平台主页 URL（前端跳转用） */
+  homepageUrl: string
   /** 数据区块能力（refine_verdict = 支持 UNAC 精细化同步） */
   capabilities: string[]
 }

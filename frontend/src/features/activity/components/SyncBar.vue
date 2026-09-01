@@ -6,7 +6,7 @@
  * 可能较慢），平台视图只同步该平台（直接触发）。 */
 
 import { computed, ref } from 'vue'
-import { Link2, Plus, RefreshCw, Sparkles, TriangleAlert, UserRoundPen } from 'lucide-vue-next'
+import { ExternalLink, Link2, Plus, RefreshCw, Sparkles, TriangleAlert, UserRoundPen } from 'lucide-vue-next'
 import { NButton, NModal, NTooltip } from 'naive-ui'
 import UserGroupMenu from '@/features/activity/components/UserGroupMenu.vue'
 import { accountLabel, platformMeta, refiningKeys } from '@/features/activity/store'
@@ -32,6 +32,12 @@ const emit = defineEmits<{
 const platformAccount = computed<BoundAccount | null>(() => {
   if (props.activePlatform === 'all') return null
   return props.accounts.find((a) => a.platform === props.activePlatform) ?? null
+})
+
+/** 平台视图下当前平台的主页 URL */
+const platformHomepage = computed(() => {
+  if (props.activePlatform === 'all') return ''
+  return platformMeta(props.activePlatform as PlatformId)?.homepageUrl ?? ''
 })
 
 /** 凭据过期（auth_expired）：账号按钮警示态，点击重新授权（走换绑路径） */
@@ -101,6 +107,20 @@ function confirmSyncAll(): void {
         </button>
       </template>
       {{ refining ? '精细化同步进行中' : '精细化同步（UNAC → 具体评测结果）' }}
+    </NTooltip>
+    <NTooltip v-if="activePlatform !== 'all' && platformHomepage" :show-arrow="false">
+      <template #trigger>
+        <a
+          :href="platformHomepage"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="tool-icon-btn"
+          aria-label="访问平台主页"
+        >
+          <ExternalLink :size="15" />
+        </a>
+      </template>
+      访问 {{ platformMeta(activePlatform as PlatformId)?.name ?? activePlatform }} 主页
     </NTooltip>
     <NTooltip v-if="activePlatform === 'all'" :show-arrow="false">
       <template #trigger>
@@ -215,6 +235,10 @@ function confirmSyncAll(): void {
   color: var(--accent-strong);
   border-color: var(--accent);
   transform: translateY(-1px);
+}
+
+a.tool-icon-btn {
+  text-decoration: none;
 }
 
 .tool-icon-btn:disabled {

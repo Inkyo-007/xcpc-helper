@@ -189,6 +189,7 @@ class PlatformAdapter:
     capabilities: frozenset[Capability]
     auth: AuthMode
     min_interval: float  # 平台建议请求间隔（秒），net 层限流用
+    homepage_url: str = ""  # 平台主页 URL（前端跳转用）
 
     async def verify(
         self, handle: str, credentials: Credentials | None = None

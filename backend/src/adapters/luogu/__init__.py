@@ -79,6 +79,7 @@ class LuoguAdapter(PlatformAdapter):
     )
     auth = AuthMode.COOKIE
     min_interval = 5.0  # 反爬敏感平台：低频请求长期避开 JS 挑战升级
+    homepage_url = "https://www.luogu.com.cn"
 
     def __init__(
         self,

@@ -39,6 +39,7 @@ class VJudgeAdapter(PlatformAdapter):
     capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
     auth = AuthMode.NONE
     min_interval = 2.0  # 保守限流
+    homepage_url = "https://vjudge.net"
 
     def __init__(self, fetcher: HttpFetcher) -> None:
         self._fetcher = fetcher

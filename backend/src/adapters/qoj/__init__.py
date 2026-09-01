@@ -74,6 +74,7 @@ class QOJAdapter(PlatformAdapter):
     capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
     auth = AuthMode.COOKIE
     min_interval = 1.0
+    homepage_url = "http://qoj.ac"
 
     def __init__(self, fetcher: HttpFetcher) -> None:
         self._fetcher = fetcher
