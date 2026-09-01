@@ -177,7 +177,9 @@ class LeetCodeCNAdapter(PlatformAdapter):
                 "operationName": "userProgressQuestionList",
             }
             data = await self._post_graphql(query, credentials=credentials)
-            result = data.get("data", {}).get("userProgressQuestionList", {})
+            result = data.get("data", {}).get("userProgressQuestionList") if data else None
+            if result is None:
+                break
             page_questions = result.get("questions", [])
 
             if not page_questions:
