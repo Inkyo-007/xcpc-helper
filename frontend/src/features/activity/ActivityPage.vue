@@ -78,7 +78,7 @@ const activeAccount = computed(() =>
   activePlatform.value === 'all' ? null : boundOn(activePlatform.value),
 )
 /** 平台视图且该平台同步中：右栏替换为进度面板（不影响其他视图与功能） */
-const platformSyncing = computed(() => activeAccount.value?.syncState === 'running')
+const platformViewSyncing = computed(() => activeAccount.value?.syncState === 'running')
 /** 平台视图且该平台未绑定（已有其他账号在用时）：右栏显示未绑定引导而非全零统计 */
 const platformUnbound = computed(
   () =>
@@ -315,7 +315,7 @@ async function onSync(): Promise<void> {
         </section>
       </aside>
 
-      <div v-if="platformSyncing" class="act-main">
+      <div v-if="platformViewSyncing" class="act-main">
         <section class="act-panel act-syncing">
           <SyncProgressPanel
             :platform-name="platformName(activePlatform as PlatformId)"

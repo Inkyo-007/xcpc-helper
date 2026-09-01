@@ -34,8 +34,23 @@ const dayPage = ref(1)
  * 同步为纯后台属性，不再有全局遮罩）。syncFiring 覆盖"刚点击、首轮状态尚未
  * 合并"的窗口期，让快速完成的同步也有即时反馈。 */
 const syncFiring = ref(false)
+
+/** 当前平台视图是否有账号在同步中 */
+const platformSyncing = computed(() => {
+  if (activePlatform.value === 'all') return false
+  return accounts.value.some(
+    (a) => a.platform === activePlatform.value && a.syncState === 'running',
+  )
+})
+
+/** 是否有任一账号在同步中（驱动页签角标等全局提示） */
+const anySyncing = computed(() =>
+  accounts.value.some((a) => a.syncState === 'running'),
+)
+
+/** 当前平台视图的同步按钮是否应显示进行态 */
 const syncing = computed(
-  () => syncFiring.value || accounts.value.some((a) => a.syncState === 'running'),
+  () => syncFiring.value || (activePlatform.value === 'all' ? anySyncing.value : platformSyncing.value),
 )
 const initialized = ref(false)
 
