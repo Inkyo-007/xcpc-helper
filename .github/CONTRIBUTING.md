@@ -49,7 +49,7 @@ XCPC Helper 是一个面向算法竞赛选手的本地辅助工具。我们深�
 
 1. **Fork 本仓库**，然后克隆到本地：
    ```bash
-   git clone https://github.com/你的用户名/xcpc-helper.git
+   git clone https://github.com/Inkyo-007/xcpc-helper.git
    cd xcpc-helper
    ```
 
