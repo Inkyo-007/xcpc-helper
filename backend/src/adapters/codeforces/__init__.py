@@ -49,6 +49,7 @@ class CodeforcesAdapter(PlatformAdapter):
     capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
     auth = AuthMode.NONE
     min_interval = 2.0  # 官方建议请求间隔 ≥ 2 秒
+    homepage_url = "https://codeforces.com"
 
     def __init__(self, fetcher: HttpFetcher) -> None:
         self._fetcher = fetcher

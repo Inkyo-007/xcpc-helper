@@ -5,7 +5,7 @@
  * · 换绑账号：打开绑定弹窗（新账号替换旧账号及其本地数据）；
  * · 解绑账号：确认后删除该账号全部本地数据（提交记录与凭据，不可找回）。 */
 
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { KeyRound, Link2, Unlink } from 'lucide-vue-next'
 import { NButton, NModal } from 'naive-ui'
 import DeleteConfirmModal from '@/shared/components/DeleteConfirmModal.vue'
@@ -25,9 +25,14 @@ const emit = defineEmits<{
   'update-credentials': [account: BoundAccount]
 }>()
 
-const { platformName } = useActivity()
+const { platformName, platformMeta } = useActivity()
 
 const confirmingUnbind = ref(false)
+
+const isCookiePlatform = computed(() => {
+  if (!props.account) return false
+  return platformMeta(props.account.platform)?.auth === 'cookie'
+})
 
 watch(
   () => props.show,
@@ -73,7 +78,7 @@ function confirmUnbind(): void {
         </div>
       </div>
 
-      <div class="acct-row">
+      <div v-if="isCookiePlatform" class="acct-row">
         <div class="acct-desc">
           <span class="acct-title">更新凭据</span>
           <span class="acct-hint">重新录入 cookie 等登录凭据，保留已有数据</span>

@@ -56,6 +56,7 @@ class AtCoderAdapter(PlatformAdapter):
     capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
     auth = AuthMode.NONE
     min_interval = 1.0  # kenkoooo 公益接口要求请求间隔 ≥ 1 秒
+    homepage_url = "https://atcoder.jp"
 
     def __init__(self, fetcher: HttpFetcher) -> None:
         self._fetcher = fetcher

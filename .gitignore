@@ -46,3 +46,6 @@ backend/books/**/.tmp-*
 
 # 免安装压缩包构建输出（scripts/package.ps1）
 release/
+
+# Agent Teams
+.agent-teams/

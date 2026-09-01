@@ -36,7 +36,27 @@ VERDICT_MAP: dict[str, Verdict] = {
 
 def map_verdict(raw: str) -> Verdict:
     """VJudge status 字段 → 统一 Verdict；未知结果归 UKE。"""
-    if not raw:
+    text = raw.strip().lower()
+
+    if "wrong answer" in text:
+        return Verdict.WA
+
+    if "time limit" in text:
+        return Verdict.TLE
+
+    if "memory limit" in text:
+        return Verdict.MLE
+
+    if "output limit" in text:
+        return Verdict.OLE
+
+    if "runtime error" in text:
+        return Verdict.RE
+
+    if "compilation error" in text or "compile error" in text:
+        return Verdict.CE
+
+    if not text:
         return Verdict.UKE
     return VERDICT_MAP.get(raw, Verdict.UKE)
 

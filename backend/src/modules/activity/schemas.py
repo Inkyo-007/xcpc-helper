@@ -35,6 +35,7 @@ class PlatformMetaOut(BaseModel):
     capabilities: list[Capability]
     auth: str
     browserLogin: bool = False  # 一键登录可用（cookie 平台 + 服务端具备 Playwright）
+    homepageUrl: str = ""  # 平台主页 URL（前端跳转用）
     account: BoundAccountOut | None = None  # 该平台当前绑定账号（未绑定为 null）
 
 

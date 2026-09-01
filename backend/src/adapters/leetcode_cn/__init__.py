@@ -48,6 +48,7 @@ class LeetCodeCNAdapter(PlatformAdapter):
     capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
     auth = AuthMode.COOKIE
     min_interval = 9.0  # 参考 glsync 实测：60 请求/10 分钟窗口
+    homepage_url = "https://leetcode.cn"
 
     def __init__(
         self,
@@ -176,7 +177,9 @@ class LeetCodeCNAdapter(PlatformAdapter):
                 "operationName": "userProgressQuestionList",
             }
             data = await self._post_graphql(query, credentials=credentials)
-            result = data.get("data", {}).get("userProgressQuestionList", {})
+            result = data.get("data", {}).get("userProgressQuestionList") if data else None
+            if result is None:
+                break
             page_questions = result.get("questions", [])
 
             if not page_questions:

@@ -55,6 +55,7 @@ class NowcoderAdapter(PlatformAdapter):
     capabilities = frozenset({Capability.SUBMISSIONS, Capability.USER_INFO})
     auth = AuthMode.NONE
     min_interval = 1.0  # 保守限流
+    homepage_url = "https://ac.nowcoder.com"
 
     def __init__(self, fetcher: HttpFetcher) -> None:
         self._fetcher = fetcher

@@ -1,6 +1,6 @@
 /** 训练统计（activity）域类型。与后端 schemas 对齐；mock 阶段仅覆盖第一期范围。 */
 
-export type PlatformId = 'codeforces' | 'atcoder' | 'luogu' | 'leetcode-cn' | 'nowcoder' | 'vjudge'
+export type PlatformId = 'codeforces' | 'atcoder' | 'luogu' | 'leetcode-cn' | 'nowcoder' | 'vjudge' | 'qoj'
 
 /** 平台凭据（cookie 授权平台；与后端 adapters.base.Credentials 对齐） */
 export interface AccountCredentials {
@@ -15,6 +15,8 @@ export interface PlatformMeta {
   auth: 'none' | 'cookie'
   /** 一键登录可用（cookie 平台且服务端具备浏览器登录能力） */
   browserLogin: boolean
+  /** 平台主页 URL（前端跳转用） */
+  homepageUrl: string
   /** 数据区块能力（refine_verdict = 支持 UNAC 精细化同步） */
   capabilities: string[]
 }

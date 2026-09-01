@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /** 汇总 / 单平台分段切换器：汇总 + 全部支持平台（来自后端平台注册表，
  * 与是否绑定无关；未绑定平台的视图用于引导绑定 / 换绑）。
- * 某平台账号同步中时，其页签文本右上角显示黄色圆点角标（不进入
- * 该平台页也可知悉；同步为后台属性，见 activity/conventions.md）。 */
+ * 某平台账号同步中时，其页签文本右上角显示黄色圆点角标；
+ * 凭据过期时显示红色圆点角标（不进入该平台页也可知悉；同步为后台属性，见 activity/conventions.md）。 */
 
 import { computed } from 'vue'
 import { LayoutGrid } from 'lucide-vue-next'
@@ -22,6 +22,11 @@ const { platforms, accounts } = useActivity()
 /** 正在同步的平台 id 集合（页签黄点角标） */
 const syncingIds = computed(
   () => new Set(accounts.value.filter((a) => a.syncState === 'running').map((a) => a.platform)),
+)
+
+/** 凭据过期的平台 id 集合（页签红点角标） */
+const authExpiredIds = computed(
+  () => new Set(accounts.value.filter((a) => a.syncErrorCode === 'auth_expired').map((a) => a.platform)),
 )
 </script>
 
@@ -50,7 +55,8 @@ const syncingIds = computed(
     >
       <span class="tab-label">
         {{ p.name }}
-        <i v-if="syncingIds.has(p.id)" class="tab-dot" title="正在同步" />
+        <i v-if="authExpiredIds.has(p.id)" class="tab-dot tab-dot--error" title="凭据过期" />
+        <i v-else-if="syncingIds.has(p.id)" class="tab-dot" title="正在同步" />
       </span>
     </button>
   </div>
@@ -111,6 +117,12 @@ const syncingIds = computed(
   background: #eab308;
   box-shadow: 0 0 0 2px var(--surface);
   animation: dot-pulse 1.6s ease-in-out infinite;
+}
+
+/* 凭据过期角标：文本右上角红色圆点，常亮 */
+.tab-dot--error {
+  background: #c63b57;
+  animation: none;
 }
 
 @keyframes dot-pulse {
