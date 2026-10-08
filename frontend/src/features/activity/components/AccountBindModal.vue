@@ -111,7 +111,8 @@ const parsedCredentials = computed<AccountCredentials | null>(() => {
     if (!value) return null
     cookies[key] = value
   }
-  return { cookies }
+  // 附带当前浏览器 UA：cookie 来源即本浏览器，洛谷 __client_id 与 UA 绑定
+  return { cookies, headers: { 'User-Agent': navigator.userAgent } }
 })
 
 /** 实际参与验证/绑定的 handle：cookie 兼任时取对应字段值，否则需要用户手动输入 handle */
