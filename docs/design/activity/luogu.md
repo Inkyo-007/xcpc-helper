@@ -7,15 +7,24 @@
 
 | 用途 | 端点 | 凭据 |
 | --- | --- | --- |
-| 提交明细 | `GET /record/list?user=<uid>&page=N&_contentOnly=1` | cookie |
-| 单条精化 | `GET /record/{id}?_contentOnly=1` | cookie |
+| 提交明细 | `GET /record/list?user=<uid>&page=N` | cookie |
+| 单条精化 | `GET /record/{id}` | cookie |
 | 绑定验证 · 存在性 | `GET /api/user/search?keyword=X` | **匿名可用** |
 | 绑定验证 · 凭据有效性 | 携凭据试拉 record/list 第 1 页 | cookie |
 
 说明：
 
-- `_contentOnly=1` 让页面接口返回纯 JSON 信封 `{code, currentData}`；不带则返回
-  SPA 页 + `_feInjection` 内嵌同构数据。record/list 时间**倒序**、perPage=20，
+- **2026-10 契约变更**：洛谷前端升级为 lentille/columba 架构，
+  `_contentOnly=1` JSON 信封下线；页面数据改内嵌 HTML 的
+  `<script id="lentille-context">`（`{instance, template, status, data,
+  user, time}`），adapter 提取后按 template 二次解析 `data`（成功态
+  record 列表为 `data.records.{result, count, perPage}`，详情为
+  `data.record.detail...`，与旧 `currentData` 同构；仅题名字段
+  `title` 改名 `name`）。record 页面同时改为**强制登录**：匿名/失效
+  凭据返回 HTTP 401 + 错误页（`template == "error"`，
+  `data.errorType == UserUnloginException`）。`api/user/search` 仍为
+  匿名可用的裸 JSON；
+- record/list 时间**倒序**、perPage=20，
   倒序回扫（增量 `ts < since` 停止，record `id` 去重），流式断点为
   `{"page": 页码, "fetched": 累计}`；
 - 难度直接内嵌在 record 的 `problem.difficulty`（0-7 档），无需额外请求；
@@ -30,22 +39,29 @@ httpx 必被 Spilopelia 挑战拦截。所以洛谷 adapter **不用共享 HttpF
 签名不变（入参 fetcher 忽略），会话按次创建（cookie 罐吸收挑战与轮换），
 限流记账留在实例上跨次生效。
 
-反爬挑战的三种形态与处置：
+反爬挑战的形态与处置：
 
 - `302 + Set-Cookie: C3VK`（`Ws-Action: cc`）→ 会话罐跟随自动通过；
-- Spilopelia **JS 挑战页**（请求过密时升级出现）→ 非浏览器客户端无法执行 JS，
-  带凭据时按 `AuthExpiredError` 引导重新授权（重导 cookie 是两种情况的共同
-  正确动作），匿名判 `PlatformError`；低频请求（`min_interval = 5.0`）可长期避开；
-- 信封 `code == 401/403` 且消息含「请先登录/用户不可见」→ `AuthExpiredError`；
-  `403 +「请求频繁」`（限流，非过期）→ 应用层专项重试（4 次、30s 起步指数退避；
-  clist 生产值 8 次 + 50s 附加延迟，本地酌减）；其余 `code != 200` → `PlatformError`。
+- Spilopelia **JS 挑战页**（请求过密时升级出现；200 但无 lentille-context）→
+  非浏览器客户端无法执行 JS，判 `AuthExpiredError` 引导重新授权（重导
+  cookie 是挑战与凭据失效两种情况的共同正确动作）；低频请求
+  （`min_interval = 5.0`）可长期避开；
+- lentille 错误页 `status == 401/403`（请先登录/用户不可见）→ `AuthExpiredError`；
+  错误消息含「请求频繁」（限流，非过期）→ 应用层专项重试（4 次、30s 起步
+  指数退避；clist 生产值 8 次 + 50s 附加延迟，本地酌减）；其余
+  `status != 200` → `PlatformError`。
+
+凭据应用：请求时同时透传 `credentials.cookies` 与 `credentials.headers`
+（User-Agent）——`__client_id` 与 UA 绑定，缺 UA 会被判为失效会话；
+一键登录抓取真实浏览器 UA，手动录入由前端附带 `navigator.userAgent`
+（cookie 来源即本浏览器）。
 
 会话轮换：服务端会 302 刷新 `__client_id`（轮换不失效，旧值仍可用），会话罐
 吸收即可；**不回写 secrets.json**（实测旧凭据长期有效）。
 
 ## 归一化
 
-- `submission_id` = record `id`；`problem_key` = `pid`；`problem_name` = `title`；
+- `submission_id` = record `id`；`problem_key` = `pid`；`problem_name` = `name`；
   `problem_url = https://www.luogu.com.cn/problem/{pid}`，`contest` 非空时拼
   `?contestId={cid}`（clist 格式）；比赛内提交计入统计（对齐 CF gym）；
 - **verdict 映射**（数字 status 码，以官方 `/_lfe/config/auth` 常量表实测校准）：
@@ -54,7 +70,7 @@ httpx 必被 Spilopelia 挑战拦截。所以洛谷 adapter **不用共享 HttpF
   **注意 4/5 与直觉相反（4 是 MLE、5 是 TLE）**；
 - **language 数字码**：同一常量表的 `CodeLanguage` 内置映射（27=C++20、
   7=Python 3 等），未知码兜底空串；
-- **进度上报**：全量时首页信封 `records.count` 即全站总条数，
+- **进度上报**：全量时首页 `records.count` 即全站总条数，
   `progress_cb(fetched, total)` 逐页上报真实百分比；增量总量不可知，不上报。
 
 **为什么 14 归一为 UNAC**：洛谷记录列表口径只有 AC/CE/Unaccepted（官方常量
@@ -71,7 +87,7 @@ Chrome/Edge** 独立窗口（临时 profile，`channel="chrome"` 兜底 `msedge`
 
 登录完成判定为**双重确认**：cookie 罐出现 `_uid`/`__client_id` 只是候选信号
 （匿名与两步验证中间态也携带 `__client_id`），再经鉴权探针（浏览器上下文请求
-`record/list?_contentOnly=1` 返回 `code==200` 的 JSON，节流到至多 3s 一次）
+`record/list`，解析 lentille-context `status == 200`，节流到至多 3s 一次）
 确认完整登录态才抓取 cookie 与 UA 返回。用户关窗 → canceled，超时 3 分钟 →
 timeout。凭据由 service 暂存（内存，10 分钟 TTL），bind 时消费——**凭据不经
 前端**。Playwright 未安装时 `/platforms` 的 `browserLogin=false`，前端隐藏一键
@@ -107,8 +123,8 @@ timeout。凭据由 service 暂存（内存，10 分钟 TTL），bind 时消费�
 - **与普通同步协同**：每条记录处理前获取该账号的同步锁（SyncEngine 单账号
   `asyncio.Lock`）——普通同步全程持锁，精化自然暂停，结束后自动继续
   （移交延迟 ≤ 一条记录）；
-- 与同步共用 adapter 的 5s 限流节奏（`_get_json` 实例级 pacing），不加速
-  WAF 风险；单条详情复用同一传输层与信封判定；
+- 与同步共用 adapter 的 5s 限流节奏（`_request` 实例级 pacing），不加速
+  WAF 风险；单条详情复用同一传输层与 lentille 判定；
 - store 的 `update_verdicts`（按 submission_id 就地改写 verdict，原子写 +
   同锁串行）是"磁盘优先、合并不覆盖旧行"规则的**唯一受控例外**；
 - `Account.refine_auto`（默认关）：普通同步完成后自动启动精化（增量带来的
@@ -123,6 +139,12 @@ timeout。凭据由 service 暂存（内存，10 分钟 TTL），bind 时消费�
 ## 陷阱备忘
 
 - **传输层必须 curl_cffi**：换回共享 HttpFetcher 会被 WAF 指纹挑战全灭；
+- **`_contentOnly=1` 已下线（2026-10）**：勿恢复该参数；页面数据一律解析
+  HTML 内嵌的 lentille-context，record 页面强制登录（匿名 401 错误页）；
+- **题名字段是 `name` 不是 `title`**：新架构已改名，凭旧记忆写回 title
+  会得到空题名；
+- **凭据 headers 必须透传**：`__client_id` 与 UA 绑定，`_request` 合并
+  `credentials.headers`；新增 cookie 平台路径时同样处理；
 - **状态码 4=MLE / 5=TLE（与直觉相反）**：映射表以官方常量为准，勿凭记忆改写；
 - **handle = uid，display_name 分离**：用户名可改、uid 稳定；界面显示一律
   `displayName ?? handle`；
