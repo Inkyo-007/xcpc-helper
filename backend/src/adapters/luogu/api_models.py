@@ -1,9 +1,13 @@
 """洛谷 API 响应模型。
 
 外部系统数据第一时间转化为 Pydantic 模型（见 docs/rules/backend.md）。
-洛谷信封（`_contentOnly=1` 纯 JSON 模式）：`{code, currentTemplate,
-currentData, ...}`；错误响应同为 `{code: 4xx, currentData: {...}}` 形态，
-错误消息位置不稳定，adapter 对原始体做关键词扫描判语义。
+
+2026-10 洛谷前端升级为 lentille/columba 架构：`_contentOnly=1` JSON
+信封下线，页面数据内嵌 HTML 的 `<script id="lentille-context">`（
+`{instance, template, status, data, user, time}`）；错误态
+`template == "error"`，`data` 为 `{errorCode, errorType, errorMessage}`。
+record 页面（list/detail）强制登录（匿名 401 错误页）；
+`api/user/search` 仍为匿名可用的裸 JSON。
 
 容错语义：可选字段用默认值 / None 承载；类型不匹配校验失败，由 adapter
 统一转为 PlatformError（平台格式异常，不阻断其他账号）。
@@ -13,16 +17,42 @@ currentData, ...}`；错误响应同为 `{code: 4xx, currentData: {...}}` 形态
 提前终止，静默丢弃后续新提交）。
 """
 
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+# 页面内嵌数据上下文提取（login 探针与 adapter 共用）
+LENTILLE_CONTEXT_RE = re.compile(
+    r'<script id="lentille-context" type="application/json">(.*?)</script>',
+    re.DOTALL,
+)
+
+
+class LgLentilleError(BaseModel):
+    """lentille 错误态 data（template == "error"）；字段缺失容忍。"""
+
+    errorCode: int = 0
+    errorType: str = ""
+    errorMessage: str = ""
+
+
+class LgLentilleContext(BaseModel):
+    """lentille-context 页面上下文；data 按 template 由调用方二次解析。"""
+
+    status: int = 0
+    template: str = ""
+    data: Any = None
+
 
 class LgProblemSummary(BaseModel):
-    """记录行内嵌题目信息（difficulty 0-7 档直接内嵌，无需额外请求）。"""
+    """记录行内嵌题目信息（difficulty 0-7 档直接内嵌，无需额外请求）。
+
+    题名字段为 name（旧 `_contentOnly` 时代为 title，新架构已改名）。
+    """
 
     pid: str = ""
-    title: str = ""
+    name: str = ""
     difficulty: int | None = None
 
 
@@ -55,14 +85,6 @@ class LgRecordPage(BaseModel):
 
 class LgRecordListData(BaseModel):
     records: LgRecordPage = Field(default_factory=LgRecordPage)
-
-
-class LgRecordListEnvelope(BaseModel):
-    """record/list 信封；错误体 currentData 结构不定，仅成功态强类型。"""
-
-    code: int = 0
-    currentTemplate: str = ""
-    currentData: LgRecordListData | None = None
 
 
 class LgUserSummary(BaseModel):
@@ -135,8 +157,3 @@ class LgRecordShowData(BaseModel):
     record: LgRecordShow = Field(default_factory=LgRecordShow)
 
 
-class LgRecordDetailEnvelope(BaseModel):
-    """record/:id 信封（精化只需 detail 链路）。"""
-
-    code: int = 0
-    currentData: LgRecordShowData | None = None

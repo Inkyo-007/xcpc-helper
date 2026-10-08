@@ -6,12 +6,16 @@ HttpFetcher，改用 curl_cffi（浏览器 TLS 指纹伪装）的 AsyncSession�
 注册表构造签名不变（入参 fetcher 忽略）；会话按次创建（cookie 罐
 吸收 C3VK 挑战与 __client_id 轮换），限流记账留在实例上跨次生效。
 
+数据契约（2026-10 适配）：`_contentOnly=1` JSON 信封已下线，页面数据
+改从 HTML 内嵌的 lentille-context（`{status, template, data}`）解析；
+record 页面强制登录（匿名/失效凭据 401 错误页）。
+
 反爬处置：
 - 302 + Set-Cookie C3VK：会话罐跟随自动通过；
-- JS 挑战页 / 登录跳页（非 JSON 响应）：带凭据判 AuthExpiredError
-  （重新授权是两种情况的共同正确动作），匿名判 PlatformError；
-- 信封 code 401/403 +「请先登录/用户不可见」→ AuthExpiredError；
-- 403 +「请求频繁」→ 应用层专项重试（RATE_LIMIT_RETRIES 次，
+- 200 但无 lentille-context（JS 挑战页）：判 AuthExpiredError
+  （重新授权是共同正确动作）；
+- lentille 错误页 401/403（请先登录/用户不可见）→ AuthExpiredError；
+- 错误消息含「请求频繁」→ 应用层专项重试（RATE_LIMIT_RETRIES 次，
   RATE_LIMIT_BACKOFF 起步指数退避；clist 生产值 8 次 + 50s 附加延迟）。
 """
 
@@ -41,9 +45,11 @@ from adapters.base import (
     Verdict,
 )
 from adapters.luogu.api_models import (
-    LgRecordDetailEnvelope,
-    LgRecordListEnvelope,
+    LENTILLE_CONTEXT_RE,
+    LgLentilleContext,
+    LgRecordListData,
     LgRecordRow,
+    LgRecordShowData,
     LgUserSearchResult,
     LgUserSummary,
 )
@@ -103,8 +109,8 @@ class LuoguAdapter(PlatformAdapter):
         handle 归一为 uid（API 主键），用户名作 display_name 展示。
         """
         async with self._session_factory() as session:
-            data = await self._get_json(
-                session, USER_SEARCH_URL, params={"keyword": handle}, anonymous=True
+            data = await self._get_api_json(
+                session, USER_SEARCH_URL, params={"keyword": handle}
             )
             result = self._parse(data, LgUserSearchResult, "用户搜索")
             user = self._exact_match(result.users, handle)
@@ -112,10 +118,10 @@ class LuoguAdapter(PlatformAdapter):
                 raise UserNotFoundError(f"洛谷用户不存在: {handle}")
             if credentials is not None:
                 # 凭据有效性试拉：绑定当下拦住死凭据（AuthExpiredError → 400）
-                await self._get_json(
+                await self._get_page_data(
                     session,
                     RECORD_LIST_URL,
-                    params={"user": str(user.uid), "page": 1, "_contentOnly": 1},
+                    params={"user": str(user.uid), "page": 1},
                     credentials=credentials,
                 )
             return UserInfo(
@@ -168,14 +174,13 @@ class LuoguAdapter(PlatformAdapter):
             fetched = int(resume_checkpoint.get("fetched", 0))
         async with self._session_factory() as session:
             for _ in range(page, MAX_PAGES + 1):
-                data = await self._get_json(
+                data = await self._get_page_data(
                     session,
                     RECORD_LIST_URL,
-                    params={"user": handle, "page": page, "_contentOnly": 1},
+                    params={"user": handle, "page": page},
                     credentials=credentials,
                 )
-                envelope = self._parse(data, LgRecordListEnvelope, "记录列表")
-                page_data = envelope.currentData.records if envelope.currentData else None
+                page_data = self._parse(data, LgRecordListData, "记录列表").records
                 rows = page_data.result if page_data else []
                 if not rows:
                     break
@@ -226,17 +231,14 @@ class LuoguAdapter(PlatformAdapter):
         if credentials is None:
             raise AuthExpiredError("未配置洛谷凭据，请先绑定账号并授权")
         async with self._session_factory() as session:
-            data = await self._get_json(
+            data = await self._get_page_data(
                 session,
                 f"{RECORD_DETAIL_URL}/{record_id}",
-                params={"_contentOnly": 1},
                 credentials=credentials,
             )
-        envelope = self._parse(data, LgRecordDetailEnvelope, "记录详情")
+        show = self._parse(data, LgRecordShowData, "记录详情")
         judge = (
-            envelope.currentData.record.detail.judgeResult
-            if envelope.currentData and envelope.currentData.record.detail
-            else None
+            show.record.detail.judgeResult if show.record.detail else None
         )
         if judge is None:
             return None
@@ -268,32 +270,32 @@ class LuoguAdapter(PlatformAdapter):
 
     # ===== 内部：外呼 =====
 
-    async def _get_json(
+    async def _request(
         self,
         session: Any,
         url: str,
         *,
         params: dict[str, Any] | None = None,
         credentials: Credentials | None = None,
-        anonymous: bool = False,
-    ) -> dict:
-        """curl_cffi GET + 信封判定：返回 code==200 的响应体（dict）。
+    ) -> Any:
+        """curl_cffi GET + 传输层重试（异常 / 429 / 5xx），返回响应对象。
 
-        失败语义：传输异常 / 429 / 5xx 重试（退避基准不小于 min_interval）；
-        非 JSON 响应（JS 挑战页 / 登录跳页）按是否匿名判 AuthExpiredError
-        或 PlatformError；信封 403「请求频繁」专项长退避重试；其余
-        code != 200 抛 PlatformError。
+        退避基准不小于 min_interval；凭据的 cookies 与 headers（UA 等）
+        一并应用（Credentials 契约：headers 由调用方合并，本 adapter 不
+        经共享 net 层，须自行应用——__client_id 与 UA 绑定，缺失会被
+        判为失效会话）。
         """
         cookies = dict(credentials.cookies) if credentials else None
+        headers = dict(credentials.headers) if credentials else None
         async with self._lock:
             await self._pace()
-            rate_retries = 0
             for attempt in range(MAX_RETRIES + 1):
                 try:
                     resp = await session.get(
                         url,
                         params=params,
                         cookies=cookies,
+                        headers=headers,
                         timeout=15,
                         allow_redirects=True,
                     )
@@ -309,34 +311,76 @@ class LuoguAdapter(PlatformAdapter):
                         raise PlatformError(f"洛谷返回 HTTP {resp.status_code}")
                     await self._backoff(attempt)
                     continue
+                self._last_request = time.monotonic()
+                return resp
+            raise PlatformError(f"洛谷请求重试 {MAX_RETRIES} 次仍失败")
+
+    async def _get_api_json(
+        self, session: Any, url: str, *, params: dict[str, Any] | None = None
+    ) -> dict:
+        """裸 JSON API（api/user/search，匿名可用）：200 + JSON 返回体。
+
+        非 JSON 响应（JS 挑战页）判 PlatformError（匿名场景不涉及凭据）。
+        """
+        resp = await self._request(session, url, params=params)
+        if resp.status_code != 200:
+            raise PlatformError(f"洛谷返回 HTTP {resp.status_code}")
+        try:
+            return json.loads(resp.text)
+        except ValueError:
+            raise PlatformError("洛谷返回非 JSON 响应（可能被反爬拦截）") from None
+
+    async def _get_page_data(
+        self,
+        session: Any,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        credentials: Credentials | None = None,
+    ) -> Any:
+        """页面 GET + lentille-context 解析：返回 status==200 的 data 字段。
+
+        失败语义：
+        - 无 lentille-context 的 200 页面（JS 挑战页）→ AuthExpiredError
+          （挑战与凭据失效的共同正确动作都是重新授权）；
+        - lentille 错误页 401/403（请先登录/用户不可见）→ AuthExpiredError；
+        - 错误消息含「请求频繁」→ 专项长退避重试（RATE_LIMIT_RETRIES 次）；
+        - 其余 status != 200 → PlatformError。
+        """
+        rate_retries = 0
+        while True:
+            resp = await self._request(
+                session, url, params=params, credentials=credentials
+            )
+            ctx = self._extract_lentille(resp.text)
+            if ctx is None:
                 if resp.status_code != 200:
                     raise PlatformError(f"洛谷返回 HTTP {resp.status_code}")
-                body = resp.text
-                try:
-                    data = json.loads(body)
-                except ValueError:
-                    # JS 挑战页 / 登录跳页（非 JSON）：重导凭据是共同正确动作
-                    if anonymous:
-                        raise PlatformError(
-                            "洛谷返回非 JSON 响应（可能被反爬拦截）"
-                        ) from None
-                    raise AuthExpiredError(
-                        "洛谷凭据失效或被反爬拦截，请重新授权"
-                    ) from None
-                code = data.get("code", 200) if isinstance(data, dict) else 200
-                if code == 200:
-                    self._last_request = time.monotonic()
-                    return data
-                # 重新序列化为非转义文本再匹配（json 默认转义中文为 \uXXXX）
-                text = json.dumps(data, ensure_ascii=False)
-                if _RATE_LIMIT_HINT in text and rate_retries < RATE_LIMIT_RETRIES:
-                    rate_retries += 1
-                    await asyncio.sleep(RATE_LIMIT_BACKOFF * (2 ** (rate_retries - 1)))
-                    continue
-                if code in (401, 403) and not anonymous:
-                    raise AuthExpiredError(f"洛谷凭据无效（code={code}），请重新授权")
-                raise PlatformError(f"洛谷返回错误 code={code}")
-            raise PlatformError(f"洛谷请求重试 {MAX_RETRIES} 次仍失败")
+                raise AuthExpiredError("洛谷凭据失效或被反爬拦截，请重新授权")
+            if ctx.status == 200:
+                return ctx.data
+            # 重新序列化为非转义文本再匹配（json 默认转义中文为 \uXXXX）
+            text = json.dumps(ctx.data, ensure_ascii=False, default=str)
+            if _RATE_LIMIT_HINT in text and rate_retries < RATE_LIMIT_RETRIES:
+                rate_retries += 1
+                await asyncio.sleep(RATE_LIMIT_BACKOFF * (2 ** (rate_retries - 1)))
+                continue
+            if ctx.status in (401, 403):
+                raise AuthExpiredError(
+                    f"洛谷凭据无效（HTTP {ctx.status}），请重新授权"
+                )
+            raise PlatformError(f"洛谷页面返回错误 status={ctx.status}")
+
+    @staticmethod
+    def _extract_lentille(body: str) -> LgLentilleContext | None:
+        """从 HTML 提取 lentille-context；非页面响应（挑战页等）返回 None。"""
+        m = LENTILLE_CONTEXT_RE.search(body)
+        if m is None:
+            return None
+        try:
+            return LgLentilleContext.model_validate(json.loads(m.group(1)))
+        except (ValueError, ValidationError):
+            return None
 
     async def _pace(self) -> None:
         """请求前补齐平台建议间隔（镜像 net 层语义，跨会话实例级记账）。"""
@@ -365,7 +409,7 @@ class LuoguAdapter(PlatformAdapter):
         return PlatformSubmission(
             submission_id=str(row.id),
             problem_key=row.problem.pid or "?",
-            problem_name=row.problem.title,
+            problem_name=row.problem.name,
             problem_url=problem_url(
                 row.problem.pid, row.contest.id if row.contest else None
             ),

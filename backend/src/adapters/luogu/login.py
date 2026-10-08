@@ -5,9 +5,9 @@
 - 临时独立 profile（launch() 默认临时用户目录）：不碰用户日常浏览器数据，
   登录态随窗口关闭即焚；
 - 用户在真实浏览器里自行完成登录（图形验证码/两步验证码/二级密码等自然通过），
-  应用轮询受控上下文的 cookie 罐：__client_id 出现只是候选信号（匿名与
-  两步验证中间态也携带），再经鉴权探针（record/list 返回 code==200 的
-  JSON）确认完整登录态才抓取；
+应用轮询受控上下文的 cookie 罐：__client_id 出现只是候选信号（匿名与
+两步验证中间态也携带），再经鉴权探针（record/list 页面 lentille-context
+status==200）确认完整登录态才抓取；
 - Playwright 为可选依赖（dependency group browser-login），惰性导入，
   未安装时由 service 层降级为手动粘贴路径。
 
@@ -15,17 +15,20 @@ QOJ 等后续 cookie 平台可参照本模块实现同形态登录采集。
 """
 
 import asyncio
+import json
 import logging
 import time
 
 from adapters.base import BrowserLoginCancelledError, Credentials, PlatformError
+from adapters.luogu.api_models import LENTILLE_CONTEXT_RE
 
 logger = logging.getLogger("xcpc.adapters.luogu.login")
 
 LOGIN_URL = "https://www.luogu.com.cn/auth/login"
 COOKIE_URL = "https://www.luogu.com.cn"
-# 鉴权探针端点：仅完整登录态可访问（匿名/两步验证中间态跳登录页）
-AUTH_PROBE_URL = "https://www.luogu.com.cn/record/list?_contentOnly=1"
+# 鉴权探针端点：record 页面强制登录（2026-10 起），仅完整登录态返回
+# status==200 的 lentille-context；匿名/两步验证中间态为 401 错误页
+AUTH_PROBE_URL = "https://www.luogu.com.cn/record/list"
 # 登录成功判定所需的 cookie 名（_uid = 用户 id，__client_id = 会话令牌）
 REQUIRED_COOKIES = ("_uid", "__client_id")
 
@@ -47,18 +50,26 @@ LoginCancelledError = BrowserLoginCancelledError
 async def _session_authed(context) -> bool:
     """鉴权探针：用浏览器上下文请求登录态接口，确认会话完整登录。
 
-    record/list 在未完整登录（匿名 / 两步验证码中间态）时跳登录页
-    （非 JSON 或信封 code != 200），完整登录才返回 code==200 的 JSON。
-    探针失败（网络波动等）按未登录处理——下一轮轮询重试，不误判成功。
+    `_contentOnly` 信封已下线：未完整登录（匿名 / 两步验证码中间态）时
+    record/list 返回 401 错误页，完整登录才返回 status==200 的
+    lentille-context 页面数据。探针失败（网络波动等）按未登录处理——
+    下一轮轮询重试，不误判成功。
     """
     try:
         resp = await context.request.get(AUTH_PROBE_URL, timeout=10_000)
         if resp.status != 200:
             return False
-        data = await resp.json()
+        body = await resp.text()
     except Exception:  # noqa: BLE001 - 探针失败视同未登录，轮询继续
         return False
-    return isinstance(data, dict) and data.get("code") == 200
+    m = LENTILLE_CONTEXT_RE.search(body)
+    if m is None:
+        return False
+    try:
+        ctx = json.loads(m.group(1))
+    except ValueError:
+        return False
+    return isinstance(ctx, dict) and ctx.get("status") == 200
 
 
 async def capture_credentials(timeout: float = DEFAULT_TIMEOUT) -> Credentials:

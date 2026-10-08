@@ -1,7 +1,8 @@
-"""洛谷适配器测试：录制 JSON fixture 解析、倒序分页、增量停止、信封语义、反爬分级、凭据。
+"""洛谷适配器测试：录制 fixture 解析、倒序分页、增量停止、lentille 语义、反爬分级、凭据。
 
 洛谷走 curl_cffi 会话（TLS 指纹伪装，见 activity/luogu.md），测试注入
-FakeSession 替代真实会话；fixture 为真实响应脱敏（抹除身份字段）。
+FakeSession 替代真实会话；fixture 为真实响应脱敏（抹除身份字段），
+仅存 lentille-context 的 data 载荷，由 page()/error_page() 包成 HTML。
 """
 
 import copy
@@ -58,8 +59,8 @@ class FakeSession:
     async def __aexit__(self, *args) -> bool:
         return False
 
-    async def get(self, url, *, params=None, cookies=None, timeout=None, allow_redirects=None):
-        self.requests.append({"url": url, "params": dict(params or {}), "cookies": cookies})
+    async def get(self, url, *, params=None, cookies=None, headers=None, timeout=None, allow_redirects=None):
+        self.requests.append({"url": url, "params": dict(params or {}), "cookies": cookies, "headers": headers})
         return self._handler(url, params or {})
 
 
@@ -71,7 +72,7 @@ def make_adapter(handler) -> LuoguAdapter:
 
 def row(id_: int, ts: int, status: int = 12, pid: str = "P1001") -> dict:
     """基于录制样本复制一行并覆盖关键字段。"""
-    r = copy.deepcopy(SAMPLE["currentData"]["records"]["result"][0])
+    r = copy.deepcopy(SAMPLE["records"]["result"][0])
     r["id"] = id_
     r["submitTime"] = ts
     r["status"] = status
@@ -79,14 +80,57 @@ def row(id_: int, ts: int, status: int = 12, pid: str = "P1001") -> dict:
     return r
 
 
-def envelope(rows: list[dict], per_page: int = 20) -> str:
-    return json.dumps(
+def _html(ctx: dict) -> str:
+    """lentille-context 包成最小 HTML 页面（镜像线上内嵌形态）。"""
+    payload = json.dumps(ctx, ensure_ascii=False)
+    return (
+        '<!DOCTYPE html><html><head>'
+        f'<script id="lentille-context" type="application/json">{payload}</script>'
+        "</head><body></body></html>"
+    )
+
+
+def page(rows: list[dict], per_page: int = 20) -> str:
+    """record/list 成功页（status==200，data 为记录分页容器）。"""
+    return _html(
         {
-            "code": 200,
-            "currentTemplate": "RecordList",
-            "currentData": {
-                "records": {"result": rows, "count": 9999, "perPage": per_page}
-            },
+            "instance": "main",
+            "template": "record.list",
+            "status": 200,
+            "locale": "zh-CN",
+            "data": {"records": {"result": rows, "count": 9999, "perPage": per_page}},
+            "user": None,
+            "time": 0,
+        }
+    )
+
+
+def page_with_data(data: dict) -> str:
+    """任意 data 载荷的成功页（record 详情等）。"""
+    return _html(
+        {
+            "instance": "main",
+            "template": "record.show",
+            "status": 200,
+            "locale": "zh-CN",
+            "data": data,
+            "user": None,
+            "time": 0,
+        }
+    )
+
+
+def error_page(status: int, message: str) -> str:
+    """lentille 错误页（template == "error"）。"""
+    return _html(
+        {
+            "instance": "main",
+            "template": "error",
+            "status": status,
+            "locale": "zh-CN",
+            "data": {"errorCode": status, "errorType": "TestError", "errorMessage": message, "errorData": {}},
+            "user": None,
+            "time": 0,
         }
     )
 
@@ -131,7 +175,7 @@ async def test_verify_ok_exact_match_by_name():
             )
         # 凭据有效性试拉
         assert params["user"] == "100000"
-        return FakeResponse(200, envelope([row(1, int(time.time()))]))
+        return FakeResponse(200, page([row(1, int(time.time()))]))
 
     adapter = make_adapter(handler)
     info = await adapter.verify("Demo_User", CREDS)
@@ -186,8 +230,8 @@ async def test_fetch_maps_real_fixture_fields():
 
     def handler(url, params):
         if int(params["page"]) == 1:
-            return FakeResponse(200, json.dumps(SAMPLE))
-        return FakeResponse(200, envelope([]))
+            return FakeResponse(200, page_with_data(SAMPLE))
+        return FakeResponse(200, page([]))
 
     adapter = make_adapter(handler)
     items = await fetch(adapter)
@@ -215,7 +259,7 @@ async def test_fetch_paginates_until_short_page():
     }
 
     def handler(url, params):
-        return FakeResponse(200, envelope(pages.get(int(params["page"]), [])))
+        return FakeResponse(200, page(pages.get(int(params["page"]), [])))
 
     adapter = make_adapter(handler)
     items = await fetch(adapter, min_rows=1)
@@ -234,7 +278,7 @@ async def test_fetch_incremental_stops_at_cursor():
 
     def handler(url, params):
         requested.append(int(params["page"]))
-        return FakeResponse(200, envelope(pages[int(params["page"])]))
+        return FakeResponse(200, page(pages[int(params["page"])]))
 
     adapter = make_adapter(handler)
     items = await fetch(adapter, since=since)
@@ -252,7 +296,7 @@ async def test_fetch_full_keeps_pulling_until_min_rows_past_window():
     }
 
     def handler(url, params):
-        return FakeResponse(200, envelope(pages[int(params["page"])]))
+        return FakeResponse(200, page(pages[int(params["page"])]))
 
     adapter = make_adapter(handler)
     items = await fetch(adapter, min_rows=5000)
@@ -268,7 +312,7 @@ async def test_fetch_full_stops_past_window_with_enough_rows():
     }
 
     def handler(url, params):
-        return FakeResponse(200, envelope(pages[int(params["page"])]))
+        return FakeResponse(200, page(pages[int(params["page"])]))
 
     adapter = make_adapter(handler)
     items = await fetch(adapter, min_rows=20)
@@ -281,7 +325,7 @@ async def test_fetch_resume_from_checkpoint():
 
     def handler(url, params):
         requested_pages.append(int(params["page"]))
-        return FakeResponse(200, envelope([]))
+        return FakeResponse(200, page([]))
 
     adapter = make_adapter(handler)
     items = []
@@ -299,7 +343,7 @@ async def test_fetch_resume_from_checkpoint():
 
 
 async def test_fetch_without_credentials_raises_auth_expired():
-    adapter = make_adapter(lambda url, params: FakeResponse(200, envelope([])))
+    adapter = make_adapter(lambda url, params: FakeResponse(200, page([])))
     with pytest.raises(AuthExpiredError):
         async for _batch in adapter.fetch_submissions(
             "100000",
@@ -316,6 +360,27 @@ async def test_fetch_non_json_with_credentials_is_auth_expired():
     adapter = make_adapter(lambda url, params: FakeResponse(200, "<html>Welcome - Luogu Spilopelia</html>"))
     with pytest.raises(AuthExpiredError):
         await fetch(adapter)
+
+
+async def test_fetch_forwards_credential_cookies_and_headers():
+    """凭据 cookies 与 headers（UA）随请求透传（__client_id 与 UA 绑定）。"""
+    session = FakeSession(lambda url, params: FakeResponse(200, page([])))
+    adapter = LuoguAdapter(None, session_factory=lambda: session)  # type: ignore[arg-type]
+    adapter.min_interval = 0
+    creds = Credentials(
+        cookies={"_uid": "100000", "__client_id": "tok"},
+        headers={"User-Agent": "Mozilla/5.0 TestUA"},
+    )
+    async for _batch in adapter.fetch_submissions(
+        "100000",
+        since=None,
+        credentials=creds,
+        full_window_days=FULL_WINDOW_DAYS,
+        full_min_rows=FULL_MIN_ROWS,
+    ):
+        pass
+    assert session.requests[0]["cookies"] == {"_uid": "100000", "__client_id": "tok"}
+    assert session.requests[0]["headers"] == {"User-Agent": "Mozilla/5.0 TestUA"}
 
 
 async def test_fetch_non_json_anonymous_is_platform_error():
@@ -339,8 +404,8 @@ async def test_fetch_rate_limit_403_retries_then_succeeds(monkeypatch):
         nonlocal calls
         calls += 1
         if calls == 1:
-            return FakeResponse(200, json.dumps({"code": 403, "currentData": {"errorMessage": "请求频繁，请稍候再试"}}))
-        return FakeResponse(200, envelope([row(1, int(time.time()))]))
+            return FakeResponse(200, error_page(403, "请求频繁，请稍候再试"))
+        return FakeResponse(200, page([row(1, int(time.time()))]))
 
     adapter = make_adapter(handler)
     items = await fetch(adapter)
@@ -352,8 +417,17 @@ async def test_fetch_auth_error_403_raises_auth_expired():
     """403 非限流（请先登录/用户不可见）→ AuthExpiredError。"""
     adapter = make_adapter(
         lambda url, params: FakeResponse(
-            200, json.dumps({"code": 403, "currentData": {"errorMessage": "请先登录"}})
+            200, error_page(403, "请先登录")
         )
+    )
+    with pytest.raises(AuthExpiredError):
+        await fetch(adapter)
+
+
+async def test_fetch_unlogin_401_raises_auth_expired():
+    """401 错误页（UserUnloginException，record 页面强制登录）→ AuthExpiredError。"""
+    adapter = make_adapter(
+        lambda url, params: FakeResponse(401, error_page(401, "请先登录"))
     )
     with pytest.raises(AuthExpiredError):
         await fetch(adapter)
@@ -361,7 +435,7 @@ async def test_fetch_auth_error_403_raises_auth_expired():
 
 async def test_fetch_other_error_code_is_platform_error():
     adapter = make_adapter(
-        lambda url, params: FakeResponse(200, json.dumps({"code": 500, "currentData": {}}))
+        lambda url, params: FakeResponse(200, error_page(500, "服务器内部错误"))
     )
     with pytest.raises(PlatformError):
         await fetch(adapter)
@@ -373,7 +447,7 @@ async def test_fetch_row_missing_submit_time_raises():
     def handler(url, params):
         bad = row(1, 0)
         del bad["submitTime"]
-        return FakeResponse(200, envelope([bad]))
+        return FakeResponse(200, page([bad]))
 
     adapter = make_adapter(handler)
     with pytest.raises(PlatformError):
@@ -389,7 +463,7 @@ async def test_fetch_retries_5xx(monkeypatch):
         calls += 1
         if calls == 1:
             return FakeResponse(503, "busy")
-        return FakeResponse(200, envelope([row(1, int(time.time()))]))
+        return FakeResponse(200, page([row(1, int(time.time()))]))
 
     adapter = make_adapter(handler)
     items = await fetch(adapter)
@@ -452,22 +526,18 @@ async def test_fetch_submission_verdict_maps_detail():
         assert url.endswith("/record/280413653")
         return FakeResponse(
             200,
-            json.dumps(
+            page_with_data(
                 {
-                    "code": 200,
-                    "currentTemplate": "RecordShow",
-                    "currentData": {
-                        "record": {
-                            "detail": {
-                                "judgeResult": {
-                                    "subtasks": [
-                                        {"testCases": [{"status": 12}, {"status": 5}]},
-                                        {"testCases": {"0": {"status": 6}}},  # dict 形态兼容
-                                    ]
-                                }
+                    "record": {
+                        "detail": {
+                            "judgeResult": {
+                                "subtasks": [
+                                    {"testCases": [{"status": 12}, {"status": 5}]},
+                                    {"testCases": {"0": {"status": 6}}},  # dict 形态兼容
+                                ]
                             }
                         }
-                    },
+                    }
                 }
             ),
         )
@@ -483,11 +553,8 @@ async def test_fetch_submission_verdict_conservative_none():
     def handler(url, params):
         return FakeResponse(
             200,
-            json.dumps(
-                {
-                    "code": 200,
-                    "currentData": {"record": {"detail": {"judgeResult": {"subtasks": [{"testCases": [{"status": 12}]}]}}}},
-                }
+            page_with_data(
+                {"record": {"detail": {"judgeResult": {"subtasks": [{"testCases": [{"status": 12}]}]}}}}
             ),
         )
 
@@ -496,7 +563,7 @@ async def test_fetch_submission_verdict_conservative_none():
 
     # 无 detail 字段 → None
     adapter2 = make_adapter(
-        lambda url, params: FakeResponse(200, json.dumps({"code": 200, "currentData": {"record": {}}}))
+        lambda url, params: FakeResponse(200, page_with_data({"record": {}}))
     )
     assert await adapter2.fetch_submission_verdict("2", CREDS) is None
 
@@ -519,7 +586,7 @@ async def test_fetch_reports_progress_with_total_on_full_sync():
     }
 
     def handler(url, params):
-        return FakeResponse(200, envelope(pages.get(int(params["page"]), [])))
+        return FakeResponse(200, page(pages.get(int(params["page"]), [])))
 
     adapter = make_adapter(handler)
     calls: list[tuple[int, int | None]] = []
@@ -532,7 +599,7 @@ async def test_fetch_reports_progress_with_total_on_full_sync():
         progress_cb=lambda fetched, total: calls.append((fetched, total)),
     ):
         pass
-    assert calls == [(20, 9999), (21, 9999)]  # envelope() 固定 count=9999
+    assert calls == [(20, 9999), (21, 9999)]  # page() 固定 count=9999
 
 
 async def test_fetch_no_progress_on_incremental():
@@ -540,7 +607,7 @@ async def test_fetch_no_progress_on_incremental():
     since = now_minus(1)
 
     def handler(url, params):
-        return FakeResponse(200, envelope([row(1, since + 60)]))
+        return FakeResponse(200, page([row(1, since + 60)]))
 
     adapter = make_adapter(handler)
     calls: list[tuple[int, int | None]] = []
